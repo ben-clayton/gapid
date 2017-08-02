@@ -30,6 +30,10 @@ std::shared_ptr<Pool> Pool::create(uint64_t size) {
 }
 
 Pool::Pool(uint64_t size) : mData(malloc(size)), mSize(size) {
+  static uint64_t TOTAL_SIZE = 0;
+  TOTAL_SIZE += size;
+  GAPID_INFO("*** ALLOCATING 0x%" PRIx64 " bytes (total 0x%" PRIx64 ") ***", size, TOTAL_SIZE);
+  if (size == 0x66e1c) GAPID_FATAL("SERIOUSLY?");
   if (mData == nullptr) {
     GAPID_FATAL("Out of memory allocating 0x%" PRIx64 " bytes", size);
   }

@@ -113,6 +113,7 @@
   {{Template "RemoveUpperPrefix" $.FromClass}}s[{{$.Element}}]->m{{Template "RemoveUpperPrefix" $.ToClass}}
 {{end}}
 
+
 {{/*
 -------------------------------------------------------------------------------
   Emits a validity check for an indirected function pointer.
@@ -311,7 +312,25 @@
 {{define "Statement"}}
   {{     if IsReturn $}}{{Template "Return" $}}
   {{else if IsFence  $}}{{Template "Fence" $}}
+  {{else if IsCopy   $}}{{Template "Copy" $}}
+  {{else if IsAssign $}}{{Template "Assign" $}}
   {{else              }}{{Template "C++.Statement.Default" $}}
+  {{end}}
+{{end}}
+
+
+{{/*
+-------------------------------------------------------------------------------
+  An override for the "C++.Return" macro.
+-------------------------------------------------------------------------------
+*/}}
+{{define "Return"}}
+  {{AssertType $ "Return"}}
+
+  {{if $.Function.Subroutine}}
+    {{Template "C++.Return" $}}
+  {{else}}
+    break;
   {{end}}
 {{end}}
 
@@ -346,15 +365,35 @@
 
 {{/*
 -------------------------------------------------------------------------------
-  An override for the "C++.Return" macro.
+  An override for the "C++.Copy" macro.
 -------------------------------------------------------------------------------
 */}}
-{{define "Return"}}
-  {{AssertType $ "Return"}}
+{{define "Copy"}}
+  {{AssertType $ "Copy"}}
 
-  {{if $.Function.Subroutine}}
-    {{Template "C++.Return" $}}
+  {{if GetAnnotation ($.Src | TargetField) "spy_disabled"}}
+    {{Error "Attempting to copy from a @spy_disabled slice"}}
+  {{else if GetAnnotation ($.Dst | TargetField) "spy_disabled"}}
+    observer->read({{Template "C++.Read" $.Src}}); // @spy_disabled
   {{else}}
-    break;
+    {{Template "C++.Statement.Default" $}}
   {{end}}
 {{end}}
+
+
+
+{{/*
+-------------------------------------------------------------------------------
+  An override for the "C++.Assign" macro.
+-------------------------------------------------------------------------------
+*/}}
+{{define "Assign"}}
+  {{AssertType $ "Assign"}}
+
+  {{if GetAnnotation ($.LHS | TargetField) "spy_disabled"}}
+    // @spy_disabled
+  {{else}}
+    {{Template "C++.Statement.Default" $}}
+  {{end}}
+{{end}}
+
