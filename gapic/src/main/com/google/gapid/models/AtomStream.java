@@ -332,6 +332,7 @@ public class AtomStream extends ModelBase.ForPath<AtomStream.Node, Void, AtomStr
     private final Node parent;
     private final int index;
     private Node[] children;
+    private boolean hasThumbnail;
     private Service.CommandTreeNode data;
     private API.Command command;
     private ListenableFuture<Node> loadFuture;
@@ -340,6 +341,7 @@ public class AtomStream extends ModelBase.ForPath<AtomStream.Node, Void, AtomStr
       this(null, 0);
       this.data = data;
       this.children = new Node[(int)data.getNumChildren()];
+      this.hasThumbnail = data.getHasThumbnail();
     }
 
     public Node(Node parent, int index) {
@@ -384,6 +386,10 @@ public class AtomStream extends ModelBase.ForPath<AtomStream.Node, Void, AtomStr
           getPath(Path.CommandTreeNode.newBuilder()).build());
     }
 
+    public boolean getHasThumbnail() {
+      return hasThumbnail;
+    }
+
     public ListenableFuture<Node> load(Shell shell, Supplier<ListenableFuture<NodeData>> loader) {
       if (data != null) {
         // Already loaded.
@@ -396,6 +402,7 @@ public class AtomStream extends ModelBase.ForPath<AtomStream.Node, Void, AtomStr
         submitIfNotDisposed(shell, () -> {
           data = newData.data;
           command = newData.command;
+          hasThumbnail = newData.data.getHasThumbnail();
           children = new Node[(int)data.getNumChildren()];
           loadFuture = null; // Don't hang on to listeners.
           return Node.this;

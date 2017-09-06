@@ -463,6 +463,11 @@ func (n *Capture) Command(i uint64, subidx ...uint64) *Command {
 	return &Command{Capture: n, Indices: indices}
 }
 
+// SubCommand returns the path node to a single subcommand in the capture.
+func (n *Capture) SubCommand(indices []uint64) *Command {
+	return &Command{Capture: n, Indices: indices}
+}
+
 // Context returns the path node to the a context with the given ID.
 func (n *Capture) Context(id *ID) *Context {
 	return &Context{Capture: n, Id: id}
@@ -485,6 +490,11 @@ func (n *Command) ResourceAfter(id *ID) *ResourceData {
 		Id:    id,
 		After: n,
 	}
+}
+
+// Thumbnail returns path to the thumbnail for the command.
+func (n *Command) Thumbnail(w, h uint32, f *image.Format) *Thumbnail {
+	return &Thumbnail{w, h, f, &Thumbnail_Command{n}}
 }
 
 // FramebufferObservation returns the path node to framebuffer observation

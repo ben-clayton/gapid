@@ -636,6 +636,8 @@ message CommandTreeNode {
   path.Commands commands = 3;
   // Number of commands encapsulated by this group.
   uint64 num_commands = 4;
+  // If true then the node has a thumbnail that can be requested.
+  bool has_thumbnail = 5;
 }
 
 // ConstantSet is a collection on name-value pairs to be used as an enumeration

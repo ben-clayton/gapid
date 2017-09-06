@@ -91,16 +91,23 @@ func CommandTreeNode(ctx context.Context, c *path.CommandTreeNode) (*service.Com
 
 	switch item := cmdTree.index(c.Indices).(type) {
 	case api.SubCmdIdx:
+		hasThumbnail := false
+		if len(item) == 1 {
+			cmd, _ := Cmd(ctx, cmdTree.path.Capture.SubCommand([]uint64(item)))
+			_, hasThumbnail = cmd.(path.Thumbnailer)
+		}
 		return &service.CommandTreeNode{
-			NumChildren: 0, // TODO: Subcommands
-			Commands:    cmdTree.path.Capture.SubCommandRange(item, item),
+			NumChildren:  0,
+			Commands:     cmdTree.path.Capture.SubCommandRange(item, item),
+			HasThumbnail: hasThumbnail,
 		}, nil
 	case api.CmdIDGroup:
 		return &service.CommandTreeNode{
-			NumChildren: item.Count(),
-			Commands:    cmdTree.path.Capture.CommandRange(uint64(item.Range.First()), uint64(item.Range.Last())),
-			Group:       item.Name,
-			NumCommands: item.DeepCount(func(g api.CmdIDGroup) bool { return true /* TODO: Subcommands */ }),
+			NumChildren:  item.Count(),
+			Commands:     cmdTree.path.Capture.CommandRange(uint64(item.Range.First()), uint64(item.Range.Last())),
+			Group:        item.Name,
+			NumCommands:  item.DeepCount(func(g api.CmdIDGroup) bool { return true /* TODO: Subcommands */ }),
+			HasThumbnail: true,
 		}, nil
 	case api.SubCmdRoot:
 		count := uint64(1)

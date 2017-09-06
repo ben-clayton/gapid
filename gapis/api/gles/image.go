@@ -36,6 +36,13 @@ func cubemapFaceToLayer(target GLenum) GLint {
 	return layer
 }
 
+func getBoundTexture(target GLenum, g *api.State, thread uint64) *Texture {
+	s := GetState(g)
+	unit := s.GetContext(thread).Bound.TextureUnit
+	tex, _ := subGetBoundTextureForUnit(nil, nil, 0, nil, g, s, 0, nil, unit, target)
+	return tex
+}
+
 // getSizedFormatFromTuple returns sized format from unsized format and component type.
 func getSizedFormatFromTuple(unsizedFormat, ty GLenum) (sizedFormat GLenum) {
 	sf, _ := subGetSizedFormatFromTuple(nil, nil, api.CmdNoID, nil, &api.State{}, nil, 0, nil, unsizedFormat, ty)

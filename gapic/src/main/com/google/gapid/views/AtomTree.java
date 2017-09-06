@@ -558,8 +558,7 @@ public class AtomTree extends Composite implements Tab, Capture.Listener, AtomSt
   }
 
   /**
-   * Image provider for the command tree. Groups that represent frames or draw calls will have
-   * a thumbnail preview of the framebuffer in the tree.
+   * Image provider for the command tree.
    */
   private static class ImageProvider implements LoadingIndicator.Repaintable {
     private static final int PREVIEW_SIZE = 18;
@@ -617,7 +616,7 @@ public class AtomTree extends Composite implements Tab, Capture.Listener, AtomSt
     }
 
     private static boolean shouldShowImage(AtomStream.Node node) {
-      return node.getData() != null && !node.getData().getGroup().isEmpty();
+      return node.getHasThumbnail();
     }
 
     private ListenableFuture<ImageData> loadImage(AtomStream.Node node) {

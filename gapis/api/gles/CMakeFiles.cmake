@@ -20,6 +20,7 @@
 set(files
     api.go
     compat.go
+    cmd_thumbnails.go
     compat_client.go
     compat_test.go
     constant_sets.go

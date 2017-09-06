@@ -28,20 +28,77 @@ import (
 
 // Thumbnail resolves and returns the thumbnail from the path p.
 func Thumbnail(ctx context.Context, p *path.Thumbnail) (*image.Info, error) {
-	switch parent := p.Parent().(type) {
-	case *path.Command:
-		return CommandThumbnail(ctx, p, parent)
-	case *path.CommandTreeNode:
-		return CommandTreeNodeThumbnail(ctx, p, parent)
-	case *path.ResourceData:
-		return ResourceDataThumbnail(ctx, p, parent)
-	default:
-		return nil, fmt.Errorf("Unexpected Thumbnail parent %T", parent)
+	img, err := func() (*image.Info, error) {
+		switch parent := p.Parent().(type) {
+		case *path.Command:
+			return CommandThumbnail(ctx, p, parent)
+		case *path.CommandTreeNode:
+			return CommandTreeNodeThumbnail(ctx, p, parent)
+		case *path.ResourceData:
+			return ResourceDataThumbnail(ctx, p, parent)
+		default:
+			return nil, fmt.Errorf("Unexpected Thumbnail parent %T", parent)
+		}
+	}()
+
+	if err != nil {
+		return nil, err
 	}
+	if img == nil {
+		return nil, &service.ErrDataUnavailable{Reason: messages.ErrNoTextureData("")}
+	}
+
+	if p.DesiredFormat != nil {
+		// Convert the image to the desired format.
+		if img.Format.Key() != p.DesiredFormat.Key() {
+			img, err = img.Convert(ctx, p.DesiredFormat)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// Image format supports resizing. See if the image should be.
+	scaleX, scaleY := float32(1), float32(1)
+	if p.DesiredMaxWidth > 0 && img.Width > p.DesiredMaxWidth {
+		scaleX = float32(p.DesiredMaxWidth) / float32(img.Width)
+	}
+	if p.DesiredMaxHeight > 0 && img.Height > p.DesiredMaxHeight {
+		scaleY = float32(p.DesiredMaxHeight) / float32(img.Height)
+	}
+	scale := scaleX // scale := min(scaleX, scaleY)
+	if scale > scaleY {
+		scale = scaleY
+	}
+
+	targetWidth := uint32(float32(img.Width) * scale)
+	targetHeight := uint32(float32(img.Height) * scale)
+
+	// Prevent scaling to zero size.
+	if targetWidth == 0 {
+		targetWidth = 1
+	}
+	if targetHeight == 0 {
+		targetHeight = 1
+	}
+
+	if targetWidth == img.Width && targetHeight == img.Height {
+		// Image is already at requested target size.
+		return img, err
+	}
+
+	return img.Resize(ctx, targetWidth, targetHeight, 1)
 }
 
 // CommandThumbnail resolves and returns the thumbnail for the framebuffer at p.
 func CommandThumbnail(ctx context.Context, pt *path.Thumbnail, pc *path.Command) (*image.Info, error) {
+	if cmd, _ := Cmd(ctx, pc); cmd != nil {
+		if t, ok := cmd.(path.Thumbnailer); ok {
+			pt := pc.Thumbnail(pt.DesiredMaxWidth, pt.DesiredMaxHeight, pt.DesiredFormat)
+			return t.Thumbnail(ctx, pt)
+		}
+	}
+
 	imageInfoPath, err := FramebufferAttachment(ctx,
 		nil, // device
 		pc,
@@ -109,53 +166,5 @@ func ResourceDataThumbnail(ctx context.Context, pt *path.Thumbnail, pd *path.Res
 		return nil, fmt.Errorf("Type %T does not support thumbnailing", obj)
 	}
 
-	img, err := t.Thumbnail(ctx, pt)
-	if err != nil {
-		return nil, err
-	}
-
-	if img == nil {
-		return nil, &service.ErrDataUnavailable{Reason: messages.ErrNoTextureData("")}
-	}
-
-	if pt.DesiredFormat != nil {
-		// Convert the image to the desired format.
-		if img.Format.Key() != pt.DesiredFormat.Key() {
-			img, err = img.Convert(ctx, pt.DesiredFormat)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	// Image format supports resizing. See if the image should be.
-	scaleX, scaleY := float32(1), float32(1)
-	if pt.DesiredMaxWidth > 0 && img.Width > pt.DesiredMaxWidth {
-		scaleX = float32(pt.DesiredMaxWidth) / float32(img.Width)
-	}
-	if pt.DesiredMaxHeight > 0 && img.Height > pt.DesiredMaxHeight {
-		scaleY = float32(pt.DesiredMaxHeight) / float32(img.Height)
-	}
-	scale := scaleX // scale := min(scaleX, scaleY)
-	if scale > scaleY {
-		scale = scaleY
-	}
-
-	targetWidth := uint32(float32(img.Width) * scale)
-	targetHeight := uint32(float32(img.Height) * scale)
-
-	// Prevent scaling to zero size.
-	if targetWidth == 0 {
-		targetWidth = 1
-	}
-	if targetHeight == 0 {
-		targetHeight = 1
-	}
-
-	if targetWidth == img.Width && targetHeight == img.Height {
-		// Image is already at requested target size.
-		return img, err
-	}
-
-	return img.Resize(ctx, targetWidth, targetHeight, 1)
+	return t.Thumbnail(ctx, pt)
 }
