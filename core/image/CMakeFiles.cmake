@@ -41,7 +41,6 @@ set(files
     s3_dxt1_rgba.go
     s3_dxt3_rgba.go
     s3_dxt5_rgba.go
-    thumbnailer.go
     uncompressed.go
 )
 set(dirs

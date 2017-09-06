@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/gapid/core/data/protoutil"
 	"github.com/google/gapid/core/image"
+	"github.com/google/gapid/gapis/service/path"
 )
 
 func (l *CubemapLevel) faces() [6]*image.Info {
@@ -68,7 +69,7 @@ func (m *imageMatcher) consider(i *image.Info) {
 
 // Interface compliance check
 var _ = image.Convertable((*Texture2D)(nil))
-var _ = image.Thumbnailer((*Texture2D)(nil))
+var _ = path.Thumbnailer((*Texture2D)(nil))
 
 // ConvertTo returns this Texture2D with each mip-level converted to the requested format.
 func (t *Texture2D) ConvertTo(ctx context.Context, f *image.Format) (interface{}, error) {
@@ -86,8 +87,8 @@ func (t *Texture2D) ConvertTo(ctx context.Context, f *image.Format) (interface{}
 }
 
 // Thumbnail returns the image that most closely matches the desired size.
-func (t *Texture2D) Thumbnail(ctx context.Context, w, h, d uint32) (*image.Info, error) {
-	m := imageMatcher{width: w, height: h, depth: 1}
+func (t *Texture2D) Thumbnail(ctx context.Context, p *path.Thumbnail) (*image.Info, error) {
+	m := imageMatcher{width: p.DesiredMaxWidth, height: p.DesiredMaxHeight, depth: 1}
 	for _, l := range t.Levels {
 		m.consider(l)
 	}
@@ -97,7 +98,7 @@ func (t *Texture2D) Thumbnail(ctx context.Context, w, h, d uint32) (*image.Info,
 
 // Interface compliance check
 var _ = image.Convertable((*Cubemap)(nil))
-var _ = image.Thumbnailer((*Cubemap)(nil))
+var _ = path.Thumbnailer((*Cubemap)(nil))
 
 // ConvertTo returns this Cubemap with each mip-level face converted to the requested format.
 func (t *Cubemap) ConvertTo(ctx context.Context, f *image.Format) (interface{}, error) {
@@ -124,8 +125,8 @@ func (t *Cubemap) ConvertTo(ctx context.Context, f *image.Format) (interface{}, 
 }
 
 // Thumbnail returns the image that most closely matches the desired size.
-func (t *Cubemap) Thumbnail(ctx context.Context, w, h, d uint32) (*image.Info, error) {
-	m := imageMatcher{width: w, height: h, depth: 1}
+func (t *Cubemap) Thumbnail(ctx context.Context, p *path.Thumbnail) (*image.Info, error) {
+	m := imageMatcher{width: p.DesiredMaxWidth, height: p.DesiredMaxHeight, depth: 1}
 
 	for _, l := range t.Levels {
 		m.consider(l.NegativeX)
@@ -141,7 +142,7 @@ func (t *Cubemap) Thumbnail(ctx context.Context, w, h, d uint32) (*image.Info, e
 
 // Interface compliance check
 var _ = image.Convertable((*Texture)(nil))
-var _ = image.Thumbnailer((*Texture)(nil))
+var _ = path.Thumbnailer((*Texture)(nil))
 
 // ConvertTo returns this Texture2D with each mip-level converted to the requested format.
 func (t *Texture) ConvertTo(ctx context.Context, f *image.Format) (interface{}, error) {
@@ -157,10 +158,10 @@ func (t *Texture) ConvertTo(ctx context.Context, f *image.Format) (interface{}, 
 }
 
 // Thumbnail returns the image that most closely matches the desired size.
-func (t *Texture) Thumbnail(ctx context.Context, w, h, d uint32) (*image.Info, error) {
+func (t *Texture) Thumbnail(ctx context.Context, p *path.Thumbnail) (*image.Info, error) {
 	data := protoutil.OneOf(t.Type)
-	if t, ok := data.(image.Thumbnailer); ok {
-		return t.Thumbnail(ctx, w, h, d)
+	if t, ok := data.(path.Thumbnailer); ok {
+		return t.Thumbnail(ctx, p)
 	}
 	return nil, nil
 }

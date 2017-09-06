@@ -12,14 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package image
+package path
 
-import "context"
+import (
+	"context"
+
+	"github.com/google/gapid/core/image"
+)
 
 // Thumbnailer is the interface implemented by types that can be visualized as
 // a thumbnail image.
 type Thumbnailer interface {
 	// Thumbnail returns a thumbnail image info that most closely matches the
-	// desired image width, height and depth.
-	Thumbnail(ctx context.Context, w, h, d uint32) (*Info, error)
+	// desired image dimensions of p.
+	Thumbnail(ctx context.Context, p *Thumbnail) (*image.Info, error)
 }

@@ -30,25 +30,25 @@ import (
 func Thumbnail(ctx context.Context, p *path.Thumbnail) (*image.Info, error) {
 	switch parent := p.Parent().(type) {
 	case *path.Command:
-		return CommandThumbnail(ctx, p.DesiredMaxWidth, p.DesiredMaxHeight, p.DesiredFormat, parent)
+		return CommandThumbnail(ctx, p, parent)
 	case *path.CommandTreeNode:
-		return CommandTreeNodeThumbnail(ctx, p.DesiredMaxWidth, p.DesiredMaxHeight, p.DesiredFormat, parent)
+		return CommandTreeNodeThumbnail(ctx, p, parent)
 	case *path.ResourceData:
-		return ResourceDataThumbnail(ctx, p.DesiredMaxWidth, p.DesiredMaxHeight, p.DesiredFormat, parent)
+		return ResourceDataThumbnail(ctx, p, parent)
 	default:
 		return nil, fmt.Errorf("Unexpected Thumbnail parent %T", parent)
 	}
 }
 
 // CommandThumbnail resolves and returns the thumbnail for the framebuffer at p.
-func CommandThumbnail(ctx context.Context, w, h uint32, f *image.Format, p *path.Command) (*image.Info, error) {
+func CommandThumbnail(ctx context.Context, pt *path.Thumbnail, pc *path.Command) (*image.Info, error) {
 	imageInfoPath, err := FramebufferAttachment(ctx,
 		nil, // device
-		p,
+		pc,
 		api.FramebufferAttachment_Color0,
 		&service.RenderSettings{
-			MaxWidth:      w,
-			MaxHeight:     h,
+			MaxWidth:      pt.DesiredMaxWidth,
+			MaxHeight:     pt.DesiredMaxHeight,
 			WireframeMode: service.WireframeMode_None,
 		},
 		&service.UsageHints{
@@ -60,8 +60,8 @@ func CommandThumbnail(ctx context.Context, w, h uint32, f *image.Format, p *path
 	}
 
 	var boxedImageInfo interface{}
-	if f != nil {
-		boxedImageInfo, err = Get(ctx, imageInfoPath.As(f).Path())
+	if pt.DesiredFormat != nil {
+		boxedImageInfo, err = Get(ctx, imageInfoPath.As(pt.DesiredFormat).Path())
 	} else {
 		boxedImageInfo, err = Get(ctx, imageInfoPath.Path())
 	}
@@ -73,43 +73,43 @@ func CommandThumbnail(ctx context.Context, w, h uint32, f *image.Format, p *path
 }
 
 // CommandTreeNodeThumbnail resolves and returns the thumbnail for the framebuffer at p.
-func CommandTreeNodeThumbnail(ctx context.Context, w, h uint32, f *image.Format, p *path.CommandTreeNode) (*image.Info, error) {
-	boxedCmdTree, err := database.Resolve(ctx, p.Tree.ID())
+func CommandTreeNodeThumbnail(ctx context.Context, pt *path.Thumbnail, pn *path.CommandTreeNode) (*image.Info, error) {
+	boxedCmdTree, err := database.Resolve(ctx, pn.Tree.ID())
 	if err != nil {
 		return nil, err
 	}
 
 	cmdTree := boxedCmdTree.(*commandTree)
 
-	switch item := cmdTree.index(p.Indices).(type) {
+	switch item := cmdTree.index(pn.Indices).(type) {
 	case api.CmdIDGroup:
 		thumbnail := item.Range.Last()
 		if userData, ok := item.UserData.(*CommandTreeNodeUserData); ok {
 			thumbnail = userData.Thumbnail
 		}
-		return CommandThumbnail(ctx, w, h, f, cmdTree.path.Capture.Command(uint64(thumbnail)))
+		return CommandThumbnail(ctx, pt, cmdTree.path.Capture.Command(uint64(thumbnail)))
 	case api.SubCmdIdx:
-		return CommandThumbnail(ctx, w, h, f, cmdTree.path.Capture.Command(uint64(item[0]), item[1:]...))
+		return CommandThumbnail(ctx, pt, cmdTree.path.Capture.Command(uint64(item[0]), item[1:]...))
 	case api.SubCmdRoot:
-		return CommandThumbnail(ctx, w, h, f, cmdTree.path.Capture.Command(uint64(item.Id[0]), item.Id[1:]...))
+		return CommandThumbnail(ctx, pt, cmdTree.path.Capture.Command(uint64(item.Id[0]), item.Id[1:]...))
 	default:
 		panic(fmt.Errorf("Unexpected type: %T", item))
 	}
 }
 
 // ResourceDataThumbnail resolves and returns the thumbnail for the resource at p.
-func ResourceDataThumbnail(ctx context.Context, w, h uint32, f *image.Format, p *path.ResourceData) (*image.Info, error) {
-	obj, err := ResolveInternal(ctx, p)
+func ResourceDataThumbnail(ctx context.Context, pt *path.Thumbnail, pd *path.ResourceData) (*image.Info, error) {
+	obj, err := ResolveInternal(ctx, pd)
 	if err != nil {
 		return nil, err
 	}
 
-	t, ok := obj.(image.Thumbnailer)
+	t, ok := obj.(path.Thumbnailer)
 	if !ok {
 		return nil, fmt.Errorf("Type %T does not support thumbnailing", obj)
 	}
 
-	img, err := t.Thumbnail(ctx, w, h, 1)
+	img, err := t.Thumbnail(ctx, pt)
 	if err != nil {
 		return nil, err
 	}
@@ -118,10 +118,10 @@ func ResourceDataThumbnail(ctx context.Context, w, h uint32, f *image.Format, p 
 		return nil, &service.ErrDataUnavailable{Reason: messages.ErrNoTextureData("")}
 	}
 
-	if f != nil {
+	if pt.DesiredFormat != nil {
 		// Convert the image to the desired format.
-		if img.Format.Key() != f.Key() {
-			img, err = img.Convert(ctx, f)
+		if img.Format.Key() != pt.DesiredFormat.Key() {
+			img, err = img.Convert(ctx, pt.DesiredFormat)
 			if err != nil {
 				return nil, err
 			}
@@ -130,11 +130,11 @@ func ResourceDataThumbnail(ctx context.Context, w, h uint32, f *image.Format, p 
 
 	// Image format supports resizing. See if the image should be.
 	scaleX, scaleY := float32(1), float32(1)
-	if w > 0 && img.Width > w {
-		scaleX = float32(w) / float32(img.Width)
+	if pt.DesiredMaxWidth > 0 && img.Width > pt.DesiredMaxWidth {
+		scaleX = float32(pt.DesiredMaxWidth) / float32(img.Width)
 	}
-	if h > 0 && img.Height > h {
-		scaleY = float32(h) / float32(img.Height)
+	if pt.DesiredMaxHeight > 0 && img.Height > pt.DesiredMaxHeight {
+		scaleY = float32(pt.DesiredMaxHeight) / float32(img.Height)
 	}
 	scale := scaleX // scale := min(scaleX, scaleY)
 	if scale > scaleY {

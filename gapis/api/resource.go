@@ -60,7 +60,7 @@ type ReplaceCallback func(where uint64, with interface{})
 
 // Interface compliance check
 var _ = image.Convertable((*ResourceData)(nil))
-var _ = image.Thumbnailer((*ResourceData)(nil))
+var _ = path.Thumbnailer((*ResourceData)(nil))
 
 // ConvertTo returns this Texture2D with each mip-level converted to the requested format.
 func (r *ResourceData) ConvertTo(ctx context.Context, f *image.Format) (interface{}, error) {
@@ -76,10 +76,10 @@ func (r *ResourceData) ConvertTo(ctx context.Context, f *image.Format) (interfac
 }
 
 // Thumbnail returns the image that most closely matches the desired size.
-func (r *ResourceData) Thumbnail(ctx context.Context, w, h, d uint32) (*image.Info, error) {
+func (r *ResourceData) Thumbnail(ctx context.Context, p *path.Thumbnail) (*image.Info, error) {
 	data := protoutil.OneOf(r.Data)
-	if t, ok := data.(image.Thumbnailer); ok {
-		return t.Thumbnail(ctx, w, h, d)
+	if t, ok := data.(path.Thumbnailer); ok {
+		return t.Thumbnail(ctx, p)
 	}
 	return nil, nil
 }
