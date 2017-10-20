@@ -42,7 +42,7 @@ func Thumbnail(ctx context.Context, p *path.Thumbnail) (*image.Info, error) {
 
 // CommandThumbnail resolves and returns the thumbnail for the framebuffer at p.
 func CommandThumbnail(ctx context.Context, w, h uint32, f *image.Format, p *path.Command) (*image.Info, error) {
-	imageInfoPath, err := FramebufferAttachment(ctx,
+	imageInfoPath, err := FramebufferAttachmentAfterCommand(ctx,
 		nil, // device
 		p,
 		api.FramebufferAttachment_Color0,
@@ -85,8 +85,8 @@ func CommandTreeNodeThumbnail(ctx context.Context, w, h uint32, f *image.Format,
 	case api.CmdIDGroup:
 		thumbnail := item.Range.Last()
 		if userData, ok := item.UserData.(*CmdGroupData); ok {
-			if userData.Thumbnail != api.CmdNoID {
-				thumbnail = userData.Thumbnail
+			if userData.Visualization != api.CmdNoID {
+				thumbnail = userData.Visualization
 			}
 		}
 		return CommandThumbnail(ctx, w, h, f, cmdTree.path.Capture.Command(uint64(thumbnail)))

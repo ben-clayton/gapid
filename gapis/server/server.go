@@ -223,7 +223,7 @@ func (s *server) GetDevicesForReplay(ctx context.Context, p *path.Capture) ([]*p
 	return devices.ForReplay(ctx, p)
 }
 
-func (s *server) GetFramebufferAttachment(
+func (s *server) GetFramebufferAttachmentAfterCommand(
 	ctx context.Context,
 	device *path.Device,
 	after *path.Command,
@@ -231,14 +231,32 @@ func (s *server) GetFramebufferAttachment(
 	settings *service.RenderSettings,
 	hints *service.UsageHints) (*path.ImageInfo, error) {
 
-	ctx = log.Enter(ctx, "GetFramebufferAttachment")
+	ctx = log.Enter(ctx, "GetFramebufferAttachmentAfterCommand")
 	if err := device.Validate(); err != nil {
 		return nil, log.Errf(ctx, err, "Invalid path: %v", device)
 	}
 	if err := after.Validate(); err != nil {
 		return nil, log.Errf(ctx, err, "Invalid path: %v", after)
 	}
-	return resolve.FramebufferAttachment(ctx, device, after, attachment, settings, hints)
+	return resolve.FramebufferAttachmentAfterCommand(ctx, device, after, attachment, settings, hints)
+}
+
+func (s *server) GetFramebufferAttachmentForCommandTreeNode(
+	ctx context.Context,
+	device *path.Device,
+	after *path.CommandTreeNode,
+	attachment api.FramebufferAttachment,
+	settings *service.RenderSettings,
+	hints *service.UsageHints) (*path.ImageInfo, error) {
+
+	ctx = log.Enter(ctx, "GetFramebufferAttachmentForCommandTreeNode")
+	if err := device.Validate(); err != nil {
+		return nil, log.Errf(ctx, err, "Invalid path: %v", device)
+	}
+	if err := after.Validate(); err != nil {
+		return nil, log.Errf(ctx, err, "Invalid path: %v", after)
+	}
+	return resolve.FramebufferAttachmentForCommandTreeNode(ctx, device, after, attachment, settings, hints)
 }
 
 func (s *server) Get(ctx context.Context, p *path.Any) (interface{}, error) {

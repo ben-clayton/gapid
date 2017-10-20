@@ -250,7 +250,7 @@ func (c *client) GetDevicesForReplay(ctx context.Context, p *path.Capture) ([]*p
 	return res.GetDevices().List, nil
 }
 
-func (c *client) GetFramebufferAttachment(
+func (c *client) GetFramebufferAttachmentAfterCommand(
 	ctx context.Context,
 	dev *path.Device,
 	cmd *path.Command,
@@ -260,7 +260,31 @@ func (c *client) GetFramebufferAttachment(
 
 	res, err := c.client.GetFramebufferAttachment(ctx, &service.GetFramebufferAttachmentRequest{
 		Device:     dev,
-		After:      cmd,
+		After:      &service.GetFramebufferAttachmentRequest_Command{Command: cmd},
+		Attachment: att,
+		Settings:   rs,
+		Hints:      hints,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := res.GetError(); err != nil {
+		return nil, err.Get()
+	}
+	return res.GetImage(), nil
+}
+
+func (c *client) GetFramebufferAttachmentForCommandTreeNode(
+	ctx context.Context,
+	dev *path.Device,
+	node *path.CommandTreeNode,
+	att api.FramebufferAttachment,
+	rs *service.RenderSettings,
+	hints *service.UsageHints) (*path.ImageInfo, error) {
+
+	res, err := c.client.GetFramebufferAttachment(ctx, &service.GetFramebufferAttachmentRequest{
+		Device:     dev,
+		After:      &service.GetFramebufferAttachmentRequest_CommandTreeNode{CommandTreeNode: node},
 		Attachment: att,
 		Settings:   rs,
 		Hints:      hints,

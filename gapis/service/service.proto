@@ -271,10 +271,14 @@ message GetDevicesForReplayResponse {
 
 message GetFramebufferAttachmentRequest {
   path.Device device = 1;
-  path.Command after = 2;
-  api.FramebufferAttachment attachment = 3;
-  RenderSettings settings = 4;
-  UsageHints hints = 5;
+  api.FramebufferAttachment attachment = 2;
+  RenderSettings settings = 3;
+  UsageHints hints = 4;
+
+  oneof after {
+    path.Command command = 5;
+    path.CommandTreeNode command_tree_node = 6;
+  }
 }
 
 message GetFramebufferAttachmentResponse {

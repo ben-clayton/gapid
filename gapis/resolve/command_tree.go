@@ -33,7 +33,7 @@ import (
 // CmdGroupData is the additional metadata assigned to api.CmdIDGroups UserData
 // field.
 type CmdGroupData struct {
-	Thumbnail api.CmdID
+	Visualization api.CmdID
 	// If true, then children frame event groups should not be added to this group.
 	NoFrameEventGroups bool
 }
@@ -406,7 +406,7 @@ func addFrameGroups(ctx context.Context, events *service.Events, p *path.Command
 
 			group, _ := t.root.AddGroup(frameStart, frameEnd+1, fmt.Sprintf("Frame %v", frameCount))
 			if group != nil {
-				group.UserData = &CmdGroupData{Thumbnail: i}
+				group.UserData = &CmdGroupData{Visualization: i}
 			}
 		}
 	}
@@ -418,13 +418,12 @@ func addFrameGroups(ctx context.Context, events *service.Events, p *path.Command
 func setThumbnails(ctx context.Context, g *api.CmdIDGroup, drawOrClearCmds api.Spans) {
 	data, _ := g.UserData.(*CmdGroupData)
 	if data == nil {
-		data = &CmdGroupData{Thumbnail: api.CmdNoID}
+		data = &CmdGroupData{Visualization: api.CmdNoID}
 		g.UserData = data
 	}
-	if data.Thumbnail == api.CmdNoID {
+	if data.Visualization == api.CmdNoID {
 		if s, c := interval.Intersect(drawOrClearCmds, g.Bounds().Span()); c > 0 {
-			thumbnail := drawOrClearCmds[s+c-1].Bounds().Start
-			data.Thumbnail = thumbnail
+			data.Visualization = drawOrClearCmds[s+c-1].Bounds().Start
 		}
 	}
 

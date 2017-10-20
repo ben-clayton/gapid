@@ -244,8 +244,13 @@ public class FramebufferView extends Composite
     }
   }
 
-  private ListenableFuture<Path.ImageInfo> getImageInfoPath(Path.Command atomPath) {
+  private ListenableFuture<Path.ImageInfo> getImageInfoPath(Path.Command after) {
     return client.getFramebufferAttachment(
-        models.devices.getReplayDevice(), atomPath, target, renderSettings, HINTS);
+        models.devices.getReplayDevice(), after, target, renderSettings, HINTS);
+  }
+
+  private ListenableFuture<Path.ImageInfo> getImageInfoPath(Path.CommandTreeNode node) {
+    return client.getFramebufferAttachment(
+        models.devices.getReplayDevice(), node, target, renderSettings, HINTS);
   }
 }

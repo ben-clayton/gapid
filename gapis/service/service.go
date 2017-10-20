@@ -78,15 +78,30 @@ type Service interface {
 	// the local Android devices will be returned first.
 	GetDevicesForReplay(ctx context.Context, p *path.Capture) ([]*path.Device, error)
 
-	// GetFramebufferAttachment returns the ImageInfo identifier describing the
-	// given framebuffer attachment and device, immediately following the
-	// command after.
-	// The provided RenderSettings structure can be used to adjust maximum desired
-	// dimensions of the image, as well as applying debug visualizations.
-	GetFramebufferAttachment(
+	// GetFramebufferAttachmentAfterCommand returns the ImageInfo identifier
+	// describing the given framebuffer attachment and device, immediately
+	// following the command after.
+	// The provided RenderSettings structure can be used to adjust maximum
+	// desired dimensions of the image, as well as applying debug
+	// visualizations.
+	GetFramebufferAttachmentAfterCommand(
 		ctx context.Context,
 		device *path.Device,
 		after *path.Command,
+		attachment api.FramebufferAttachment,
+		settings *RenderSettings,
+		hints *UsageHints) (*path.ImageInfo, error)
+
+	// GetFramebufferAttachmentForCommandTreeNode returns the ImageInfo
+	// identifier describing the given framebuffer attachment and device, for
+	// the given command tree node.
+	// The provided RenderSettings structure can be used to adjust maximum
+	// desired dimensions of the image, as well as applying debug
+	// visualizations.
+	GetFramebufferAttachmentForCommandTreeNode(
+		ctx context.Context,
+		device *path.Device,
+		after *path.CommandTreeNode,
 		attachment api.FramebufferAttachment,
 		settings *RenderSettings,
 		hints *UsageHints) (*path.ImageInfo, error)

@@ -29,9 +29,9 @@ import (
 	"github.com/google/gapid/gapis/service/path"
 )
 
-// FramebufferAttachment resolves the specified framebuffer attachment at the
-// specified point in a capture.
-func FramebufferAttachment(
+// FramebufferAttachmentAfterCommand resolves the specified framebuffer
+// attachment after the given command.
+func FramebufferAttachmentAfterCommand(
 	ctx context.Context,
 	device *path.Device,
 	after *path.Command,
@@ -67,6 +67,45 @@ func FramebufferAttachment(
 		return nil, err
 	}
 	return path.NewImageInfo(id), nil
+}
+
+// FramebufferAttachmentForCommandTreeNode resolves the specified framebuffer
+// attachment for the given command tree node.
+func FramebufferAttachmentForCommandTreeNode(
+	ctx context.Context,
+	device *path.Device,
+	node *path.CommandTreeNode,
+	attachment api.FramebufferAttachment,
+	settings *service.RenderSettings,
+	hints *service.UsageHints,
+) (*path.ImageInfo, error) {
+	boxedCmdTree, err := database.Resolve(ctx, node.Tree.ID())
+	if err != nil {
+		return nil, err
+	}
+
+	cmdTree := boxedCmdTree.(*commandTree)
+
+	var cmdPath *path.Command
+
+	switch item := cmdTree.index(node.Indices).(type) {
+	case api.CmdIDGroup:
+		cmdID := item.Range.Last()
+		if userData, ok := item.UserData.(*CmdGroupData); ok {
+			if userData.Visualization != api.CmdNoID {
+				cmdID = userData.Visualization
+			}
+		}
+		cmdPath = cmdTree.path.Capture.Command(uint64(cmdID))
+	case api.SubCmdIdx:
+		cmdPath = cmdTree.path.Capture.Command(uint64(item[0]), item[1:]...)
+	case api.SubCmdRoot:
+		cmdPath = cmdTree.path.Capture.Command(uint64(item.Id[0]), item.Id[1:]...)
+	default:
+		panic(fmt.Errorf("Unexpected type: %T", item))
+	}
+
+	return FramebufferAttachmentAfterCommand(ctx, device, cmdPath, attachment, settings, hints)
 }
 
 // framebufferAttachmentInfo returns the framebuffer dimensions and format

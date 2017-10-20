@@ -183,7 +183,25 @@ public class Client {
         stack -> Futures.transformAsync(
             client.getFramebufferAttachment(GetFramebufferAttachmentRequest.newBuilder()
                 .setDevice(device)
-                .setAfter(after)
+                .setCommand(after)
+                .setAttachment(attachment)
+                .setSettings(settings)
+                .setHints(hints)
+                .build()),
+            in -> immediateFuture(throwIfError(in.getImage(), in.getError(), stack))));
+  }
+
+  public ListenableFuture<Path.ImageInfo> getFramebufferAttachment(Path.Device device,
+      Path.CommandTreeNode node, API.FramebufferAttachment attachment,
+      Service.RenderSettings settings, Service.UsageHints hints) {
+    return call(
+        () -> String.format("RPC->getFramebufferAttachment(%s, %s, %s, %s, %s)",
+            shortDebugString(device), shortDebugString(node), attachment,
+            shortDebugString(settings), shortDebugString(hints)),
+        stack -> Futures.transformAsync(
+            client.getFramebufferAttachment(GetFramebufferAttachmentRequest.newBuilder()
+                .setDevice(device)
+                .setCommandTreeNode(node)
                 .setAttachment(attachment)
                 .setSettings(settings)
                 .setHints(hints)

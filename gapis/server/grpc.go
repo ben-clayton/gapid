@@ -30,6 +30,7 @@ import (
 	"github.com/google/gapid/core/log/log_pb"
 	"github.com/google/gapid/core/net/grpcutil"
 	"github.com/google/gapid/gapis/service"
+	"github.com/google/gapid/gapis/service/path"
 
 	"google.golang.org/grpc"
 
@@ -303,14 +304,30 @@ func (s *grpcServer) GetDevicesForReplay(ctx xctx.Context, req *service.GetDevic
 
 func (s *grpcServer) GetFramebufferAttachment(ctx xctx.Context, req *service.GetFramebufferAttachmentRequest) (*service.GetFramebufferAttachmentResponse, error) {
 	defer s.inRPC()()
-	image, err := s.handler.GetFramebufferAttachment(
-		s.bindCtx(ctx),
-		req.Device,
-		req.After,
-		req.Attachment,
-		req.Settings,
-		req.Hints,
-	)
+	var image *path.ImageInfo
+	var err error
+	switch after := req.After.(type) {
+	case *service.GetFramebufferAttachmentRequest_Command:
+		image, err = s.handler.GetFramebufferAttachmentAfterCommand(
+			s.bindCtx(ctx),
+			req.Device,
+			after.Command,
+			req.Attachment,
+			req.Settings,
+			req.Hints,
+		)
+	case *service.GetFramebufferAttachmentRequest_CommandTreeNode:
+		image, err = s.handler.GetFramebufferAttachmentForCommandTreeNode(
+			s.bindCtx(ctx),
+			req.Device,
+			after.CommandTreeNode,
+			req.Attachment,
+			req.Settings,
+			req.Hints,
+		)
+	default:
+		err = fmt.Errorf("Invalid After field: %T", after)
+	}
 	if err := service.NewError(err); err != nil {
 		return &service.GetFramebufferAttachmentResponse{Res: &service.GetFramebufferAttachmentResponse_Error{Error: err}}, nil
 	}
