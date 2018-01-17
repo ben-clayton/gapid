@@ -216,6 +216,7 @@ func (c *compiler) buildTypes(api *semantic.API) {
 				targetTypePtr := c.ty.Pointer(c.targetType(t))
 
 				copyToTarget := c.module.Function(c.ty.Void, "S_"+t.Name()+"•copy_to_target", c.ty.ctxPtr, storageTypePtr, targetTypePtr)
+				copyToTarget.MakeInline()
 				c.ty.storage_to_target[t] = &copyToTarget
 				err(copyToTarget.Build(func(jb *codegen.Builder) {
 					s := c.scope(jb)
