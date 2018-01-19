@@ -19,6 +19,7 @@ cc_library(
             "lib/X86/*.cc",
             "lib/X86/*.h",
         ]),
+        "//conditions:default": [],
     }),
     includes = ["lib"],
     hdrs = glob([
