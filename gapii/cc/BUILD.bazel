@@ -88,6 +88,17 @@ apic_template(
 )
 
 cc_library(
+    name = "runtime",
+    srcs = [
+        "runtime/runtime.cpp"
+    ],
+    alwayslink = 1,
+    deps = [
+        "//gapil/runtime/cc",
+    ]
+)
+
+cc_library(
     name = "cc",
     srcs = glob(
         [
@@ -150,6 +161,7 @@ cc_library(
         "//gapis/capture:capture_cc_proto",
         "//gapis/memory/memory_pb:memory_pb_cc_proto",
         "@com_google_protobuf//:protobuf",
+        "runtime",
     ],
 )
 
