@@ -152,10 +152,10 @@ static void GetProgramReflectionInfo_GLES31(GlesSpy* spy, LinkProgramExtra* extr
   const GLuint program = extra->mID;
   const auto& imports = spy->imports();
 
-  const bool hasGeometryShader       = p->mShaders.count(GL_GEOMETRY_SHADER) > 0;
-  const bool hasTessControlShader    = p->mShaders.count(GL_TESS_CONTROL_SHADER) > 0;
-  const bool hasTessEvaluationShader = p->mShaders.count(GL_TESS_EVALUATION_SHADER) > 0;
-  const bool hasComputeShader        = p->mShaders.count(GL_COMPUTE_SHADER) > 0;
+  const bool hasGeometryShader       = p->mShaders.contains(GL_GEOMETRY_SHADER);
+  const bool hasTessControlShader    = p->mShaders.contains(GL_TESS_CONTROL_SHADER);
+  const bool hasTessEvaluationShader = p->mShaders.contains(GL_TESS_EVALUATION_SHADER);
+  const bool hasComputeShader        = p->mShaders.contains(GL_COMPUTE_SHADER);
 
   std::vector<char> buffer;  // Temporary buffer for getting string.
   const int bufferSuffixSize = 16;  // Allocate a bit more extra space so we can append integer to name.
@@ -191,7 +191,7 @@ static void GetProgramReflectionInfo_GLES31(GlesSpy* spy, LinkProgramExtra* extr
 
   // Helper method to get all locations of program resource
   auto getResourceLocations = [&](uint32_t interface, const gapil::String& name, GLint arraySize) {
-    U32ToGLint locations;
+    U32ToGLint locations(spy->getArena());
     locations[0] = imports.glGetProgramResourceLocation(program, interface, name.c_str());
     if (arraySize > 1) {
       // Copy the array base name (without the [0] suffix) to the temporary buffer
@@ -230,7 +230,7 @@ static void GetProgramReflectionInfo_GLES31(GlesSpy* spy, LinkProgramExtra* extr
 
   // Helper method to get all resource blocks of given type
   auto getResourceBlocks = [&](uint32_t interface) {
-    U32ToProgramResourceBlock__R blocks;
+    U32ToProgramResourceBlock__R blocks(spy->getArena());
     GLint count = getInterfaceiv(interface, GL_ACTIVE_RESOURCES);
     if (interface != GL_ATOMIC_COUNTER_BUFFER) {
       buffer.resize(getInterfaceiv(interface, GL_MAX_NAME_LENGTH) + bufferSuffixSize);
@@ -258,7 +258,7 @@ static void GetProgramReflectionInfo_GLES31(GlesSpy* spy, LinkProgramExtra* extr
     const bool bv = (interface == GL_BUFFER_VARIABLE);
     const bool tfv = (interface == GL_TRANSFORM_FEEDBACK_VARYING);
 
-    U32ToProgramResource__R resources;
+    U32ToProgramResource__R resources(spy->getArena());
     GLint count = getInterfaceiv(interface, GL_ACTIVE_RESOURCES);
     buffer.resize(getInterfaceiv(interface, GL_MAX_NAME_LENGTH) + bufferSuffixSize);
     for (int i = 0; i < count; i++) {
@@ -398,13 +398,13 @@ gapil::Ref<LinkProgramExtra> GlesSpy::GetLinkProgramExtra(CallObserver* observer
       auto& id = kvp.first;
       auto& u = kvp.second;
       if (u->mBlockIndex != -1) {
-        GAPID_ASSERT(resources->mUniformBlocks.count(u->mBlockIndex) == 1);
+        GAPID_ASSERT(resources->mUniformBlocks.contains(u->mBlockIndex));
         resources->mUniformBlocks[u->mBlockIndex]->mResources[id] = u;
       } else {
         resources->mDefaultUniformBlock[id] = u;
       }
       if (u->mAtomicCounterBufferIndex != -1) {
-        GAPID_ASSERT(resources->mAtomicCounterBuffers.count(u->mAtomicCounterBufferIndex) == 1);
+        GAPID_ASSERT(resources->mAtomicCounterBuffers.contains(u->mAtomicCounterBufferIndex));
         resources->mAtomicCounterBuffers[u->mAtomicCounterBufferIndex]->mResources[id] = u;
       }
     }
@@ -412,7 +412,7 @@ gapil::Ref<LinkProgramExtra> GlesSpy::GetLinkProgramExtra(CallObserver* observer
       auto& id = kvp.first;
       auto& u = kvp.second;
       if (u->mBlockIndex != -1) {
-        GAPID_ASSERT(resources->mShaderStorageBlocks.count(u->mBlockIndex) == 1);
+        GAPID_ASSERT(resources->mShaderStorageBlocks.contains(u->mBlockIndex));
         resources->mShaderStorageBlocks[u->mBlockIndex]->mResources[id] = u;
       }
     }

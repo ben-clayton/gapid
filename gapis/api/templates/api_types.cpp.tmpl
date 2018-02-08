@@ -65,7 +65,7 @@
   {{$name := Macro "C++.Type" $}}
   {{if len $.Fields}}
 ¶
-    {{$name}}::{{$name}}()»»
+    {{$name}}::{{$name}}(core::Arena* arena)»»
       {{$a := ForEach $.Fields "DeclareDefaultInitializer" | JoinWith "\n, "}}
       {{if $a}}: {{$a}}{{end}}
       ««§•{}

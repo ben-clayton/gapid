@@ -27,8 +27,7 @@
 #include "core/cc/interval_list.h"
 #include "core/cc/scratch_allocator.h"
 #include "core/cc/vector.h"
-
-#include <google/protobuf/arena.h>
+#include "core/memory/arena/cc/arena.h"
 
 #include <stack>
 
@@ -74,6 +73,9 @@ public:
 
     // getCurrentThread returns the current thread identifier.
     uint64_t getCurrentThread() { return mCurrentThread; }
+
+    // getArena returns the active memory arena.
+    core::Arena* getArena() const;
 
     // read is called to make a read memory observation of size bytes, starting
     // at base. It only records the range of the read memory, the actual

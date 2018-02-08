@@ -317,7 +317,7 @@ EGLBoolean Spy::eglMakeCurrent(CallObserver* observer, EGLDisplay display, EGLSu
 }
 
 gapil::Ref<StaticContextState> GlesSpy::GetEGLStaticContextState(CallObserver* observer, EGLDisplay display, EGLContext context) {
-    Constants constants;
+    Constants constants(&mArena);
     getContextConstants(constants);
 
     gapil::String threadName;

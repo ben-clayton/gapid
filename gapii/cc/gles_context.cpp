@@ -91,7 +91,7 @@ void GlesSpy::getContextConstants(Constants& out) {
         std::istringstream iss(extensions);
         std::string extension;
         while (std::getline(iss, extension, ' ')) {
-            out.mExtensions[out.mExtensions.size()] = gapil::String(&mArena, extension.c_str());
+            out.mExtensions[out.mExtensions.count()] = gapil::String(&mArena, extension.c_str());
         }
     }
     bool gles20 = true;
