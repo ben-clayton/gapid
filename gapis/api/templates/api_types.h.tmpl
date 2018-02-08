@@ -32,12 +32,13 @@
   #ifndef {{$guard}}
   #define {{$guard}}
 ¶
-  #include "gapii/cc/shared_map.h"
   #include "gapii/cc/slice.h"
 ¶
   #include "gapil/runtime/cc/ref.inc"
+  #include "gapil/runtime/cc/map.inc"
   #include "gapil/runtime/cc/string.h"
 ¶
+  #include "core/memory/arena/cc/arena.h"
   #include "core/cc/static_array.h"
 ¶
   #include <functional>
@@ -162,7 +163,7 @@
     {{end}}
 
     {{if len $.Fields}}
-      {{$name}}();
+      explicit {{$name}}(core::Arena*);
       {{$name}}(§»
         {{range $i, $f := $.Fields}}
           {{if $i}}, §{{end}}
@@ -240,7 +241,7 @@
 {{/*
 -------------------------------------------------------------------------------
   Emits the declaration of the map's key and value types (if it is not already
-  declared) followed by the map's declaration as a SharedMap.
+  declared) followed by the map's declaration as a gapil::Map.
 -------------------------------------------------------------------------------
 */}}
 {{define "DeclareMap"}}
@@ -249,7 +250,7 @@
   {{Template "DeclareType" $.KeyType}}
   {{Template "DeclareType" $.ValueType}}
 
-  typedef SharedMap<{{Template "C++.Type" $.KeyType}}, {{Template "C++.Type" $.ValueType}}> {{Template "C++.Type" $}};
+  typedef gapil::Map<{{Template "C++.Type" $.KeyType}}, {{Template "C++.Type" $.ValueType}}> {{Template "C++.Type" $}};
 {{end}}
 
 {{/*

@@ -21,6 +21,7 @@
 {{/* ---- Overrides ---- */}}
 {{Global "C++.EnumTypeOverride"   "uint32_t"}}
 {{Global "C++.StringTypeOverride" "gapil::String"}}
+{{Global "C++.ArenaOverride"      "&mArena"}}
 {{Global "C++.Statement.Override" "Statement"}}
 
 {{Global "ApiIndex" $.Index}}
@@ -194,7 +195,11 @@
       observer->enter(cmd::{{.Name}}{§
         observer->getCurrentThread(),
         {{range $i, $p := $.CallParameters}}
-          {{if $i}}, {{end}}{{$p.Name}}§
+          {{$ty := TypeOf $p | Underlying}}
+          {{if $i}}, {{end}}§
+          {{if IsStaticArray $ty}}{{Template "C++.Type" $p}}::create({{$p.Name}})
+          {{else}}{{$p.Name}}§
+          {{end}}
         {{end}}
       });
 ¶

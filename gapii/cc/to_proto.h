@@ -17,7 +17,6 @@
 #ifndef GAPII_TO_PROTO_H
 #define GAPII_TO_PROTO_H
 
-#include "gapii/cc/shared_map.h"
 #include "gapii/cc/slice.h"
 #include "gapis/memory/memory_pb/memory.pb.h"
 
@@ -124,14 +123,17 @@ struct ProtoConverter<std::string, gapil::String> {
     }
 };
 
-// Converts SharedMap to proto
+// Converts gapil::Map to proto
 template <typename Out, typename K, typename V>
-struct ProtoConverter<Out, SharedMap<K, V>> {
-    static inline void convert(Out* out, const SharedMap<K, V>& in, ToProtoContext& ctx) {
-        auto ref = ctx.GetReferenceID(in.get());
+struct ProtoConverter<Out, gapil::Map<K, V>> {
+    static inline void convert(Out* out, const gapil::Map<K, V>& in, ToProtoContext& ctx) {
+        auto ref = ctx.GetReferenceID(in.instance_ptr());
         out->set_referenceid(ref.first);
         if (ref.second) {
-            std::map<K, V> sorted(in.begin(), in.end());
+            std::map<K, V> sorted;
+            for (auto it : in) {
+                sorted.emplace(std::make_pair(it.first, it.second));
+            }
             auto keys = out->mutable_keys();
             auto values = out->mutable_values();
             keys->Reserve(sorted.size());

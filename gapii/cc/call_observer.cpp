@@ -71,6 +71,10 @@ uint32_t CallObserver::getPoolID() {
     return mSpy->getPoolID();
 }
 
+core::Arena* CallObserver::getArena() const {
+    return mSpy->getArena();
+}
+
 void CallObserver::read(const void* base, uint64_t size) {
     if (!mSpy->should_trace(mApi)) return;
     if (size > 0) {

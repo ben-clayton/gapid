@@ -98,12 +98,12 @@ Symbol kGLESExports[] = {
       {{$imports := print (Title (Global "API")) "Spy::imports()"}}
       EXPORT {{Template "C++.ReturnType" $c}} STDCALL {{$name}}({{Template "C++.CallParameters" $c}}) {
         Spy* s = Spy::get();
-        GAPID_DEBUG({{Template "C++.PrintfCommandCall" $c}});
+        GAPID_INFO({{Template "C++.PrintfCommandCall" $c}});
         auto spy_ctx = s->enter("{{$name}}", GlesAPI);
         {{if not (IsVoid $c.Return.Type)}}auto _result_ = §{{end}}
         s->{{$name}}({{Macro "C++.CallArguments" $c | Strings "spy_ctx" | JoinWith ", "}});
         s->exit();
-        GAPID_DEBUG("{{$name}}() -- done");
+        GAPID_INFO("{{$name}}() -- done");
         {{if not (IsVoid $c.Return.Type)}}return _result_;{{end}}
       }
     {{end}}

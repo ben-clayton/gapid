@@ -126,15 +126,27 @@
   {{else if IsEnum        $}}0
   {{else if IsChar        $}}0
   {{else if IsString      $}}gapil::String()
-  {{else if IsStaticArray $}}{{Template "C++.Type" $}}{}
+  {{else if IsStaticArray $}}{{Template "C++.Type" $}}::create({{Template "C++.Null" $.ValueType}})
   {{else if IsPseudonym   $}}{{Template "C++.Null" $.To}}
-  {{else if IsClass       $}}{{Template "C++.Type" $}}()
+  {{else if IsClass       $}}{{Template "C++.Type" $}}({{Template "C++.Arena"}})
   {{else if IsSlice       $}}{{Template "C++.Type" $}}()
-  {{else if IsMap         $}}{{Template "C++.Type" $}}()
+  {{else if IsMap         $}}{{Template "C++.Type" $}}({{Template "C++.Arena"}})
   {{else if IsPointer     $}}nullptr
   {{else if IsReference   $}}{{Template "C++.Type" $}}()
   {{else}}{{Error "macro Null called with unsupported type: %s" $.Name}}
   {{end}}
+{{end}}
+
+
+{{/*
+-------------------------------------------------------------------------------
+  Emits the identifier of the memory arena which is by default 'arena'.
+  This can be overridden with the "C++.ArenaOverride" global.
+-------------------------------------------------------------------------------
+*/}}
+{{define "C++.Arena"}}
+  {{$a := Global "C++.ArenaOverride"}}
+  {{if $a}}{{$a}}{{else}}arena{{end}}
 {{end}}
 
 
@@ -597,7 +609,7 @@
 {{define "C++.Read"}}
   {{     if IsBoolValue        $}}{{$}}
   {{else if IsNumericValue     $}}{{Template "C++.NumericValue" $}}
-  {{else if IsStringValue      $}}gapil::String(&mArena, {{printf "%q" $}})
+  {{else if IsStringValue      $}}gapil::String({{Template "C++.Arena"}}, {{printf "%q" $}})
   {{else if IsMessageValue     $}}"{{$.AST.Name.Value}}"
   {{else if IsParameter        $}}{{Template "C++.ReadParameter" $}}
   {{else if IsBinaryOp         $}}({{Template "C++.Read" $.LHS}}) {{$.Operator}} ({{Template "C++.Read" $.RHS}})
@@ -613,11 +625,11 @@
   {{else if IsMember           $}}{{Template "C++.Dereference" $.Object}}{{Template "C++.Read" $.Field}}
   {{else if IsGlobal           $}}{{Template "C++.Global" $}}
   {{else if IsArrayIndex       $}}{{Template "C++.Read" $.Array}}[{{Template "C++.Read" $.Index}}]
-  {{else if IsMapIndex         $}}findOrZero({{Template "C++.Read" $.Map}}, {{Template "C++.Read" $.Index}})
-  {{else if IsMapContains      $}}{{Template "C++.Read" $.Map}}.count({{Template "C++.Read" $.Key}}) > 0
+  {{else if IsMapIndex         $}}{{Template "C++.Read" $.Map}}.findOrZero({{Template "C++.Read" $.Index}})
+  {{else if IsMapContains      $}}{{Template "C++.Read" $.Map}}.contains({{Template "C++.Read" $.Key}})
   {{else if IsLength           $}}{{Template "C++.Type" $.Type}}(({{Template "C++.ReadLength" "Type" (TypeOf $.Object) "Value" $.Object}}))
   {{else if IsNull             $}}{{Template "C++.Null" $.Type}}
-  {{else if IsNew              $}}gapil::Ref<{{Template "C++.Type" (Unpack $.Type).To}}>::create(&mArena)
+  {{else if IsNew              $}}gapil::Ref<{{Template "C++.Type" (Unpack $.Type).To}}>::create({{Template "C++.Arena"}})
   {{else if IsCreate           $}}{{Template "C++.Create" $}}
   {{else if IsArrayInitializer $}}{{Template "C++.ArrayInitializer" $}}
   {{else if IsClassInitializer $}}{{Template "C++.ClassInitializer" $}}
@@ -645,7 +657,7 @@
   {{AssertType $ "Parameter"}}
 
   {{$ty := TypeOf $}}
-  {{if IsString $ty}}gapil::String(&mArena, {{$.Name}})
+  {{if IsString $ty}}gapil::String({{Template "C++.Arena"}}, {{$.Name}})
   {{else           }}{{$.Name}}
   {{end}}
 {{end}}
@@ -689,14 +701,14 @@
 -------------------------------------------------------------------------------
 */}}
 {{define "C++.NumericValue"}}
-  {{     if IsInt8Value    $}}{{$}}
-  {{else if IsUint8Value   $}}{{$}}U
-  {{else if IsInt16Value   $}}{{$}}
-  {{else if IsUint16Value  $}}{{$}}U
-  {{else if IsInt32Value   $}}{{$}}L
-  {{else if IsUint32Value  $}}{{$}}UL
-  {{else if IsInt64Value   $}}{{$}}LL
-  {{else if IsUint64Value  $}}{{$}}ULL
+  {{     if IsInt8Value    $}}static_cast<int8_t>({{$}})
+  {{else if IsUint8Value   $}}static_cast<uint8_t>({{$}})
+  {{else if IsInt16Value   $}}static_cast<int16_t>({{$}})
+  {{else if IsUint16Value  $}}static_cast<uint16_t>({{$}})
+  {{else if IsInt32Value   $}}static_cast<int32_t>({{$}})
+  {{else if IsUint32Value  $}}static_cast<uint32_t>({{$}})
+  {{else if IsInt64Value   $}}static_cast<int64_t>({{$}})
+  {{else if IsUint64Value  $}}static_cast<uint64_t>({{$}})
   {{else if IsFloat32Value $}}{{$s := print $}}{{$s}}{{if not (Contains "." $s)}}.{{end}}f
   {{else if IsFloat64Value $}}{{$}}
   {{else}}{{Error "macro C++.NumericValue called with unsupported type: %T" $}}
@@ -752,7 +764,7 @@
   {{AssertType $ "Create"}}
 
   {{$ty := Unpack $.Type}}
-  gapil::Ref<{{Template "C++.Type" $ty.To}}>::create(&mArena, {{Template "C++.ClassInitializer" $.Initializer}})
+  gapil::Ref<{{Template "C++.Type" $ty.To}}>::create({{Template "C++.Arena"}}, {{Template "C++.ClassInitializer" $.Initializer}})
 {{end}}
 
 
@@ -840,7 +852,7 @@
   {{     if IsPseudonym   $ty}}{{Template "C++.ReadLength" "Type" $ty.To "Value" $.Value}}
   {{else if IsSlice       $ty}}{{Template "C++.Read" $.Value}}.count()
   {{else if IsString      $ty}}{{Template "C++.Read" $.Value}}.length()
-  {{else if IsMap         $ty}}{{Template "C++.Read" $.Value}}.size()
+  {{else if IsMap         $ty}}{{Template "C++.Read" $.Value}}.count()
   {{else                     }}{{Error "macro C++.ReadLength called with unsupported type: %v" $.Type}}
   {{end}}
 {{end}}
