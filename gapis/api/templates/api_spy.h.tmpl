@@ -58,6 +58,7 @@ namespace {{(Global "API")}}_pb {
   class {{$spyname}} : public virtual SpyBase {
   «public:»
     {{$imports := Macro "ApiClassnames.Imports"}}
+    inline {{$spyname}}();
     inline void init();
 ¶
     inline const {{$imports}}& imports() const;
@@ -87,6 +88,13 @@ namespace {{(Global "API")}}_pb {
   };
 ¶
   // Inline methods
+  inline {{$spyname}}::{{$spyname}}()
+    {{range $i, $g := $.Globals}}
+      {{if $i}}, {{else}}: {{end}}§
+      {{$g.Name}}({{Macro "C++.Null" (TypeOf $g)}}) §
+    {{end}}
+  {}
+¶
   inline void {{$spyname}}::init() {
     mImports.resolve();
     {{range $g := $.Globals}}
