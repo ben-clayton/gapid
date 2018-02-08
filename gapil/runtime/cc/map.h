@@ -15,6 +15,7 @@
 #ifndef __GAPIL_RUNTIME_MAP_H__
 #define __GAPIL_RUNTIME_MAP_H__
 
+#include "maker.h"
 #include "runtime.h"
 
 namespace core {
@@ -36,13 +37,6 @@ public:
 
     using key_type = K;
     using value_type = V;
-
-    Map(core::Arena*);
-    Map(const Map<K,V>&);
-    Map(Map<K, V>&&);
-    ~Map();
-
-    Map<K,V>& operator = (const Map<K,V>&);
 
     class iterator {
     public:
@@ -92,9 +86,22 @@ public:
         inline const_iterator(const element* elem, const Allocation* map);
     };
 
+    Map(core::Arena*);
+    Map(const Map<K,V>&);
+    Map(Map<K, V>&&);
+    ~Map();
+
+    Map<K, V> clone() const;
+
+    Map<K,V>& operator = (const Map<K,V>&);
+
     inline uint64_t capacity() const;
 
     inline uint64_t count() const;
+
+    inline bool empty() const;
+
+    inline bool contains(const K&) const;
 
     inline const const_iterator begin() const;
 
@@ -114,6 +121,14 @@ public:
     inline iterator find(const K& key);
 
     inline const_iterator find(const K& k) const;
+
+    // finds a key in the map and returns the value. If no value is present
+    // returns the zero for that type.
+    inline V findOrZero(const K& key) const;
+
+    // instance_ptr returns an opaque pointer to the underlying map data.
+    // This can be used for map equality.
+    inline const void* instance_ptr() const;
 
 private:
     struct Allocation : public map_t {
@@ -251,6 +266,16 @@ uint64_t Map<K, V>::count() const {
 }
 
 template <typename K, typename V>
+bool Map<K, V>::empty() const {
+    return ptr->count == 0;
+}
+
+template <typename K, typename V>
+bool Map<K, V>::contains(const K& key) const {
+    return ptr->contains(key);
+}
+
+template <typename K, typename V>
 const typename Map<K, V>::const_iterator Map<K, V>::begin() const {
     auto it = const_iterator{ptr->els(), ptr};
     for (size_t i = 0; i < ptr->capacity; ++i) {
@@ -314,15 +339,28 @@ typename Map<K, V>::iterator Map<K, V>::find(const K& key) {
 
 template <typename K, typename V>
 typename Map<K, V>::const_iterator Map<K, V>::find(const K& k) const {
-    // Sorry for the const_cast. We know that if the last element is false,
-    // this wont be modified.
-    const V* idx = const_cast<Map<K, V>*>(ptr)->index(k, false);
+    const V* idx = ptr->index(k, false);
     if (idx == nullptr) {
         return end();
     }
     size_t offs =
         (reinterpret_cast<uintptr_t>(idx) - reinterpret_cast<uintptr_t>(ptr->els())) / sizeof(element);
     return const_iterator{ptr->els() + offs, ptr};
+}
+
+template <typename K, typename V>
+V Map<K, V>::findOrZero(const K& key) const {
+    auto it = find(key);
+    if (it == end()) {
+        auto arena = reinterpret_cast<core::Arena*>(ptr->arena);
+        return make<V>(arena);
+    }
+    return it->second;
+}
+
+template <typename K, typename V>
+inline const void* Map<K, V>::instance_ptr() const {
+    return ptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

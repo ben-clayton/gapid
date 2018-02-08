@@ -55,6 +55,16 @@ Map<K, V>::~Map() {
 }
 
 template<typename K, typename V>
+Map<K, V> Map<K, V>::clone() const {
+    auto arena = reinterpret_cast<core::Arena*>(ptr->arena);
+    auto out = Map(arena);
+    for (auto it : *this) {
+        out[it.first] = it.second;
+    }
+    return out;
+}
+
+template<typename K, typename V>
 Map<K, V>& Map<K, V>::operator = (const Map<K, V>& other) {
     GAPID_ASSERT_MSG(other.ptr->ref_count > 0, "attempting to reference freed map");
     if (ptr != other.ptr) {
@@ -166,8 +176,9 @@ V* Map<K, V>::Allocation::index(K key, bool insert) {
         }
 
         uint64_t bucket_location = storageBucket(hasher(key));
-        new(&els()[bucket_location].second) V();
-        new(&els()[bucket_location].first) K(key);
+        auto a = reinterpret_cast<core::Arena*>(arena);
+        inplace_new(&els()[bucket_location].second, a);
+        inplace_new(&els()[bucket_location].first, a, key);
         els()[bucket_location].used = GAPIL_MAP_ELEMENT_FULL;
         count++;
 

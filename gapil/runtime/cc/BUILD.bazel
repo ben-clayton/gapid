@@ -21,6 +21,7 @@ cc_library(
         "string.cpp",
     ],
     hdrs = [
+        "maker.h",
         "runtime.h",
         "map.h",
         "map.inc",
