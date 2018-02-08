@@ -15,6 +15,7 @@
 #ifndef __GAPIL_RUNTIME_REF_H__
 #define __GAPIL_RUNTIME_REF_H__
 
+#include "maker.h"
 #include "runtime.h"
 
 #include "core/memory/arena/cc/arena.h"
@@ -34,8 +35,8 @@ public:
     Ref(Ref&&);
     ~Ref();
 
-    template <class ...ARGS>
-    inline static Ref create(core::Arena* arena, ARGS...);
+    template <typename ...ARGS>
+    inline static Ref create(core::Arena* arena, ARGS&&...);
 
     Ref& operator = (const Ref& other);
 
@@ -66,12 +67,13 @@ private:
 
 
 template<typename T>
-template <class ...ARGS>
-Ref<T> Ref<T>::create(core::Arena* arena, ARGS... args) {
-    auto ptr = arena->create<Allocation>();
+template<typename ...ARGS>
+Ref<T> Ref<T>::create(core::Arena* arena, ARGS&&... args) {
+    auto buf = arena->allocate(sizeof(Allocation), alignof(Allocation));
+    auto ptr = reinterpret_cast<Allocation*>(buf);
     ptr->ref_count = 1;
     ptr->arena = reinterpret_cast<arena_t*>(arena);
-    new(&ptr->object) T(args...);
+    inplace_new(&ptr->object, arena, std::forward<ARGS>(args)...);
     return Ref(ptr);
 }
 
