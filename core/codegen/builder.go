@@ -251,7 +251,7 @@ func (b *Builder) Return(val *Value) {
 		assertTypesEqual(val.Type(), b.function.Type.Signature.Result)
 		b.llvm.CreateStore(val.llvm, b.result)
 	} else if !b.result.IsNil() {
-		b.llvm.CreateStore(llvm.ConstNull(b.result.Type()), b.result)
+		b.llvm.CreateStore(llvm.ConstNull(b.function.Type.Signature.Result.llvmTy()), b.result)
 	}
 	b.llvm.CreateBr(b.exit)
 }
@@ -280,4 +280,9 @@ func (b *Builder) block(block, next llvm.BasicBlock, f func()) {
 	if !next.IsNil() && !b.IsBlockTerminated() {
 		b.llvm.CreateBr(next)
 	}
+}
+
+// Dumps the current module to stderr.
+func (b *Builder) Dump() {
+	b.m.llvm.Dump()
 }
