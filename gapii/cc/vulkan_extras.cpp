@@ -360,10 +360,10 @@ void VulkanSpy::enterSubcontext(CallObserver*) {}
 void VulkanSpy::leaveSubcontext(CallObserver*) {}
 void VulkanSpy::nextSubcontext(CallObserver*) {}
 void VulkanSpy::resetSubcontext(CallObserver*) {}
-void VulkanSpy::onPreSubcommand(CallObserver*, std::shared_ptr<CommandReference>) {}
-void VulkanSpy::onPreProcessCommand(CallObserver*, std::shared_ptr<CommandReference>) {}
-void VulkanSpy::onPostSubcommand(CallObserver*, std::shared_ptr<CommandReference>) {}
-void VulkanSpy::onDeferSubcommand(CallObserver*, std::shared_ptr<CommandReference>) {}
+void VulkanSpy::onPreSubcommand(CallObserver*, gapil::Ref<CommandReference>) {}
+void VulkanSpy::onPreProcessCommand(CallObserver*, gapil::Ref<CommandReference>) {}
+void VulkanSpy::onPostSubcommand(CallObserver*, gapil::Ref<CommandReference>) {}
+void VulkanSpy::onDeferSubcommand(CallObserver*, gapil::Ref<CommandReference>) {}
 void VulkanSpy::onCommandAdded(CallObserver*, VkCommandBuffer) {}
-void VulkanSpy::postBindSparse(CallObserver*, std::shared_ptr<QueuedSparseBinds>) {}
+void VulkanSpy::postBindSparse(CallObserver*, gapil::Ref<QueuedSparseBinds>) {}
 }
