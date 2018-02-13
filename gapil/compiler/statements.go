@@ -80,13 +80,13 @@ func (c *compiler) subroutine(f *semantic.Function) {
 		paramTys[i+1] = c.targetType(p.Type)
 	}
 	out := c.module.Function(resTy, f.Name(), paramTys...)
+	c.functions[f] = out
 	c.build(out, func(s *scope) {
 		for i, p := range params {
 			s.parameters[p] = s.Parameter(i + 1).SetName(p.Name())
 		}
 		c.block(s, f.Block)
 	})
-	c.functions[f] = out
 	c.setCurrentFunction(old)
 }
 
