@@ -67,6 +67,10 @@ func isStorageType(ty semantic.Type) bool {
 			}
 		}
 		return true
+	case *semantic.Enum:
+		return true
+	case *semantic.StaticArray:
+		return isStorageType(ty.ValueType)
 	default:
 		return false
 	}
