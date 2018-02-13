@@ -346,11 +346,15 @@ func (c *compiler) read(s *scope, n *semantic.Read) {
 }
 
 func (c *compiler) return_(s *scope, n *semantic.Return) {
-	val := c.expression(s, n.Value)
-	c.reference(s, val, n.Value.ExpressionType())
+	if n.Value != nil {
+		val := c.expression(s, n.Value)
+		c.reference(s, val, n.Value.ExpressionType())
 
-	retTy := c.returnType(c.currentFunc) // <error, value>
-	c.doReturn(s, s.Zero(retTy).Insert(retValue, val))
+		retTy := c.returnType(c.currentFunc) // <error, value>
+		c.doReturn(s, s.Zero(retTy).Insert(retValue, val))
+	} else {
+		c.doReturn(s, nil)
+	}
 }
 
 func (c *compiler) doReturn(s *scope, val *codegen.Value) {
