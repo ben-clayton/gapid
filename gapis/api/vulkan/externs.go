@@ -316,6 +316,34 @@ func bindSparse(ctx context.Context, a api.Cmd, id api.CmdID, s *api.GlobalState
 	}
 }
 
+func (e externs) vkErrInvalidHandle(string handleType, uint64_t handle) {
+	var issue replay.Issue
+	issue.Command = e.cmdID
+	issue.Severity = service.Severity_ErrorLevel
+	issue.Error = fmt.Errorf("Invalid %s: %v", handleType, handle)
+}
+
+func (e externs) vkErrNullPointer(string pointerType) {
+	var issue replay.Issue
+	issue.Command = e.cmdID
+	issue.Severity = service.Severity_ErrorLevel
+	issue.Error = fmt.Errorf("Null pointer of %s", pointerType)
+}
+
+func (e externs) vkErrUnrecognizedExtension(string name) {
+	var issue replay.Issue
+	issue.Command = e.cmdID
+	issue.Severity = service.Severity_WarningLevel
+	issue.Error = fmt.Errorf("Unsupported extension: %s", name)
+}
+
+func (e externs) vkErrExpectNVDedicatedlyAllocatedHandle(string handleType, uint64_t handle) {
+	var issue replay.Issue
+	issue.Command = e.cmdID
+	issue.Severity = service.Severity_WarningLevel
+	issue.Error = fmt.Errorf("%v: %v is not created with VK_NV_dedicated_allocation extension structure, but is bound to a dedicatedly allocated handle", handleType, handle)
+}
+
 // TODO: Change to take error message type once all the errors are merged to
 // en-us.stb.md
 func (e externs) onVkError(err interface{}) {
