@@ -105,6 +105,10 @@ func Compile(api *semantic.API, mappings *resolver.Mappings, s Settings) (*Progr
 		return nil, err
 	}
 
+	if err := prog.Module.Verify(); err != nil {
+		return nil, err
+	}
+
 	return prog, nil
 }
 
