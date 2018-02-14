@@ -31,18 +31,20 @@ using core::Interval;
 namespace gapii {
 
 SpyBase::SpyBase()
-    : mObserveApplicationPool(true)
+    : mContext{}
+    , mObserveApplicationPool(true)
     , mNullEncoder(PackEncoder::noop())
     , mDeviceInstance(nullptr)
     , mCurrentABI(nullptr)
     , mResources{{core::Id{{0}}, 0}}
-    , mNextPoolID(1)
     , mWatchedApis(0xFFFFFFFF)
 #if COHERENT_TRACKING_ENABLED
     , mMemoryTracker()
 #endif // TARGET_OS
     , mIsRecordingState(false)
 {
+    mContext.next_pool_id = 1;
+    mContext.arena = reinterpret_cast<arena_t*>(&mArena);
 }
 
 void SpyBase::init(CallObserver* observer) {

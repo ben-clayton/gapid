@@ -41,12 +41,15 @@ typedef struct string_t  string;
 typedef struct context_t {
 	uint32_t    id;
 	uint32_t    location;
+	uint32_t    next_pool_id;
 	globals*    globals;
 	arena*      arena;
 } context;
 
 typedef struct pool_t {
 	uint32_t ref_count;
+	uint32_t id;     // Unique identifier of this pool.
+	uint64_t size;   // Total size of the pool in bytes.
 	arena*   arena;  // arena that owns the allocation of this pool and its buffer.
 	void*    buffer; // nullptr for application pool
 } pool;
@@ -100,6 +103,7 @@ DECL_GAPIL_CALLBACK(int32_t, gapil_string_compare, string*, string*);
 
 DECL_GAPIL_CALLBACK(void,    gapil_apply_reads,       context* ctx);
 DECL_GAPIL_CALLBACK(void,    gapil_apply_writes,      context* ctx);
+DECL_GAPIL_CALLBACK(pool*,   gapil_make_pool,         context* ctx, uint64_t size);
 DECL_GAPIL_CALLBACK(void,    gapil_make_slice,        context* ctx, uint64_t size, slice* out);
 DECL_GAPIL_CALLBACK(void,    gapil_copy_slice,        context* ctx, slice* dst, slice* src);
 DECL_GAPIL_CALLBACK(void,    gapil_pointer_to_slice,  context* ctx, uint64_t ptr, uint64_t offset, uint64_t size, slice* out);

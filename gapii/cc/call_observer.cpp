@@ -67,12 +67,12 @@ CallObserver::CallObserver(SpyBase* spy, CallObserver* parent, uint8_t api)
 // Releases the observation data memory at the end.
 CallObserver::~CallObserver() {}
 
-uint32_t CallObserver::getPoolID() {
-    return mSpy->getPoolID();
+core::Arena* CallObserver::arena() const {
+    return mSpy->arena();
 }
 
-core::Arena* CallObserver::getArena() const {
-    return mSpy->getArena();
+context_t* CallObserver::context() const {
+    return mSpy->context();
 }
 
 void CallObserver::read(const void* base, uint64_t size) {
@@ -129,14 +129,14 @@ gapil::String CallObserver::string(const char* str) {
     for (uint64_t i = 0;; i++) {
         if (str[i] == 0) {
             read(str, i + 1);
-            return gapil::String(mSpy->getArena(), str, str + i);
+            return gapil::String(mSpy->arena(), str, str + i);
         }
     }
 }
 
-gapil::String CallObserver::string(const Slice<char>& slice) {
+gapil::String CallObserver::string(const gapil::Slice<char>& slice) {
     read(slice);
-    return gapil::String(mSpy->getArena(), slice.begin(), slice.end());
+    return gapil::String(mSpy->arena(), slice.begin(), slice.end());
 }
 
 }  // namespace gapii

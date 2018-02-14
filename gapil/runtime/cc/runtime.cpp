@@ -101,11 +101,18 @@ void gapil_free(arena_t* a, void* ptr) {
 pool* gapil_make_pool(context* ctx, uint64_t size) {
     Arena* arena = reinterpret_cast<Arena*>(ctx->arena);
 
-    auto buffer = arena->allocate(size, 16);
-    memset(buffer, 0, size);
+    void* buffer = nullptr;
+    if (size > 0) {
+        // Zero-sized pools can be requested as a 'virtual' placeholder for
+        // GAPII mid-execution capture.
+        buffer = arena->allocate(size, 16);
+        memset(buffer, 0, size);
+    }
 
     auto pool = arena->create<pool_t>();
     pool->arena = ctx->arena;
+    pool->id = ctx->next_pool_id++;
+    pool->size = size;
     pool->ref_count = 1;
     pool->buffer = buffer;
 

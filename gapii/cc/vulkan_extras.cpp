@@ -80,7 +80,7 @@ bool VulkanSpy::observeFramebuffer(CallObserver* observer,
     uint32_t queue_family = image->mLastBoundQueue->mFamily;
     auto& instance_fn = mImports.mVkInstanceFunctions[instance];
 
-    VkPhysicalDeviceMemoryProperties memory_properties(&mArena);
+    VkPhysicalDeviceMemoryProperties memory_properties(arena());
     instance_fn.vkGetPhysicalDeviceMemoryProperties(physical_device,
         &memory_properties);
 
@@ -118,7 +118,7 @@ bool VulkanSpy::observeFramebuffer(CallObserver* observer,
     });
 
 
-    VkMemoryRequirements image_reqs(&mArena);
+    VkMemoryRequirements image_reqs(arena());
     fn.vkGetImageMemoryRequirements(device, resolve_image, &image_reqs);
 
     uint32_t image_memory_req = 0xFFFFFFFF;
@@ -168,7 +168,7 @@ bool VulkanSpy::observeFramebuffer(CallObserver* observer,
         fn.vkDestroyBuffer(device, buffer, nullptr);
     });
 
-    VkMemoryRequirements buffer_reqs(&mArena);
+    VkMemoryRequirements buffer_reqs(arena());
     fn.vkGetBufferMemoryRequirements(device, buffer, &buffer_reqs);
 
     uint32_t buffer_memory_req = 0;

@@ -17,7 +17,8 @@
 #ifndef GAPII_TO_PROTO_H
 #define GAPII_TO_PROTO_H
 
-#include "gapii/cc/slice.h"
+#include "gapil/runtime/cc/slice.h"
+
 #include "gapis/memory/memory_pb/memory.pb.h"
 
 #include "core/cc/static_array.h"
@@ -41,18 +42,17 @@ class ToProtoContext {
 
     // This method is called for all serialized slices.
     template<typename T>
-    void SeenSlice(const Slice<T>& s) {
-      uint8_t* base = reinterpret_cast<uint8_t*>(s.begin());
-      mSeenSlices.push_back(Slice<uint8_t>(base, s.size(), s.pool()));
+    void SeenSlice(const gapil::Slice<T>& s) {
+      mSeenSlices.push_back(s.template as<uint8_t>());
     }
 
     // Return a vector of all serialized slices within this context.
     // Note that slices are recorded as byte-slices (the original type is discarded).
-    const std::vector<Slice<uint8_t>>& SeenSlices() { return mSeenSlices; }
+    const std::vector<gapil::Slice<uint8_t>>& SeenSlices() { return mSeenSlices; }
 
   private:
     std::unordered_map<const void*, uint64_t> mSeenReferences;
-    std::vector<Slice<uint8_t>> mSeenSlices;
+    std::vector<gapil::Slice<uint8_t>> mSeenSlices;
 };
 
 // Default converter for any type which is not specialized below.
@@ -81,14 +81,15 @@ struct ProtoConverter<Out, void*> {
 
 // Converts Slice to proto
 template<typename T>
-struct ProtoConverter<memory_pb::Slice, Slice<T>> {
-    static inline void convert(memory_pb::Slice* out, const Slice<T>& in, ToProtoContext& ctx) {
+struct ProtoConverter<memory_pb::Slice, gapil::Slice<T>> {
+    static inline void convert(memory_pb::Slice* out, const gapil::Slice<T>& in, ToProtoContext& ctx) {
         ctx.SeenSlice(in);
+
         auto base = reinterpret_cast<uintptr_t>(in.begin());
-        if (!in.isApplicationPool()) {
-          base -= reinterpret_cast<uintptr_t>(in.pool()->base());
+        if (auto p = in.pool()) {
+          base -= reinterpret_cast<uintptr_t>(p->buffer);
+          out->set_pool(p->id);
         }
-        out->set_pool(in.poolID());
         out->set_root(base);
         out->set_base(base);
         out->set_count(in.count());
