@@ -346,15 +346,22 @@ func (c *compiler) read(s *scope, n *semantic.Read) {
 }
 
 func (c *compiler) return_(s *scope, n *semantic.Return) {
+	var val *codegen.Value
+	var ty semantic.Type
 	if n.Value != nil {
-		val := c.expression(s, n.Value)
-		c.reference(s, val, n.Value.ExpressionType())
-
-		retTy := c.returnType(c.currentFunc) // <error, value>
-		c.doReturn(s, s.Zero(retTy).Insert(retValue, val))
+		val = c.expression(s, n.Value)
+		ty = n.Value.ExpressionType()
+	} else if c.currentFunc.Signature.Return != semantic.VoidType {
+		val = c.initialValue(s, c.currentFunc.Signature.Return)
+		ty = c.currentFunc.Signature.Return
 	} else {
 		c.doReturn(s, nil)
+		return
 	}
+	c.reference(s, val, ty)
+	retTy := c.returnType(c.currentFunc) // <error, value>
+	ret := s.Zero(retTy).Insert(retValue, val)
+	c.doReturn(s, ret)
 }
 
 func (c *compiler) doReturn(s *scope, val *codegen.Value) {

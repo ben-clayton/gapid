@@ -335,8 +335,8 @@ func (c *compiler) buildMapType(t *semantic.Map) {
 
 	c.build(mi.Lookup, func(s *scope) {
 		m := s.Parameter(0).SetName("map")
-		s.arena = m.Index(0, mapArena).Load().SetName("arena")
 		k := s.Parameter(1).SetName("key")
+		s.arena = m.Index(0, mapArena).Load().SetName("arena")
 		ptr := s.Call(mi.Index, m, k, s.Scalar(false))
 		s.If(ptr.IsNull(), func() {
 			s.Return(c.initialValue(s, t.ValueType))
