@@ -21,7 +21,7 @@
 {{/* ---- Overrides ---- */}}
 {{Global "C++.EnumTypeOverride"   "uint32_t"}}
 {{Global "C++.StringTypeOverride" "gapil::String"}}
-{{Global "C++.ArenaOverride"      "&mArena"}}
+{{Global "C++.ArenaOverride"      "arena()"}}
 {{Global "C++.Statement.Override" "Statement"}}
 
 {{Global "ApiIndex" $.Index}}
@@ -241,7 +241,7 @@
           observer->encodeAndDelete(new api::CmdCall);
         {{else}}
           observer->encode(cmd::{{.Name}}Call{§
-          {{if IsString $.Return.Type}}gapil::String(&mArena, result)
+          {{if IsString $.Return.Type}}gapil::String(arena(), result)
           {{else                     }}result
           {{end}}
           §});

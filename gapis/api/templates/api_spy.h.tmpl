@@ -20,7 +20,7 @@
 
 {{/* ---- Overrides ---- */}}
 {{Global "C++.EnumTypeOverride" "uint32_t"}}
-{{Global "C++.ArenaOverride"    "&mArena"}}
+{{Global "C++.ArenaOverride"    "arena()"}}
 
 {{$filename := print (Global "API") "_spy.h" }}
 {{Global "SpyName" (print (Title (Global "API")) "Spy")}}

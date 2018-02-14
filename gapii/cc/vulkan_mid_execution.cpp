@@ -276,12 +276,12 @@ void VulkanSpy::prepareGPUBuffers(PackEncoder *group,
   auto empty_index = sendResource(VulkanSpy::kApiIndex, &empty, 0);
 
   auto create_virtual_pool = [&](uint64_t pool_size) {
-    auto pool = Pool::create_virtual(getPoolID(), pool_size);
+    auto pool = gapil_make_pool(context(), 0);
     memory_pb::Observation observation;
     observation.set_base(0);
     observation.set_size(0);
     observation.set_resindex(empty_index);
-    observation.set_pool(pool->id());
+    observation.set_pool(pool->id);
     group->object(&observation);
     return pool;
   };
@@ -294,7 +294,6 @@ void VulkanSpy::prepareGPUBuffers(PackEncoder *group,
     // Prep fences
     for (auto &fence : Fences) {
       if (fence.second->mDevice == device.second->mVulkanHandle) {
-        ;
         fence.second->mSignaled =
             (device_functions.vkGetFenceStatus(device.second->mVulkanHandle,
                                                fence.second->mVulkanHandle) ==
@@ -316,7 +315,7 @@ void VulkanSpy::prepareGPUBuffers(PackEncoder *group,
         device.second->mVulkanHandle, &create_info, nullptr, &buffer);
 
     TransferBufferMemoryRequirements[device.second->mVulkanHandle] =
-        VkMemoryRequirements{&mArena};
+        VkMemoryRequirements{arena()};
     mImports.mVkDeviceFunctions[device.second->mVulkanHandle]
         .vkGetBufferMemoryRequirements(
             device.second->mVulkanHandle, buffer,
@@ -327,10 +326,10 @@ void VulkanSpy::prepareGPUBuffers(PackEncoder *group,
 
   for (auto &mem : DeviceMemories) {
     auto &memory = mem.second;
-    memory->mData = Slice<uint8_t>(
+    memory->mData = gapil::Slice<uint8_t>(
         nullptr, memory->mAllocationSize,
         create_virtual_pool(memory->mAllocationSize));
-    gpu_pools->insert(memory->mData.poolID());
+    gpu_pools->insert(memory->mData.pool_id());
     if (memory->mMappedLocation != nullptr) {
       if (subIsMemoryCoherent(nullptr, nullptr, memory)) {
         trackMappedCoherentMemory(
@@ -395,7 +394,7 @@ void VulkanSpy::prepareGPUBuffers(PackEncoder *group,
       }
       auto &deviceMemory = DeviceMemories[bind.mmemory];
       StagingBuffer stage(
-          &mArena, device_functions, buf->mDevice,
+          arena(), device_functions, buf->mDevice,
           PhysicalDevices[Devices[buf->mDevice]->mPhysicalDevice]
               ->mMemoryProperties,
           bind.msize);
@@ -434,7 +433,7 @@ void VulkanSpy::prepareGPUBuffers(PackEncoder *group,
       observation.set_base(bind.mmemoryOffset);
       observation.set_size(bind.msize);
       observation.set_resindex(resIndex);
-      observation.set_pool(deviceMemory->mData.poolID());
+      observation.set_pool(deviceMemory->mData.pool_id());
       group->object(&observation);
     }
   }
@@ -525,9 +524,9 @@ void VulkanSpy::prepareGPUBuffers(PackEncoder *group,
         byte_size_and_extent e =
             level_size(image_info.mExtent, image_info.mFormat, lev.first);
         level->mData =
-            Slice<uint8_t>(nullptr, e.level_size,
+            gapil::Slice<uint8_t>(nullptr, e.level_size,
                            create_virtual_pool(e.level_size));
-        gpu_pools->insert(level->mData.poolID());
+        gpu_pools->insert(level->mData.pool_id());
       }
     }
 
@@ -694,7 +693,7 @@ void VulkanSpy::prepareGPUBuffers(PackEncoder *group,
       }
 
       StagingBuffer stage(
-          &mArena, device_functions, img->mDevice,
+          arena(), device_functions, img->mDevice,
           PhysicalDevices[Devices[img->mDevice]->mPhysicalDevice]
               ->mMemoryProperties,
           offset);
@@ -792,7 +791,7 @@ void VulkanSpy::prepareGPUBuffers(PackEncoder *group,
           observation.set_size(e.level_size);
           observation.set_resindex(resIndex);
           observation.set_pool(
-              img->mLayers[array_layer]->mLevels[mip_level]->mData.poolID());
+              img->mLayers[array_layer]->mLevels[mip_level]->mData.pool_id());
           group->object(&observation);
         }
         new_offset = next_offset;

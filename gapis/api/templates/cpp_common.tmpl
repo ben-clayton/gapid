@@ -44,7 +44,7 @@
   {{else if IsReference   $}}gapil::Ref<{{Template "C++.Type" $.To}}>
   {{else if IsString      $}}{{Template "C++.StringType" $}}
   {{else if IsStaticArray $}}core::StaticArray<{{Template "C++.Type" $.ValueType}}, {{$.Size}}>
-  {{else if IsSlice       $}}Slice<{{if IsVoid $.To}}uint8_t{{else}}{{Template "C++.Type" $.To}}{{end}}>
+  {{else if IsSlice       $}}gapil::Slice<{{if IsVoid $.To}}uint8_t{{else}}{{Template "C++.Type" $.To}}{{end}}>
   {{else if IsPointer     $}}{{Template "C++.Type" $.To}}*
   {{else if IsAny         $}}auto
   {{else}}{{Template "C++.TypeName" $}}

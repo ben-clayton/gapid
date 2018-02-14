@@ -317,17 +317,17 @@ EGLBoolean Spy::eglMakeCurrent(CallObserver* observer, EGLDisplay display, EGLSu
 }
 
 gapil::Ref<StaticContextState> GlesSpy::GetEGLStaticContextState(CallObserver* observer, EGLDisplay display, EGLContext context) {
-    Constants constants(&mArena);
+    Constants constants(arena());
     getContextConstants(constants);
 
     gapil::String threadName;
 #if TARGET_OS == GAPID_OS_ANDROID
     char buffer[256] = { 0 };
     prctl(PR_GET_NAME, (unsigned long)buffer, 0, 0, 0);
-    threadName = gapil::String(&mArena, buffer);
+    threadName = gapil::String(arena(), buffer);
 #endif
 
-    auto out = gapil::Ref<StaticContextState>::create(&mArena, constants, threadName);
+    auto out = gapil::Ref<StaticContextState>::create(arena(), constants, threadName);
 
     observer->encodeAndDelete(out->toProto());
 
@@ -394,7 +394,7 @@ gapil::Ref<DynamicContextState> GlesSpy::GetEGLDynamicContextState(CallObserver*
     bool resetViewportScissor = true;
     bool preserveBuffersOnSwap = swapBehavior == EGL_BUFFER_PRESERVED;
 
-    auto out = gapil::Ref<DynamicContextState>::create(&mArena,
+    auto out = gapil::Ref<DynamicContextState>::create(arena(),
         width, height,
         backbufferColorFmt, backbufferDepthFmt, backbufferStencilFmt,
         resetViewportScissor,
@@ -451,20 +451,20 @@ void Spy::saveInitialState() {
     if (should_trace(GlesSpy::kApiIndex)) {
       ToProtoContext pbCtx;
       auto glesState = GlesSpy::serializeState(pbCtx);
-      std::map<uint32_t, Pool*> seenPools;
+      std::map<uint32_t, const pool_t*> seenPools;
       for (const auto& s : pbCtx.SeenSlices()) {
-        if (!s.isApplicationPool()) {
-          seenPools.emplace(s.poolID(), s.pool().get());
+        if (auto p = s.pool()) {
+          seenPools.emplace(p->id, p);
         }
       }
       for (const auto& kvp : seenPools) {
-        Pool* p = kvp.second;
-        auto resIndex = sendResource(GlesSpy::kApiIndex, p->base(), p->size());
+        auto p = kvp.second;
+        auto resIndex = sendResource(GlesSpy::kApiIndex, p->buffer, p->size);
         memory_pb::Observation observation;
         observation.set_base(0);
-        observation.set_size(p->size());
+        observation.set_size(p->size);
         observation.set_resindex(resIndex);
-        observation.set_pool(p->id());
+        observation.set_pool(p->id);
         group->object(&observation);
       }
       group->object(glesState.get());
@@ -475,20 +475,21 @@ void Spy::saveInitialState() {
 
         ToProtoContext pbCtx;
         auto vulkanState = VulkanSpy::serializeState(pbCtx);
-        std::map<uint32_t, Pool*> seenPools;
+        std::map<uint32_t, const pool_t*> seenPools;
         for (const auto& s : pbCtx.SeenSlices()) {
-          if (!s.isApplicationPool() && gpu_pools.find(s.poolID()) == gpu_pools.end()) {
-            seenPools.emplace(s.poolID(), s.pool().get());
+          auto p = s.pool();
+          if (p != nullptr && gpu_pools.find(p->id) == gpu_pools.end()) {
+            seenPools.emplace(p->id, p);
           }
         }
         for (const auto& kvp : seenPools) {
-          Pool* p = kvp.second;
-          auto resIndex = sendResource(VulkanSpy::kApiIndex, p->base(), p->size());
+          auto p = kvp.second;
+          auto resIndex = sendResource(VulkanSpy::kApiIndex, p->buffer, p->size);
           memory_pb::Observation observation;
           observation.set_base(0);
-          observation.set_size(p->size());
+          observation.set_size(p->size);
           observation.set_resindex(resIndex);
-          observation.set_pool(p->id());
+          observation.set_pool(p->id);
           group->object(&observation);
         }
         group->object(vulkanState.get());

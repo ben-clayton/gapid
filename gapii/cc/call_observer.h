@@ -20,7 +20,7 @@
 #include "gapii/cc/abort_exception.h"
 #include "gapii/cc/gles_types.h"
 #include "gapii/cc/pack_encoder.h"
-#include "gapii/cc/slice.h"
+#include "gapil/runtime/cc/slice.h"
 
 #include "gapis/memory/memory_pb/memory.pb.h"
 
@@ -74,8 +74,11 @@ public:
     // getCurrentThread returns the current thread identifier.
     uint64_t getCurrentThread() { return mCurrentThread; }
 
-    // getArena returns the active memory arena.
-    core::Arena* getArena() const;
+    // arena returns the active memory arena.
+    core::Arena* arena() const;
+
+    // arena returns the active context.
+    context_t* context() const;
 
     // read is called to make a read memory observation of size bytes, starting
     // at base. It only records the range of the read memory, the actual
@@ -90,22 +93,22 @@ public:
     // read records the memory range for the given slice as a read operation.
     // The actual copying of the data is deferred until the data is to be sent.
     template <typename T>
-    inline void read(const Slice<T>& slice);
+    inline void read(const gapil::Slice<T>& slice);
 
     // read records and returns the i'th element from the slice src. The actual
     // copying of the data is deferred until the data is to be sent.
     template <typename T>
-    inline T read(const Slice<T>& src, uint64_t i);
+    inline T read(const gapil::Slice<T>& src, uint64_t i);
 
     // write records the memory for the given slice as a write operation. The
     // actual copying of the data is deferred until the data is to be sent.
     template <typename T>
-    inline void write(const Slice<T>& slice);
+    inline void write(const gapil::Slice<T>& slice);
 
     // write records a value to i'th element in the slice dst. The actual
     // copying of the data is deferred until the data is to be sent.
     template <typename T>
-    inline void write(const Slice<T>& dst, uint64_t i, const T& value);
+    inline void write(const gapil::Slice<T>& dst, uint64_t i, const T& value);
 
     // copy copies N elements from src to dst, where N is the smaller of
     // src.count() and dst.count().
@@ -113,20 +116,20 @@ public:
     // of dst is returned so that the write observation can be made after the
     // call to the imported function.
     template <typename T>
-    inline Slice<T> copy(const Slice<T>& dst, const Slice<T>& src);
+    inline gapil::Slice<T> copy(const gapil::Slice<T>& dst, const gapil::Slice<T>& src);
 
     // clone observes src as a read operation and returns a copy of src in a
     // new Pool.
     template <typename T>
-    inline Slice<T> clone(const Slice<T>& src);
+    inline gapil::Slice<T> clone(const gapil::Slice<T>& src);
 
     // string returns a gapil::String from the null-terminated string str.
     // str is observed as a read operation.
     gapil::String string(const char* str);
 
-    // string returns a gapil::String from the Slice<char> slice.
+    // string returns a gapil::String from the gapil::Slice<char> slice.
     // slice is observed as a read operation.
-    gapil::String string(const Slice<char>& slice);
+    gapil::String string(const gapil::Slice<char>& slice);
 
     // encoder returns the PackEncoder currently in use.
     inline PackEncoder::SPtr encoder();
@@ -155,19 +158,16 @@ public:
     void observePending();
 
 private:
-    // returns new unique pool ID.
-    uint32_t getPoolID();
-
     // shouldObserve returns true if the given slice is located in application
     // pool and we are supposed to observe application pool.
     template <class T>
-    bool shouldObserve(const Slice<T>& slice) const {
-        return mObserveApplicationPool && slice.isApplicationPool();
+    bool shouldObserve(const gapil::Slice<T>& slice) const {
+        return mObserveApplicationPool && slice.is_app_pool();
     }
 
     // Make a slice on a new Pool.
     template <typename T>
-    inline Slice<T> make(uint64_t count);
+    inline gapil::Slice<T> make(uint64_t count);
 
     // A pointer to the spy instance.
     SpyBase* mSpy;
@@ -201,14 +201,14 @@ private:
 };
 
 template <typename T>
-inline void CallObserver::read(const Slice<T>& slice) {
+inline void CallObserver::read(const gapil::Slice<T>& slice) {
     if (shouldObserve(slice)) {
         read(slice.begin(), slice.count() * sizeof(T));
     }
 }
 
 template <typename T>
-inline T CallObserver::read(const Slice<T>& src, uint64_t index) {
+inline T CallObserver::read(const gapil::Slice<T>& src, uint64_t index) {
     T& elem = src[index];
     if (shouldObserve(src)) {
         read(&elem, sizeof(T));
@@ -217,14 +217,14 @@ inline T CallObserver::read(const Slice<T>& src, uint64_t index) {
 }
 
 template <typename T>
-inline void CallObserver::write(const Slice<T>& slice) {
+inline void CallObserver::write(const gapil::Slice<T>& slice) {
     if (shouldObserve(slice)) {
         write(slice.begin(), slice.count() * sizeof(T));
     }
 }
 
 template <typename T>
-inline void CallObserver::write(const Slice<T>& dst, uint64_t index,
+inline void CallObserver::write(const gapil::Slice<T>& dst, uint64_t index,
                                 const T& value) {
     if (!shouldObserve(
             dst)) {  // The spy must not mutate data in the application pool.
@@ -235,7 +235,7 @@ inline void CallObserver::write(const Slice<T>& dst, uint64_t index,
 }
 
 template <typename T>
-inline Slice<T> CallObserver::copy(const Slice<T>& dst, const Slice<T>& src) {
+inline gapil::Slice<T> CallObserver::copy(const gapil::Slice<T>& dst, const gapil::Slice<T>& src) {
     read(src);
     if (!shouldObserve(
             dst)) {  // The spy must not mutate data in the application pool.
@@ -246,8 +246,8 @@ inline Slice<T> CallObserver::copy(const Slice<T>& dst, const Slice<T>& src) {
 }
 
 template <typename T>
-inline Slice<T> CallObserver::clone(const Slice<T>& src) {
-    Slice<T> dst = make<T>(src.count());
+inline gapil::Slice<T> CallObserver::clone(const gapil::Slice<T>& src) {
+    gapil::Slice<T> dst = make<T>(src.count());
     // Make sure that we actually fill the data the first time.
     // If we use ::copy(), then the copy will only happen if
     // the observer is active.
@@ -257,9 +257,8 @@ inline Slice<T> CallObserver::clone(const Slice<T>& src) {
 }
 
 template <typename T>
-inline Slice<T> CallObserver::make(uint64_t count) {
-    auto pool = Pool::create(getPoolID(), count * sizeof(T));
-    return Slice<T>(reinterpret_cast<T*>(pool->base()), count, pool);
+inline gapil::Slice<T> CallObserver::make(uint64_t count) {
+    return gapil::Slice<T>::create(context(), count);
 }
 
 inline PackEncoder::SPtr CallObserver::encoder() {
