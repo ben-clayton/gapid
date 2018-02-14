@@ -281,8 +281,3 @@ func (b *Builder) block(block, next llvm.BasicBlock, f func()) {
 		b.llvm.CreateBr(next)
 	}
 }
-
-// Dumps the current module to stderr.
-func (b *Builder) Dump() {
-	b.m.llvm.Dump()
-}
