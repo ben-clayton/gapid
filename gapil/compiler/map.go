@@ -331,6 +331,7 @@ func (c *compiler) buildMapType(t *semantic.Map) {
 
 			s.Return(valPtr)
 		})
+		s.Return(s.Zero(c.ty.Pointer(mi.Val)))
 	})
 
 	c.build(mi.Lookup, func(s *scope) {
