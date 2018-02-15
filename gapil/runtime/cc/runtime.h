@@ -79,7 +79,7 @@ typedef struct map_t {
 ////////////////////////////////////////////////////////////////////////////////
 // Functions to be implemented by the user of the runtime                     //
 ////////////////////////////////////////////////////////////////////////////////
-void* gapil_remap_pointer(context* ctx, uint64_t pointer, uint64_t length);
+void* gapil_remap_pointer(context* ctx, uintptr_t pointer, uint64_t length);
 void  gapil_get_code_location(context* ctx, char** file, uint32_t* line);
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -106,8 +106,8 @@ DECL_GAPIL_CALLBACK(void,    gapil_apply_writes,      context* ctx);
 DECL_GAPIL_CALLBACK(pool*,   gapil_make_pool,         context* ctx, uint64_t size);
 DECL_GAPIL_CALLBACK(void,    gapil_make_slice,        context* ctx, uint64_t size, slice* out);
 DECL_GAPIL_CALLBACK(void,    gapil_copy_slice,        context* ctx, slice* dst, slice* src);
-DECL_GAPIL_CALLBACK(void,    gapil_pointer_to_slice,  context* ctx, uint64_t ptr, uint64_t offset, uint64_t size, slice* out);
-DECL_GAPIL_CALLBACK(string*, gapil_pointer_to_string, context* ctx, uint64_t ptr);
+DECL_GAPIL_CALLBACK(void,    gapil_pointer_to_slice,  context* ctx, uintptr_t ptr, uint64_t offset, uint64_t size, slice* out);
+DECL_GAPIL_CALLBACK(string*, gapil_pointer_to_string, context* ctx, uintptr_t ptr);
 DECL_GAPIL_CALLBACK(string*, gapil_slice_to_string,   context* ctx, slice* slice);
 DECL_GAPIL_CALLBACK(void,    gapil_string_to_slice,   context* ctx, string* string, slice* out);
 DECL_GAPIL_CALLBACK(void,    gapil_call_extern,       context* ctx, string* name, void* args, void* res);

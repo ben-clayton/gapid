@@ -18,11 +18,13 @@
 
 extern "C" {
 
-void* gapil_remap_pointer(context* ctx, uint64_t pointer, uint64_t length) {
-    return reinterpret_cast<void*>(pointer);
+void *gapil_remap_pointer(context *ctx, uintptr_t pointer, uint64_t length)
+{
+    return reinterpret_cast<void *>(pointer);
 }
 
-void  gapil_get_code_location(context* ctx, char** file, uint32_t* line) {
+void gapil_get_code_location(context *ctx, char **file, uint32_t *line)
+{
 }
 
 } // extern "C"

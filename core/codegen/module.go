@@ -42,6 +42,7 @@ func NewModule(name string, target *device.ABI) *Module {
 	layout := target.MemoryLayout
 	intSize := 8 * int(layout.Integer.Size)
 	ptrSize := 8 * int(layout.Pointer.Size)
+	sizeSize := 8 * int(layout.Size.Size)
 
 	ctx := llvm.NewContext()
 	m := &Module{
@@ -58,6 +59,8 @@ func NewModule(name string, target *device.ABI) *Module {
 			Uint16:        Integer{false, basicType{"uint16", 16, ctx.Int16Type()}},
 			Uint32:        Integer{false, basicType{"uint32", 32, ctx.Int32Type()}},
 			Uint64:        Integer{false, basicType{"uint64", 64, ctx.Int64Type()}},
+			Uintptr:       Integer{false, basicType{"uintptr", ptrSize, ctx.IntType(ptrSize)}},
+			Size:          Integer{false, basicType{"size", sizeSize, ctx.IntType(sizeSize)}},
 			Float32:       Float{basicType{"float32", 32, ctx.FloatType()}},
 			Float64:       Float{basicType{"float64", 64, ctx.DoubleType()}},
 			ptrSizeInBits: ptrSize,
@@ -208,6 +211,8 @@ func (m *Module) parseTypeName(name string) Type {
 		return m.Types.Float32
 	case "double":
 		return m.Types.Float64
+	case "uintptr_t":
+		return m.Types.Uintptr
 	case "...":
 		return Variadic
 	default:

@@ -212,7 +212,7 @@ func gapil_apply_writes(c *C.context) {
 }
 
 //export gapil_remap_pointer
-func gapil_remap_pointer(c *C.context, ptr, length C.uint64_t) unsafe.Pointer {
+func gapil_remap_pointer(c *C.context, ptr C.uintptr_t, length C.uint64_t) unsafe.Pointer {
 	e := env(c)
 	return e.buffers.remap(memory.Range{Base: uint64(ptr), Size: uint64(length)})
 }

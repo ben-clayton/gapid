@@ -60,6 +60,8 @@ type Types struct {
 	Uint16  Type // Uint16 is an unigned 16-bit integer type.
 	Uint32  Type // Uint32 is an unsigned 32-bit integer type.
 	Uint64  Type // Uint64 is an unsigned 64-bit integer type.
+	Uintptr Type // Uinptr is an unsigned integer type of the same width as a pointer.
+	Size    Type // Size is an unsigned integer of native bit-width.
 	Float32 Type // Float32 is a 32-bit floating-point number type.
 	Float64 Type // Float64 is a 64-bit floating-point number type.
 

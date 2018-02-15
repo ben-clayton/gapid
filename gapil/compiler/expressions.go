@@ -427,15 +427,13 @@ func (c *compiler) parameter(s *scope, e *semantic.Parameter) *codegen.Value {
 func (c *compiler) pointerRange(s *scope, e *semantic.PointerRange) *codegen.Value {
 	p := c.expression(s, e.Pointer)
 	elTy := c.storageType(e.Type.To)
-	u64 := c.ty.Uint64
-	address := p.Cast(u64).SetName("address")
 	start := c.expression(s, e.Range.LHS).Cast(c.ty.Uint64).SetName("start")
 	end := c.expression(s, e.Range.RHS).Cast(c.ty.Uint64).SetName("end")
 	offset := s.Mul(start, s.SizeOf(elTy)).Cast(c.ty.Uint64).SetName("offset")
 	count := s.Sub(end, start).SetName("count")
 	size := s.Mul(count, s.SizeOf(elTy)).Cast(c.ty.Uint64).SetName("size")
 	slicePtr := s.Local("slicePtr", c.ty.sli)
-	s.Call(c.callbacks.pointerToSlice, s.ctx, address, offset, size, slicePtr)
+	s.Call(c.callbacks.pointerToSlice, s.ctx, p, offset, size, slicePtr)
 	slice := slicePtr.Load()
 	c.deferRelease(s, slice, e.Type)
 	return slice

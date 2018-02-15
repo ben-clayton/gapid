@@ -244,22 +244,21 @@ func (c *compiler) buildTypes(api *semantic.API) {
 // targetType returns the codegen type used to represent t in the
 // target-preferred form.
 func (c *compiler) targetType(t semantic.Type) codegen.Type {
-	layout := c.settings.TargetABI.MemoryLayout
 	t = semantic.Underlying(t)
 	switch t := t.(type) {
 	case *semantic.Builtin:
 		switch t {
 		case semantic.IntType:
-			return c.basicType(c.intType(layout.Integer.Size))
+			return c.ty.Int
 		case semantic.SizeType:
-			return c.basicType(c.uintType(layout.Size.Size))
+			return c.ty.Size
 		}
 	case *semantic.StaticArray:
 		return c.ty.Array(c.targetType(t.ValueType), int(t.Size))
 	case *semantic.Slice:
 		return c.ty.sli
 	case *semantic.Pointer:
-		return c.ty.Uint64
+		return c.ty.Uintptr
 	case *semantic.Class, *semantic.Reference, *semantic.Map:
 		if out, ok := c.ty.target[t]; ok {
 			return out
