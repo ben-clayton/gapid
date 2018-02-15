@@ -248,7 +248,7 @@
   {{else if IsUint        $.Type}}value.U64({{$.Name}})
   {{else if IsString      $.Type}}ϟb.String({{$.Name}})
   {{else if IsPointer     $.Type}}{{$.Name}}.value(ϟb, ϟa, ϟs)
-  {{else if IsEnum        $.Type}}value.U32({{$.Name}})
+  {{else if IsEnum        $.Type}}{{Template "Go.Replay.Value" "Type" $.Type.NumberType "Name" $.Name}}
   {{else if IsStaticArray $.Type}}{{$.Name}}.value(ϟb, ϟa, ϟs)
   {{else if IsPseudonym   $.Type}}{{$.Name}}.value(ϟb, ϟa, ϟs)
   {{else if IsClass       $.Type}}{{$.Name}}.value(ϟb, ϟa, ϟs)

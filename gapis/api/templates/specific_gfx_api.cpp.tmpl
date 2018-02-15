@@ -133,7 +133,7 @@
     {{end}}
 
     if (stack->isValid()) {
-      GAPID_DEBUG({{Template "C++.PrintfCommandCallWithLabel" $}});
+      GAPID_INFO({{Template "C++.PrintfCommandCallWithLabel" $}});
 
       {{if GetAnnotation $ "indirect"}}
         {{$args := (GetAnnotation $ "indirect").Arguments}}
@@ -145,7 +145,7 @@
       {{end}}
         {{if not (IsVoid $.Return.Type)}}
           {{Template "C++.ReturnType" $}} return_value = {{Template "Call" $}};
-          GAPID_DEBUG("[%u]{{$name}} returned {{Template "C++.PrintfFormatCode" $.Return.Type}}", cmdLabel, return_value);
+          GAPID_INFO("[%u]{{$name}} returned {{Template "C++.PrintfFormatCode" $.Return.Type}}", cmdLabel, return_value);
           {{if eq $name "glGetError"}}
             if (return_value != Gles::GLenum::GL_NO_ERROR) {
               GAPID_ERROR("[%u]glGetError() returned: 0x%x", cmdLabel, return_value);
