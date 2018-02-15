@@ -19,18 +19,18 @@
 
 inline void VulkanSpy::notifyPendingCommandAdded(CallObserver*, VkQueue) {}
 
-void VulkanSpy::vkErrInvalidHandle(gapil::String handleType, uint64_t handle){
+inline void VulkanSpy::vkErrInvalidHandle(CallObserver*, std::string handleType, uint64_t handle){
     GAPID_WARNING("Error: Invalid %s: %llu", handleType.c_str(), handle)
 }
 
-void VulkanSpy::vkErrNullPointer(gapil::String pointerType) {
+inline void VulkanSpy::vkErrNullPointer(CallObserver*, std::string pointerType) {
     GAPID_WARNING("Error: Null pointer of %s", pointerType.c_str())
 }
 
-void VulkanSpy::vkErrUnrecognizedExtension(gapil::String name) {
+inline void VulkanSpy::vkErrUnrecognizedExtension(CallObserver*, std::string name) {
     GAPID_WARNING("Error: Unrecognized extension: %s", name.c_str())
 }
 
-void VulkanSpy::vkErrExpectNVDedicatedlyAllocatedHandle(gapil::String handleType, uint64_t handle) {
-    GAPID_WARNING("Error: Expected handle that was allocated with a dedicated allocation: %s: %llu", handleType, handle)
+inline void VulkanSpy::vkErrExpectNVDedicatedlyAllocatedHandle(CallObserver*, std::string handleType, uint64_t handle) {
+    GAPID_WARNING("Error: Expected handle that was allocated with a dedicated allocation: %s: %llu", handleType.c_str(), handle)
 }
