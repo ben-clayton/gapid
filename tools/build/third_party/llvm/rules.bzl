@@ -41,7 +41,13 @@ def llvmLibrary(name, path="", deps=[], excludes={}, extras={}):
         name = name,
         srcs =  llvm_sources(path, exclude=exclude),
         deps = deps,
-        copts = cc_copts() + select({
+        copts = cc_copts() + [
+            # Always optimize LLVM.
+            "-O2",
+            "-DNDEBUG",
+            "-ffunction-sections",
+            "-fdata-sections",
+        ] + select({
             "@//tools/build:linux": [],
             "@//tools/build:darwin": [],
             "@//tools/build:windows": [],
@@ -50,7 +56,11 @@ def llvmLibrary(name, path="", deps=[], excludes={}, extras={}):
                 "-fno-rtti",
                 "-fno-exceptions",
             ]
-        })
+        }),
+        # TODO: Linker optimization flags appear to be target-dependent.
+        # linkopts = [
+        #     "-Wl,--gc-sections",
+        # ],
     )
 
 def _tablegen_impl(ctx):
