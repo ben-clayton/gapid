@@ -75,7 +75,7 @@ void Logger::vlogf(unsigned level, const char* src_file, unsigned src_line, cons
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t.time_since_epoch());
 
 #define LOG_COMMON "%02d:%02d:%02d.%03d %c %s: [%s:%u] ", loc->tm_hour, loc->tm_min, loc->tm_sec, \
-    static_cast<int>(ms.count() % 1000), "FEWIDV"[level], mSystem, src_file, src_line 
+    static_cast<int>(ms.count() % 1000), "FEWIDV"[level], mSystem, src_file, src_line
 
 #if TARGET_OS == GAPID_OS_WINDOWS
     {
@@ -108,6 +108,7 @@ void Logger::vlogf(unsigned level, const char* src_file, unsigned src_line, cons
     }
 
     if (level == LOG_LEVEL_FATAL) {
+        *(int*)0 = 0;
         exit(EXIT_FAILURE);
     }
 }

@@ -13,26 +13,12 @@
 # limitations under the License.
 
 load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
-load("//tools/build:rules.bzl", "api_library", "apic_compile", "apic_template", "filter", "cc_copts")
+load("//tools/build:rules.bzl", "api_library", "apic_compile", "apic_template", "cc_copts", "filter")
 
 api_library(
     name = "api",
-    api = "test.api",
+    api = "cloner.api",
     apiname = "test",
-    includes = glob(["*.api"]),
-    visibility = ["//visibility:public"],
-    deps = ["//gapis/messages:api"],
-)
-
-apic_template(
-    name = "generated",
-    api = ":api",
-    templates = [
-        "//gapis/api/templates:api",
-        "//gapis/api/templates:mutate",
-        "//gapis/api/templates:constant_sets",
-        "//gapis/api/templates:convert",
-    ],
     visibility = ["//visibility:public"],
 )
 
@@ -41,6 +27,15 @@ apic_compile(
     api = ":api",
     emit = ["clone"],
     symbols = "c",
+)
+
+apic_template(
+    name = "generated",
+    api = ":api",
+    templates = [
+        "//gapis/api/templates:api",
+    ],
+    visibility = ["//visibility:public"],
 )
 
 # Needed because apic_compile, can't (yet) return a cc provider.
@@ -68,8 +63,7 @@ cc_library(
 go_library(
     name = "go_default_library",
     srcs = [
-        "doc.go",
-        "test.go",
+        "shims.go",
         ":generated",  # keep
     ],
     cdeps = [
@@ -79,53 +73,36 @@ go_library(
         "//gapil/runtime/cc:cloner",
     ],
     cgo = True,  # keep
-    clinkopts = [],  # keep
-    importpath = "github.com/google/gapid/gapis/api/test",
+    copts = cc_copts(),  # keep
+    importpath = "github.com/google/gapid/gapil/compiler/plugins/cloner/test",
     visibility = ["//visibility:public"],
     deps = [
+        "//core/data:go_default_library",  # keep
+        "//core/data/binary:go_default_library",  # keep
+        "//core/data/id:go_default_library",  # keep
+        "//core/data/slice:go_default_library",  # keep
         "//core/math/interval:go_default_library",
+        "//core/math/u64:go_default_library",  # keep
+        "//core/os/device:go_default_library",  # keep
+        "//gapil/constset:go_default_library",
         "//gapis/api:go_default_library",
+        "//gapis/replay:go_default_library",  # keep
+        "//gapis/replay/builder:go_default_library",
+        "//gapis/replay/protocol:go_default_library",  # keep
+        "//gapis/replay/value:go_default_library",  # keep
         "//gapis/service/path:go_default_library",
-        "@com_github_golang_protobuf//proto:go_default_library",  # keep
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "convert_test.go",
-        "intrinsics_test.go",
-        "map_test.go",
-        "mutate_test.go",
-        "subroutines_test.go",
-    ],
+    size = "small",
+    srcs = ["cloner_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//core/assert:go_default_library",
-        "//core/data:go_default_library",  # keep
-        "//core/data/binary:go_default_library",  # keep
-        "//core/data/dictionary:go_default_library",
-        "//core/data/id:go_default_library",
-        "//core/data/protoconv:go_default_library",
-        "//core/data/slice:go_default_library",  # keep
-        "//core/event/task:go_default_library",  # keep
-        "//core/log:go_default_library",  # keep
-        "//core/math/u64:go_default_library",  # keep
+        "//core/log:go_default_library",
         "//core/memory/arena:go_default_library",
-        "//core/os/device:go_default_library",
-        "//gapil/constset:go_default_library",  # keep
-        "//gapir/client:go_default_library",
-        "//gapis/api:go_default_library",
-        "//gapis/api/test/test_pb:go_default_library",  #keep
-        "//gapis/database:go_default_library",
         "//gapis/memory:go_default_library",
-        "//gapis/memory/memory_pb:go_default_library",  #keep
-        "//gapis/messages:go_default_library",  #keep
-        "//gapis/replay:go_default_library",  #keep
-        "//gapis/replay/builder:go_default_library",
-        "//gapis/replay/opcode:go_default_library",
-        "//gapis/replay/protocol:go_default_library",
-        "//gapis/replay/value:go_default_library",  #keep
-        "//gapis/stringtable:go_default_library",  #keep
     ],
 )
