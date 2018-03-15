@@ -32,6 +32,8 @@
   #define {{$guard}}
 ¶
   #include "gapil/runtime/cc/runtime.h"
+  #include "stdint.h"
+  typedef uint8_t bool;
 ¶
   {{range $c := $.Classes}}
     {{Template "ForwardDeclareType" $c}}
@@ -67,7 +69,9 @@
 */}}
 {{define "ForwardDeclareType"}}
   {{if not (IsBuiltin $)}}
-    {{if IsClass $}}{{Template "C.Type" $}};{{end}}
+    {{if IsClass $}}struct __{{Template "C.Type" $}};
+      typedef struct __{{Template "C.Type" $}} {{Template "C.Type" $}};
+    {{end}}
   {{end}}
 {{end}}
 
@@ -83,7 +87,7 @@
   {{else if IsBool        $}}bool
   {{else if IsInt         $}}int
   {{else if IsUint        $}}unsigned int
-  {{else if IsSize        $}}size_val
+  {{else if IsSize        $}}size_t
   {{else if IsChar        $}}char
   {{else if IsU8          $}}uint8_t
   {{else if IsS8          $}}int8_t
@@ -97,13 +101,13 @@
   {{else if IsS64         $}}int64_t
   {{else if IsEnum        $}}{{$.Name}}
   {{else if IsReference   $}}{{Template "C.Type" $.To}}_ref
-  {{else if IsString      $}}struct string*
+  {{else if IsString      $}}string*
   {{else if IsStaticArray $}}{{Template "C.Type" $.ValueType}}
-  {{else if IsSlice       $}}{{Template "C.Type" $.To}}_slice
+  {{else if IsSlice       $}}{{Template "C++.TypeName" $.To}}_slice
   {{else if IsPointer     $}}{{Template "C.Type" $.To}}{{if $.Const}} const{{end}}*
   {{else if IsMap         $}}{{Template "C++.TypeName" $}}
   {{else if IsPseudonym   $}}{{Template "C++.TypeName" $}}
-  {{else}}struct {{Template "C++.TypeName" $}}
+  {{else}}{{Template "C++.TypeName" $}}
   {{end}}
 {{end}}
 
@@ -146,11 +150,11 @@
   {{end}}
 
   {{$name := Macro "C++.TypeName" $}}
-  struct {{$name}} {
+  typedef struct __{{$name}} {
     {{range $f := $.Fields}}
       {{Template "C.Type" $f}} {{$f.Name}}{{if IsStaticArray $f.Type}}[{{$f.Type.Size}}]{{end}};
     {{end}}
-  };¶
+  } {{$name}};¶
 {{end}}
 
 {{/*
@@ -180,18 +184,19 @@
   {{Template "DeclareType" $.KeyType}}
   {{Template "DeclareType" $.ValueType}}
 
-  struct {{Template "C++.TypeName" $}}_element {
+  typedef struct __{{Template "C++.TypeName" $}}_element {
     uint64_t used;
     {{Template "C.Type" $.KeyType}} first;
     {{Template "C.Type" $.ValueType}} second;
-  };
-  struct {{Template "C++.TypeName" $}}_map {
+  } {{Template "C++.TypeName" $}}_element;
+
+  typedef struct __{{Template "C++.TypeName" $}}_map {
     uint32_t ref_count;
     struct arena* arena;
     uint64_t count;
     uint64_t capacity;
     {{Template "C.Type" $}}_element* elements;
-  };
+  } {{Template "C++.TypeName" $}}_map;
   typedef struct {{Template "C.Type" $}}_map* {{Template "C++.TypeName" $}};
 ¶
 {{end}}
@@ -206,11 +211,11 @@
 
   {{Template "DeclareType" $.To}}
 
-  struct {{Template "C++.TypeName" $.To}}_ref_data {
+  typedef struct __{{Template "C++.TypeName" $.To}}_ref_data {
     uint32_t ref_count;
     struct arena* arena;
     {{Template "C.Type" $.To}} val;
-  };
+  } {{Template "C++.TypeName" $.To}}_ref_data;
 
   typedef {{Template "C.Type" $.To}}_ref_data* {{Template "C++.TypeName" $.To}}_ref;
 ¶
@@ -222,12 +227,12 @@
     {{Error "DeclareSlice can only handle builtin types. Got: '%T'" $.To}}
   {{end}}
 
-  struct {{Template "C++.TypeName" $.To}}_slice {
+  typedef struct __{{Template "C++.TypeName" $.To}}_slice {
     pool* pool;
     void* root;
     {{Template "C.Type" $.To}}* base;
     uint64_t size;
-  };
+  } {{Template "C++.TypeName" $.To}}_slice;
 ¶
 {{end}}
 
@@ -238,16 +243,16 @@
 -------------------------------------------------------------------------------
 */}}
 {{define "DeclareEnum"}}
-  typedef {{$.Name}} {{Template "C++.EnumType" $}};
+  typedef {{Template "C++.EnumType" $}} {{$.Name}};
 {{end}}
 
 {{define "DeclareCommand"}}
   {{$name := Macro "CmdName" $}}
-  struct {{$name}} {
+  typedef struct __{{$name}} {
     uint64_t thread_id;
     {{range $p := $.CallParameters}}
       {{Template "C.Type" $p}} {{$p.Name}};
     {{end}}
     {{if not (IsVoid $.Return.Type)}}{{Template "C.Type" $.Return.Type}} _return;{{end}}
-  };
+  } {{$name}};
 {{end}}

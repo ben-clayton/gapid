@@ -25,7 +25,7 @@
   {{AssertType $ "API"}}
   {{template "Go.GeneratedHeader" (Global "OutputDir")}}
 ¶  
-// #include "ctypes.h"
+// #include "gapis/api/vulkan/ctypes.h"
 import "C"
 ¶
   {{range $e := $.Enums}}
@@ -93,12 +93,12 @@ import "C"
     {{Template "DeclareType" $f}}
   {{end}}
 
-  type {{$name}} struct {
+  type __{{$name}} struct {
     c *C.struct_{{$name}}
   }
   {{$struct   := Macro "C++.TypeName" $}}
   {{range $f := $.Fields}}
-    {{Template "DeclareGetterSetter" "Struct" $struct "Name" $f.Name "Type" $f.Type}}
+    {{Template "DeclareGetterSetter" "Struct" (printf "__%v" $struct) "Name" $f.Name "Type" $f.Type}}
   {{end}}
 {{end}}
 
@@ -113,7 +113,7 @@ import "C"
       {{else if IsPointer $}}{{Template "DeclarePointer" $}}
       {{else if IsPseudonym $}} 
         {{Template "DeclareType" $.To}}
-        type {{$.Name}} {{Template "ConstructorType" $.To}}
+        type __{{$.Name}} {{Template "ConstructorType" $.To}}
       {{else}}
       {{end}}
       ¶
@@ -134,7 +134,7 @@ import "C"
 
 {{define "DeclareEnum"}}
     {{Template "DeclareType" $}}
-    type {{$.Name}} {{Template "ConstructorType" $}}
+    type __{{$.Name}} {{Template "Go.Type" $.NumberType}}
     »{{Template "DeclareEnumEntries" $}}«
 {{end}}
 
@@ -147,7 +147,7 @@ import "C"
   {{AssertType $ "Enum"}}
 
   {{range $entry := $.Entries}}
-    const {{$entry.Name}} = {{$.Name}}({{$entry.Value}});
+    const {{$entry.Name}} = __{{$.Name}}({{$entry.Value}});
   {{end}}
 {{end}}
 
@@ -175,15 +175,15 @@ import "C"
     }
 
     {{if not (IsVoid $.To)}}
-      func Get(i int32) {{Template "ConstructorType" $.To}} {
-        return {{Template "ConstructorType" $.To}}(c.base[i])
+      func (c {{$name}}_ptr) Get(i int32) {{Template "ConstructorType" $.To}} {
+        return {{Template "ConstructorType" $.To}}(c.c.base[i])
       }
-      func Set(val {{Template "ConstructorType" $.To}})  {
-        *c = {{Template "CGoType" $.To}}(val)
+      func (c {{$name}}_ptr) Set(val {{Template "ConstructorType" $.To}})  {
+        *c.c = {{Template "CGoType" $.To}}(val)
       }
 
-      func Offset(idx int) {{$name}}_ptr {
-        return {{$name}}_ptr{c + idx}
+      func (c {{$name}}_ptr) Offset(idx int) {{$name}}_ptr {
+        return {{$name}}_ptr{c.c + idx}
       }
     {{end}}
 {{end}}
@@ -236,8 +236,8 @@ import "C"
       {{else if IsS64         $}}C.int64_t
       {{else if IsString      $}}C.string
       {{else if IsPseudonym   $}}C.{{$.Name}}
-      {{else if IsSlice       $}}C.{{$.To.Name}}_slice
-      {{else if IsEnum        $}}C.{{$.Name}}
+      {{else if IsSlice       $}}C.{{Macro "C++.TypeName" $.To}}_slice
+      {{else if IsEnum        $}}__C.{{$.Name}}
       {{else if IsStaticArray $}}{{Template "CGoType" $.ValueType}}[{{$.Size}}]
       {{else if IsPointer     $}}*{{Template "CGoType" $.To}}
       {{else if IsClass       $}}C.struct_{{Template "C++.TypeName" $}}
@@ -293,11 +293,11 @@ import "C"
   {{else if IsS64         $}}int64
   {{else if IsBuiltin     $}}{{Template "Go.Type" $}}
   {{else if IsSlice       $}}{{Template "C++.TypeName" $.To}}_slice
-  {{else if IsPseudonym   $}}{{Template "C++.TypeName" $}}
-  {{else if IsEnum        $}}{{$.Name}}
+  {{else if IsPseudonym   $}}__{{Template "C++.TypeName" $}}
+  {{else if IsEnum        $}}__{{$.Name}}
   {{else if IsStaticArray $}}[{{$.Size}}]{{Template "ConstructorType" $.ValueType}}
   {{else if IsPointer     $}}{{Template "C++.TypeName" $.To}}_ptr
-  {{else if IsClass       $}}{{Template "C++.TypeName" $}}
+  {{else if IsClass       $}}__{{Template "C++.TypeName" $}}
   {{else}}{{Error "DeclareConstructorType does not support type '%T'" $}}
   {{end}}
 {{end}}
@@ -313,9 +313,9 @@ import "C"
       {{Template "DeclareConstructorType" (TypeOf $f)}}
     {{end}}
 
-    func New{{$struct}}(alloc *arena.Arena) {{$struct}} {
+    func New{{$struct}}(alloc *arena.Arena) __{{$struct}} {
       mem := *C.struct_{{$struct}}(alloc.Get(unsafe.Sizeof(C.{{$struct}}), pool.ApplicationPool))
-      return {{$struct}}{mem}
+      return __{{$struct}}{mem}
     }
   {{end}}
 {{end}}
@@ -323,13 +323,13 @@ import "C"
 
 {{define "DeclareCommand"}}
   {{$name := Macro "CmdName" $}}
-  type {{$name}} struct {
+  type __{{$name}} struct {
     c *C.struct_{{$name}}
     Extras []CmdExtra
   }
 
   {{range $p := $.CallParameters}}
-    {{Template "DeclareGetterSetter" "Struct" $name "Name" $p.Name "Type" $p.Type}}
+    {{Template "DeclareGetterSetter" "Struct" (printf "__%v" $name) "Name" $p.Name "Type" $p.Type}}
 ¶
   {{end}}
 {{end}}
