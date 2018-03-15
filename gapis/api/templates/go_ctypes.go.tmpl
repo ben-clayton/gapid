@@ -1,0 +1,335 @@
+{{/*
+ * Copyright (C) 2017 Google Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */}}
+
+{{/* ---- Includes ---- */}}
+{{Include "go_common.tmpl"}}
+{{Include "cpp_common.tmpl"}}
+
+{{$filename := "ctypes.go" }}
+{{$ | Macro "Types" | Reflow 4 | Write $filename}}
+
+{{define "Types"}}
+  {{AssertType $ "API"}}
+  {{template "Go.GeneratedHeader" (Global "OutputDir")}}
+¶  
+// #include "ctypes.h"
+import "C"
+¶
+  {{range $e := $.Enums}}
+    {{Template "DeclareEnum" $e}}
+¶
+  {{end}}
+¶
+  {{range $m := $.Maps}}
+    {{Template "DeclareMap" $m}}
+¶
+  {{end}}
+  {{range $c := $.Classes}}
+    {{Template "DeclareClass" $c}}
+¶
+  {{end}}
+  {{range $c := AllCommands $}}
+    {{range $p := $c.CallParameters}}
+      {{Template "DeclareConstructorType" $p}}
+¶
+    {{end}}
+  {{end}}
+¶
+  {{range $c := AllCommands $}}
+    {{Template "DeclareCommand" $c}}
+  {{end}}
+¶
+{{end}}
+
+{{/*
+-------------------------------------------------------------------------------
+  Emits the declaration of the map's key and value types (if it is not already
+  declared) followed by the map's declaration as a gapil::Map.
+-------------------------------------------------------------------------------
+*/}}
+{{define "DeclareMap"}}
+  {{$name   := Macro "C++.TypeName" $}}
+  {{$key    := Macro "Go.Type" $.KeyType}}
+  {{$value    := Macro "Go.Type" $.ValueType}}
+
+  type {{$name}} struct {
+    c *C.struct_{{$name}}
+  }
+
+  type {{$name}}_Iterator struct {
+    uint32 offset
+    c *C.struct_{{$name}}
+  }
+
+  {{if IsReference $.ValueType}}
+    {{$retval := Macro "Go.Type" $.ValueType.To}}
+    func (f {{$name}}) Get(k {{$key}}) {{$retval}} { }
+    func (f {{$name}}) First() {{$name}}_Iterator { }
+  {{end}}
+{{end}}
+
+{{/*
+-------------------------------------------------------------------------------
+  Emits the declaration of the C class
+-------------------------------------------------------------------------------
+*/}}
+{{define "DeclareClass"}}
+  {{$name   := Macro "C++.TypeName" $}}
+
+  {{range $f := $.Fields}}
+    {{Template "DeclareType" $f}}
+  {{end}}
+
+  type {{$name}} struct {
+    c *C.struct_{{$name}}
+  }
+  {{$struct   := Macro "C++.TypeName" $}}
+  {{range $f := $.Fields}}
+    {{Template "DeclareGetterSetter" "Struct" $struct "Name" $f.Name "Type" $f.Type}}
+  {{end}}
+{{end}}
+
+{{define "DeclareType"}}
+  {{if not (IsType $)}}{{Template "DeclareType" (TypeOf $)}}
+  {{else if not (IsBuiltin $)}}
+    {{$key  := printf "ApiType%vDeclared" $.Name}}
+    {{if not (Global $key)}}
+      {{Global $key "true"}}
+      {{if IsReference   $}}{{Template "DeclareRef" $}}
+      {{else if IsSlice   $}}{{Template "DeclareSlice" $}}
+      {{else if IsPointer $}}{{Template "DeclarePointer" $}}
+      {{else if IsPseudonym $}} 
+        {{Template "DeclareType" $.To}}
+        type {{$.Name}} {{Template "ConstructorType" $.To}}
+      {{else}}
+      {{end}}
+      ¶
+    {{end}}
+  {{end}}
+{{end}}
+
+{{define "DeclareRef"}}
+    {{$name := Macro "C++.TypeName" $.To}}
+    type {{$name}}_ref struct {
+      c *C.{{$name}}_ref
+    }
+
+    func Get() {{$name}} {
+      return {{$name}}{&c.val}
+    }
+{{end}}
+
+{{define "DeclareEnum"}}
+    {{Template "DeclareType" $}}
+    type {{$.Name}} {{Template "ConstructorType" $}}
+    »{{Template "DeclareEnumEntries" $}}«
+{{end}}
+
+{{/*
+-------------------------------------------------------------------------------
+  Emits enum entry declarations as a number of uint32_t constants.
+-------------------------------------------------------------------------------
+*/}}
+{{define "DeclareEnumEntries"}}
+  {{AssertType $ "Enum"}}
+
+  {{range $entry := $.Entries}}
+    const {{$entry.Name}} = {{$.Name}}({{$entry.Value}});
+  {{end}}
+{{end}}
+
+
+{{define "DeclareSlice"}}
+    {{Template "DeclareType" $}}
+    {{$name := Macro "C++.TypeName" $.To}}
+    type {{$name}}_slice struct {
+      c *C.{{$name}}_slice
+    }
+
+    func Get(i int32) {{Template "ConstructorType" $.To}} {
+      return c.base[i]
+    }
+    func Set(i int32, val {{Template "ConstructorType" $.To}})  {
+      c.base[i] = val
+    }
+{{end}}
+
+{{define "DeclarePointer"}}
+    {{Template "DeclareType" $}}
+    {{$name := Macro "C++.TypeName" $.To}}
+    type {{$name}}_ptr struct {
+      c *{{Template "CGoType" $.To}}
+    }
+
+    {{if not (IsVoid $.To)}}
+      func Get(i int32) {{Template "ConstructorType" $.To}} {
+        return {{Template "ConstructorType" $.To}}(c.base[i])
+      }
+      func Set(val {{Template "ConstructorType" $.To}})  {
+        *c = {{Template "CGoType" $.To}}(val)
+      }
+
+      func Offset(idx int) {{$name}}_ptr {
+        return {{$name}}_ptr{c + idx}
+      }
+    {{end}}
+{{end}}
+
+{{/*
+-------------------------------------------------------------------------------
+  Emits the declaration of the C class
+-------------------------------------------------------------------------------
+*/}}
+{{define "DeclareGetterSetter"}}
+  {{$field_title := Title $.Name}}
+  
+
+  {{if IsMap $.Type}}
+    {{$name   := Macro "C++.TypeName" $.Field}}
+    func (s {{$.Struct}}) {{$field_title}}() {{$name}} {
+      return {{Template "C++.TypeName" $.Type}}(c.c.{{$field_title}})
+    }
+  {{else if IsReference $.Type}}
+    func (s {{$.Struct}}) {{$field_title}}() {{$.Type.To.Name}}_ref {
+      return {{Template "C++.TypeName" $.Type}}_ref(c.c.{{$field_title}})
+    }
+  {{else}}
+  func (s {{$.Struct}}) {{$field_title}}() {{Template "ConstructorType" $.Type}} {
+    return {{Template "ConstructorType" $.Type}}(c.c.{{$field_title}})
+  }
+  func (s {{$.Struct}}) Set{{$field_title}}(v {{Template "ConstructorType" $.Type}}) {
+    c.c.{{$field_title}} = {{Template "CGoType" $.Type}}(v)
+  }
+  {{end}}
+{{end}}
+
+{{define "CGoType"}}
+    {{if not (IsType $)}}{{Template "CGoType" (TypeOf $)}}
+      {{else if IsVoid        $}}C.void
+      {{else if IsBool        $}}C.bool
+      {{else if IsInt         $}}C.int
+      {{else if IsUint        $}}C.uint
+      {{else if IsSize        $}}C.size_t
+      {{else if IsChar        $}}C.char
+      {{else if IsU8          $}}C.uint8_t
+      {{else if IsS8          $}}C.int8_t
+      {{else if IsU16         $}}C.uint16_t
+      {{else if IsS16         $}}C.int16_t
+      {{else if IsF32         $}}C.float
+      {{else if IsU32         $}}C.uint32_t
+      {{else if IsS32         $}}C.int32_t
+      {{else if IsF64         $}}C.double
+      {{else if IsU64         $}}C.uint64_t
+      {{else if IsS64         $}}C.int64_t
+      {{else if IsString      $}}C.string
+      {{else if IsPseudonym   $}}C.{{$.Name}}
+      {{else if IsSlice       $}}C.{{$.To.Name}}_slice
+      {{else if IsEnum        $}}C.{{$.Name}}
+      {{else if IsStaticArray $}}{{Template "CGoType" $.ValueType}}[{{$.Size}}]
+      {{else if IsPointer     $}}*{{Template "CGoType" $.To}}
+      {{else if IsClass       $}}C.struct_{{Template "C++.TypeName" $}}
+      {{else}}{{Error "DeclareConstructorType does not support type '%T'" $}}
+      {{end}}
+{{end}}
+
+
+{{define "DeclareConstructorType"}}
+  {{if not (IsType $)}}{{Template "DeclareConstructorType" (TypeOf $)}}
+  {{else if IsVoid        $}}
+  {{else if IsBool        $}}
+  {{else if IsInt         $}}
+  {{else if IsUint        $}}
+  {{else if IsSize        $}}
+  {{else if IsChar        $}}
+  {{else if IsU8          $}}
+  {{else if IsS8          $}}
+  {{else if IsU16         $}}
+  {{else if IsS16         $}}
+  {{else if IsF32         $}}
+  {{else if IsU32         $}}
+  {{else if IsS32         $}}
+  {{else if IsF64         $}}
+  {{else if IsU64         $}}
+  {{else if IsS64         $}}
+  {{else if IsPseudonym   $}}
+  {{else if IsBuiltin     $}}
+  {{else if IsEnum        $}}{{Template "DeclareConstructorType" $.NumberType}}
+  {{else if IsStaticArray $}}{{Template "DeclareConstructorType" $.ValueType}}
+  {{else if IsPointer     $}}{{Template "DeclareConstructorType" $.To}}
+  {{else if IsClass       $}}{{Template "DeclareClassConstructor" $}}
+  {{else}}{{Error "DeclareConstructorType does not support type '%T'" $}}
+  {{end}}
+{{end}}
+
+{{define "ConstructorType"}}
+  {{if not (IsType $)}}{{Template "ConstructorType" (TypeOf $)}}
+  {{else if IsBool        $}}bool
+  {{else if IsInt         $}}int
+  {{else if IsUint        $}}uint
+  {{else if IsSize        $}}uint64
+  {{else if IsChar        $}}char
+  {{else if IsU8          $}}uint8
+  {{else if IsS8          $}}int8
+  {{else if IsU16         $}}uint16
+  {{else if IsS16         $}}int16
+  {{else if IsF32         $}}float32
+  {{else if IsU32         $}}uint32
+  {{else if IsS32         $}}int32
+  {{else if IsF64         $}}float64
+  {{else if IsU64         $}}uint64
+  {{else if IsS64         $}}int64
+  {{else if IsBuiltin     $}}{{Template "Go.Type" $}}
+  {{else if IsSlice       $}}{{Template "C++.TypeName" $.To}}_slice
+  {{else if IsPseudonym   $}}{{Template "C++.TypeName" $}}
+  {{else if IsEnum        $}}{{$.Name}}
+  {{else if IsStaticArray $}}[{{$.Size}}]{{Template "ConstructorType" $.ValueType}}
+  {{else if IsPointer     $}}{{Template "C++.TypeName" $.To}}_ptr
+  {{else if IsClass       $}}{{Template "C++.TypeName" $}}
+  {{else}}{{Error "DeclareConstructorType does not support type '%T'" $}}
+  {{end}}
+{{end}}
+
+{{define "DeclareClassConstructor"}}
+  {{AssertType $ "Class"}}
+  {{$struct   := Macro "C++.TypeName" $}}
+
+  {{$key  := printf "ApiType%vConstructorDeclared" $.Name}}
+  {{if not (Global $key)}}
+    {{Global $key "true"}}
+    {{range $f := $.Fields}}
+      {{Template "DeclareConstructorType" (TypeOf $f)}}
+    {{end}}
+
+    func New{{$struct}}(alloc *arena.Arena) {{$struct}} {
+      mem := *C.struct_{{$struct}}(alloc.Get(unsafe.Sizeof(C.{{$struct}}), pool.ApplicationPool))
+      return {{$struct}}{mem}
+    }
+  {{end}}
+{{end}}
+
+
+{{define "DeclareCommand"}}
+  {{$name := Macro "CmdName" $}}
+  type {{$name}} struct {
+    c *C.struct_{{$name}}
+    Extras []CmdExtra
+  }
+
+  {{range $p := $.CallParameters}}
+    {{Template "DeclareGetterSetter" "Struct" $name "Name" $p.Name "Type" $p.Type}}
+¶
+  {{end}}
+{{end}}

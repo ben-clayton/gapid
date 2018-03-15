@@ -14,7 +14,7 @@
 
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
-load("//tools/build:rules.bzl", "api_library", "apic_template", "filter")
+load("//tools/build:rules.bzl", "api_library", "apic_template", "filter", "cc_copts")
 
 api_library(
     name = "api",
@@ -36,11 +36,29 @@ apic_template(
     templates = [
         "//gapis/api/templates:api",
         "//gapis/api/templates:mutate",
+        "//gapis/api/templates:ctypes.go",
         "//gapis/api/templates:constant_sets",
         "//gapis/api/templates:convert",
         "//gapis/api/templates:proto",
         "//gapis/api/templates:state_serialize",
     ],
+    visibility = ["//visibility:public"],
+)
+
+apic_template(
+    name = "vulkan_templated",
+    api = "//gapis/api/vulkan:api",
+    templates = [
+        "//gapis/api/templates:ctypes.h",
+    ],
+)
+
+cc_library(
+    name = "headers",
+    hdrs = [
+        ":vulkan_templated"
+    ],
+    copts = cc_copts(),
     visibility = ["//visibility:public"],
 )
 
@@ -68,6 +86,11 @@ go_library(
         "vulkan_terminator.go",
         "wireframe.go",
     ],
+    cdeps = [
+        "headers",
+    ],
+    cgo = True,
+    clinkopts = [],  # keep
     embed = [
         ":generated",  # keep
         ":vulkan_go_proto",

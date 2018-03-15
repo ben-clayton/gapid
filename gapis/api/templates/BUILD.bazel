@@ -52,6 +52,20 @@ api_template(
 )
 
 api_template(
+    name = "ctypes.go",
+    includes = [":templates"],
+    outputs = ["ctypes.go"],
+    template = "go_ctypes.go.tmpl",
+)
+
+api_template(
+    name = "ctypes.h",
+    includes = [":templates"],
+    outputs = ["ctypes.h"],
+    template = "go_ctypes.h.tmpl",
+)
+
+api_template(
     name = "state_serialize",
     includes = [":templates"],
     outputs = ["state_serialize.go"],
