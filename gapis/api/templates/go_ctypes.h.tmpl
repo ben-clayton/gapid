@@ -31,7 +31,7 @@
   #ifndef {{$guard}}
   #define {{$guard}}
 ¶
-  #include "runtime.h"
+  #include "gapil/runtime/cc/runtime.h"
 ¶
   {{range $c := $.Classes}}
     {{Template "ForwardDeclareType" $c}}
@@ -211,7 +211,7 @@
     struct arena* arena;
     {{Template "C.Type" $.To}} val;
   };
-  
+
   typedef {{Template "C.Type" $.To}}_ref_data* {{Template "C++.TypeName" $.To}}_ref;
 ¶
 {{end}}

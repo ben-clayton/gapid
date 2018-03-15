@@ -36,10 +36,10 @@ apic_template(
     templates = [
         "//gapis/api/templates:api",
         "//gapis/api/templates:mutate",
-        "//gapis/api/templates:ctypes.go",
+        "//gapis/api/templates:ctypes_go",
+        "//gapis/api/templates:ctypes_h",
         "//gapis/api/templates:constant_sets",
         "//gapis/api/templates:convert",
-        "//gapis/api/templates:proto",
         "//gapis/api/templates:state_serialize",
     ],
     visibility = ["//visibility:public"],
@@ -49,14 +49,14 @@ apic_template(
     name = "vulkan_templated",
     api = "//gapis/api/vulkan:api",
     templates = [
-        "//gapis/api/templates:ctypes.h",
+        "//gapis/api/templates:ctypes_h",
     ],
 )
 
 cc_library(
     name = "headers",
     hdrs = [
-        ":vulkan_templated"
+        ":vulkan_templated",
     ],
     copts = cc_copts(),
     visibility = ["//visibility:public"],
@@ -85,14 +85,15 @@ go_library(
         "vulkan.go",
         "vulkan_terminator.go",
         "wireframe.go",
+        ":generated",  # keep
     ],
     cdeps = [
         "headers",
+        "//gapil/runtime/cc:headers",
     ],
     cgo = True,
     clinkopts = [],  # keep
     embed = [
-        ":generated",  # keep
         ":vulkan_go_proto",
     ],
     importpath = "github.com/google/gapid/gapis/api/vulkan",
