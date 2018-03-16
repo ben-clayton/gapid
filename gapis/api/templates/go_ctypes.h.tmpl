@@ -32,8 +32,9 @@
   #define {{$guard}}
 ¶
   #include "gapil/runtime/cc/runtime.h"
-  #include "stdint.h"
-  typedef uint8_t bool;
+  #include <stdint.h>
+  #include <stdbool.h>
+  typedef uint8_t void_t;
 ¶
   {{range $c := $.Classes}}
     {{Template "ForwardDeclareType" $c}}
@@ -83,7 +84,7 @@
 */}}
 {{define "C.Type"}}
   {{if not (IsType $)}}{{Template "C.Type" (TypeOf $)}}
-  {{else if IsVoid        $}}void
+  {{else if IsVoid        $}}void_t
   {{else if IsBool        $}}bool
   {{else if IsInt         $}}int
   {{else if IsUint        $}}unsigned int
@@ -153,6 +154,9 @@
   typedef struct __{{$name}} {
     {{range $f := $.Fields}}
       {{Template "C.Type" $f}} {{$f.Name}}{{if IsStaticArray $f.Type}}[{{$f.Type.Size}}]{{end}};
+    {{end}}
+    {{if not (len $.Fields)}}
+      uint8_t __dummy; // At least one field so Cgo sees the type.
     {{end}}
   } {{$name}};¶
 {{end}}
@@ -251,7 +255,7 @@
   typedef struct __{{$name}} {
     uint64_t thread_id;
     {{range $p := $.CallParameters}}
-      {{Template "C.Type" $p}} {{$p.Name}};
+      {{Template "C.Type" $p}} {{$p.Name}}{{if IsStaticArray $p.Type}}[{{$p.Type.Size}}]{{end}};
     {{end}}
     {{if not (IsVoid $.Return.Type)}}{{Template "C.Type" $.Return.Type}} _return;{{end}}
   } {{$name}};

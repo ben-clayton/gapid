@@ -27,6 +27,9 @@
 ¶  
 // #include "gapis/api/vulkan/ctypes.h"
 import "C"
+import "unsafe"
+import "github.com/google/gapid/core/memory/arena"
+import "github.com/google/gapid/gapis/api"
 ¶
   {{range $e := $.Enums}}
     {{Template "DeclareEnum" $e}}
@@ -64,21 +67,38 @@ import "C"
   {{$name   := Macro "C++.TypeName" $}}
   {{$key    := Macro "Go.Type" $.KeyType}}
   {{$value    := Macro "Go.Type" $.ValueType}}
+  {{Template "DeclareType" $.KeyType}}
+  {{Template "DeclareType" $.ValueType}}
 
   type {{$name}} struct {
-    c *C.struct_{{$name}}
+    c C.{{$name}}
   }
 
   type {{$name}}_Iterator struct {
-    uint32 offset
-    c *C.struct_{{$name}}
+    offset uint32
+    c C.{{$name}}
   }
 
-  {{if IsReference $.ValueType}}
-    {{$retval := Macro "Go.Type" $.ValueType.To}}
-    func (f {{$name}}) Get(k {{$key}}) {{$retval}} { }
-    func (f {{$name}}) First() {{$name}}_Iterator { }
-  {{end}}
+  func (f {{$name}}) Get(k {{$key}}) {{Template "ConstructorType" $.ValueType}} {
+    {{if IsBool ($.ValueType | Underlying)}}
+      return false
+    {{else if IsNumericType ($.ValueType | Underlying)}}
+      return {{Template "ConstructorType" $.ValueType}}(0)
+    {{else if IsEnum $.ValueType}}
+      return {{Template "ConstructorType" $.ValueType}}(0)
+    {{else if IsString $.ValueType}}
+      return {{Template "ConstructorType" $.ValueType}}("")
+    {{else}}
+      // TODO: Fill this in correctly
+      return {{Template "ConstructorType" $.ValueType}}{}
+    {{end}}
+    
+  }
+  func (f {{$name}}) First() {{$name}}_Iterator { 
+    // TODO: Fill this in correctly
+    return {{$name}}_Iterator{}
+  }
+
 {{end}}
 
 {{/*
@@ -94,7 +114,7 @@ import "C"
   {{end}}
 
   type __{{$name}} struct {
-    c *C.struct_{{$name}}
+    c *C.{{$name}}
   }
   {{$struct   := Macro "C++.TypeName" $}}
   {{range $f := $.Fields}}
@@ -122,18 +142,19 @@ import "C"
 {{end}}
 
 {{define "DeclareRef"}}
-    {{$name := Macro "C++.TypeName" $.To}}
+    {{$name := Macro "ConstructorType" $.To}}
+    {{$cname := Macro "CGoType" $.To}}
     type {{$name}}_ref struct {
-      c *C.{{$name}}_ref
+      c {{$cname}}_ref
     }
 
-    func Get() {{$name}} {
-      return {{$name}}{&c.val}
+    func (c {{$name}}_ref) Get() {{$name}} {
+      return {{$name}}{&c.c.val}
     }
 {{end}}
 
 {{define "DeclareEnum"}}
-    {{Template "DeclareType" $}}
+    {{$name := Macro "ConstructorType" $}}
     type __{{$.Name}} {{Template "Go.Type" $.NumberType}}
     »{{Template "DeclareEnumEntries" $}}«
 {{end}}
@@ -147,7 +168,7 @@ import "C"
   {{AssertType $ "Enum"}}
 
   {{range $entry := $.Entries}}
-    const {{$entry.Name}} = __{{$.Name}}({{$entry.Value}});
+    const {{$entry.Name}} = __{{$.Name}}({{$entry.Value}})
   {{end}}
 {{end}}
 
@@ -155,35 +176,109 @@ import "C"
 {{define "DeclareSlice"}}
     {{Template "DeclareType" $}}
     {{$name := Macro "C++.TypeName" $.To}}
+    {{$cname := Macro "CGoType" $}}
+    {{$cbaseName := Macro "CGoType" $.To}}
     type {{$name}}_slice struct {
-      c *C.{{$name}}_slice
+      c *{{$cname}}
     }
 
-    func Get(i int32) {{Template "ConstructorType" $.To}} {
-      return c.base[i]
+    func (c {{$name}}_slice) Get(i int32) {{Template "ConstructorType" $.To}} {
+      offset := uintptr(unsafe.Sizeof(*c.c.base))*uintptr(i)
+      base := (*{{$cbaseName}})(unsafe.Pointer(uintptr(unsafe.Pointer(c.c.base)) + offset))
+      return {{Template "ToGoCast" "Type" $.To "Name" "*base"}}
     }
-    func Set(i int32, val {{Template "ConstructorType" $.To}})  {
-      c.base[i] = val
+    func (c {{$name}}_slice) Set(i int32, val {{Template "ConstructorType" $.To}})  {
+      offset := uintptr(unsafe.Sizeof(*c.c.base))*uintptr(i)
+      base := (*{{$cbaseName}})(unsafe.Pointer(uintptr(unsafe.Pointer(c.c.base)) + offset))
+      *base = {{Template "ToCCast" "Type" $.To "Name" "val"}}
     }
 {{end}}
 
+{{define "ConstName"}}
+  {{if $.Const}}_const{{end}}
+{{end}}
+
+{{define "GoDerefCPointer"}}
+  {{if IsClass ($.Type | Underlying) }}
+    {{Template "ConstructorType" $.Type}}{ {{$.Name}}.c }
+  {{else if IsPointer ($.Type | Underlying)}}
+    {{Template "ConstructorType" $.Type}}{({{Template "CGoType" $.Type}})(*{{$.Name}}.c)}
+  {{else}}
+    {{Template "ConstructorType" $.Type}}(*{{$.Name}}.c)
+  {{end}}
+{{end}}
+
+{{define "ToGoCast"}}
+  {{AssertType $.Type "Type"}}
+  {{if IsClass ($.Type | Underlying)}}
+    {{Template "ConstructorType" $.Type}}{ &{{$.Name}} }
+  {{else if IsSlice ($.Type | Underlying)}}
+    {{Template "ConstructorType" $.Type}}{ &{{$.Name}} }
+  {{else if IsMap ($.Type | Underlying)}}
+    {{Template "ConstructorType" $.Type}}{ {{$.Name}} }
+  {{else if IsString ($.Type | Underlying)}}
+    C.GoStringN((*C.char)(unsafe.Pointer(&{{$.Name}}.data[0])), (C.int)({{$.Name}}.length))
+  {{else if IsPointer ($.Type | Underlying)}}
+    {{Template "ConstructorType" $.Type}}{ {{$.Name}} }
+  {{else}}
+    {{Template "ConstructorType" $.Type}}({{$.Name}})
+  {{end}}
+{{end}}
+
+{{define "ToCCast"}}
+  {{AssertType $.Type "Type"}}
+  {{if IsClass ($.Type | Underlying)}}
+    *{{$.Name}}.c
+  {{else if IsSlice ($.Type | Underlying)}}
+    *{{$.Name}}.c
+  {{else if IsMap ($.Type | Underlying)}}
+    ({{Template "CGoType" $.Type}})({{$.Name}}.c)
+  {{else if IsPointer ($.Type | Underlying)}}
+    ({{Template "CGoType" $.Type}})({{$.Name}}.c)
+  {{else}}
+    {{Template "CGoType" $.Type}}({{$.Name}})
+  {{end}}
+{{end}}
+
+
+{{define "AssignRef"}}
+  {{AssertType $.Type "Type"}}
+  {{if IsClass ($.Type | Underlying)}}
+    *{{$.Name}}.c
+  {{else if IsSlice ($.Type | Underlying)}}
+    *{{$.Name}}.c
+  {{else if IsMap ($.Type | Underlying)}}
+    ({{Template "CGoType" $.Type}})({{$.Name}}.c)
+  {{else if IsPointer ($.Type | Underlying)}}
+    ({{Template "CGoType" $.Type}})({{$.Name}}.c)
+  {{else}}
+    {{Template "CGoType" $.Type}}({{$.Name}})
+  {{end}}
+{{end}}
+
+
 {{define "DeclarePointer"}}
-    {{Template "DeclareType" $}}
+    {{Template "DeclareType" $.To}}
+    
     {{$name := Macro "C++.TypeName" $.To}}
-    type {{$name}}_ptr struct {
+    {{$const := Macro "ConstName" $}}
+    type {{$name}}{{$const}}_ptr struct {
       c *{{Template "CGoType" $.To}}
     }
 
     {{if not (IsVoid $.To)}}
-      func (c {{$name}}_ptr) Get(i int32) {{Template "ConstructorType" $.To}} {
-        return {{Template "ConstructorType" $.To}}(c.c.base[i])
+      func (c {{$name}}{{$const}}_ptr) Get() {{Template "ConstructorType" $.To}} {
+        return {{Template "GoDerefCPointer" "Type" $.To "Name" "c"}}
       }
-      func (c {{$name}}_ptr) Set(val {{Template "ConstructorType" $.To}})  {
-        *c.c = {{Template "CGoType" $.To}}(val)
-      }
+      {{if not ($.Const)}}
+        func (c {{$name}}{{$const}}_ptr) Set(val {{Template "ConstructorType" $.To}})  {
+          *c.c = {{Template "AssignRef" "Type" $.To "Name" "val"}}
+        }
+      {{end}}
 
-      func (c {{$name}}_ptr) Offset(idx int) {{$name}}_ptr {
-        return {{$name}}_ptr{c.c + idx}
+      func (c {{$name}}{{$const}}_ptr) Offset(idx int) {{$name}}{{$const}}_ptr {
+        ptr := unsafe.Pointer(uintptr(unsafe.Pointer(c.c)) + uintptr(unsafe.Sizeof(*c.c))*uintptr(idx))
+        return {{$name}}{{$const}}_ptr{ (*{{Template "CGoType" $.To}})(ptr) }
       }
     {{end}}
 {{end}}
@@ -198,27 +293,43 @@ import "C"
   
 
   {{if IsMap $.Type}}
-    {{$name   := Macro "C++.TypeName" $.Field}}
-    func (s {{$.Struct}}) {{$field_title}}() {{$name}} {
-      return {{Template "C++.TypeName" $.Type}}(c.c.{{$field_title}})
+    {{$name   := Macro "C++.TypeName" $.Type}}
+    func (c {{$.Struct}}) {{$field_title}}() {{$name}} {
+      return {{Template "ConstructorType" $.Type}}{c.c.{{$.Name}}}
     }
   {{else if IsReference $.Type}}
-    func (s {{$.Struct}}) {{$field_title}}() {{$.Type.To.Name}}_ref {
-      return {{Template "C++.TypeName" $.Type}}_ref(c.c.{{$field_title}})
+    func (c {{$.Struct}}) {{$field_title}}() {{Template "ConstructorType" $.Type}} {
+      return {{Template "ConstructorType" $.Type}}{c.c.{{$.Name}}}
     }
   {{else}}
-  func (s {{$.Struct}}) {{$field_title}}() {{Template "ConstructorType" $.Type}} {
-    return {{Template "ConstructorType" $.Type}}(c.c.{{$field_title}})
-  }
-  func (s {{$.Struct}}) Set{{$field_title}}(v {{Template "ConstructorType" $.Type}}) {
-    c.c.{{$field_title}} = {{Template "CGoType" $.Type}}(v)
-  }
+    func (c {{$.Struct}}) {{$field_title}}() {{Template "ConstructorType" $.Type}} {
+      {{if IsStaticArray $.Type}}
+        var ret_v {{Template "ConstructorType" $.Type}}
+        for i := 0; i < {{$.Type.Size}}; i++ {
+          ret_v[i] = {{Template "ToGoCast" "Type" $.Type.ValueType "Name" (printf "c.c.%s[i]" $.Name)}}
+        }
+        return ret_v
+      {{else}}
+        return {{Template "ToGoCast" "Type" $.Type "Name" (printf "c.c.%s" $.Name)}}
+      {{end}}
+    }
+    {{if not (IsString $.Type)}}
+      func (c {{$.Struct}}) Set{{$field_title}}(v {{Template "ConstructorType" $.Type}}) {
+        {{if IsStaticArray $.Type}}
+          for i, v := range v {
+            c.c.{{$.Name}}[i] = {{Template "ToCCast" "Type" $.Type.ValueType "Name" "v"}}
+          }
+        {{else}}
+          c.c.{{$.Name}} =  {{Template "ToCCast" "Type" $.Type "Name" "v"}}
+        {{end}}
+      }
+    {{end}}
   {{end}}
 {{end}}
 
 {{define "CGoType"}}
     {{if not (IsType $)}}{{Template "CGoType" (TypeOf $)}}
-      {{else if IsVoid        $}}C.void
+      {{else if IsVoid        $}}C.void_t
       {{else if IsBool        $}}C.bool
       {{else if IsInt         $}}C.int
       {{else if IsUint        $}}C.uint
@@ -237,10 +348,10 @@ import "C"
       {{else if IsString      $}}C.string
       {{else if IsPseudonym   $}}C.{{$.Name}}
       {{else if IsSlice       $}}C.{{Macro "C++.TypeName" $.To}}_slice
-      {{else if IsEnum        $}}__C.{{$.Name}}
+      {{else if IsEnum        $}}C.{{$.Name}}
       {{else if IsStaticArray $}}{{Template "CGoType" $.ValueType}}[{{$.Size}}]
       {{else if IsPointer     $}}*{{Template "CGoType" $.To}}
-      {{else if IsClass       $}}C.struct_{{Template "C++.TypeName" $}}
+      {{else if IsClass       $}}C.{{Template "C++.TypeName" $}}
       {{else}}{{Error "DeclareConstructorType does not support type '%T'" $}}
       {{end}}
 {{end}}
@@ -280,7 +391,7 @@ import "C"
   {{else if IsInt         $}}int
   {{else if IsUint        $}}uint
   {{else if IsSize        $}}uint64
-  {{else if IsChar        $}}char
+  {{else if IsChar        $}}uint8
   {{else if IsU8          $}}uint8
   {{else if IsS8          $}}int8
   {{else if IsU16         $}}uint16
@@ -296,26 +407,27 @@ import "C"
   {{else if IsPseudonym   $}}__{{Template "C++.TypeName" $}}
   {{else if IsEnum        $}}__{{$.Name}}
   {{else if IsStaticArray $}}[{{$.Size}}]{{Template "ConstructorType" $.ValueType}}
-  {{else if IsPointer     $}}{{Template "C++.TypeName" $.To}}_ptr
+  {{else if IsPointer     $}}{{Template "C++.TypeName" $.To}}{{Template "ConstName" $}}_ptr
+  {{else if IsReference   $}}__{{Template "C++.TypeName" $.To}}_ref
   {{else if IsClass       $}}__{{Template "C++.TypeName" $}}
-  {{else}}{{Error "DeclareConstructorType does not support type '%T'" $}}
+  {{else if IsMap         $}}{{Template "C++.TypeName" $}}
+  {{else}}{{Error "ConstructorType does not support type '%T'" $}}
   {{end}}
 {{end}}
 
 {{define "DeclareClassConstructor"}}
   {{AssertType $ "Class"}}
-  {{$struct   := Macro "C++.TypeName" $}}
-
+  {{$struct   := Macro "ConstructorType" $}}
+  {{$c_struct   := Macro "CGoType" $}}
   {{$key  := printf "ApiType%vConstructorDeclared" $.Name}}
   {{if not (Global $key)}}
     {{Global $key "true"}}
     {{range $f := $.Fields}}
       {{Template "DeclareConstructorType" (TypeOf $f)}}
     {{end}}
-
-    func New{{$struct}}(alloc *arena.Arena) __{{$struct}} {
-      mem := *C.struct_{{$struct}}(alloc.Get(unsafe.Sizeof(C.{{$struct}}), pool.ApplicationPool))
-      return __{{$struct}}{mem}
+    func New{{$struct}}(alloc *arena.Arena) {{$struct}} {
+      mem := alloc.Allocate((int)(unsafe.Sizeof({{$c_struct}}{})), (int)(unsafe.Alignof({{$c_struct}}{})))
+      return {{$struct}}{(*{{$c_struct}})(mem)}
     }
   {{end}}
 {{end}}
@@ -323,9 +435,13 @@ import "C"
 
 {{define "DeclareCommand"}}
   {{$name := Macro "CmdName" $}}
+  {{range $p := $.CallParameters}}
+    {{Template "DeclareType" $p.Type}}
+  {{end}}
+
   type __{{$name}} struct {
-    c *C.struct_{{$name}}
-    Extras []CmdExtra
+    c *C.{{$name}}
+    Extras []api.CmdExtra
   }
 
   {{range $p := $.CallParameters}}

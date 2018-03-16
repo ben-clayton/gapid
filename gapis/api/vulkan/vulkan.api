@@ -1983,7 +1983,8 @@ class VkBufferViewCreateInfo {
   VkBuffer                buffer
   VkFormat                format /// Optionally specifies format of elements
   VkDeviceSize            offset /// Specified in bytes
-  VkDeviceSize            range  /// View size specified in bytes
+// TODO: Fix this, it is a keyword in Go
+  VkDeviceSize            Range  /// View size specified in bytes
 }
 
 class VkImageCreateInfo {
@@ -2318,7 +2319,7 @@ class VkDescriptorSetLayoutCreateInfo {
 }
 
 class VkDescriptorPoolSize {
-  VkDescriptorType type
+  VkDescriptorType Type
   u32              descriptorCount
 }
 
@@ -2935,7 +2936,7 @@ class VkPhysicalDeviceImageFormatInfo2 {
   VkStructureType    sType
   const void*        pNext
   VkFormat           format
-  VkImageType        type
+  VkImageType        Type
   VkImageTiling      tiling
   VkImageUsageFlags  usage
   VkImageCreateFlags flags
@@ -3009,7 +3010,7 @@ class VkPhysicalDeviceSparseImageFormatInfo2 {
   VkStructureType       sType
   const void*           pNext
   VkFormat              format
-  VkImageType           type
+  VkImageType           Type
   VkSampleCountFlagBits samples
   VkImageUsageFlags     usage
   VkImageTiling         tiling
@@ -3706,7 +3707,7 @@ cmd void vkGetPhysicalDeviceFormatProperties(
 cmd VkResult vkGetPhysicalDeviceImageFormatProperties(
     VkPhysicalDevice         physicalDevice,
     VkFormat                 format,
-    VkImageType              type,
+    VkImageType              Type,
     VkImageTiling            tiling,
     VkImageUsageFlags        usage,
     VkImageCreateFlags       flags,
@@ -4372,7 +4373,7 @@ cmd void vkGetImageSparseMemoryRequirements(
 cmd void vkGetPhysicalDeviceSparseImageFormatProperties(
     VkPhysicalDevice               physicalDevice,
     VkFormat                       format,
-    VkImageType                    type,
+    VkImageType                    Type,
     VkSampleCountFlagBits          samples,
     VkImageUsageFlags              usage,
     VkImageTiling                  tiling,
@@ -4869,7 +4870,7 @@ cmd VkResult vkCreateBufferView(
     Buffer:        Buffers[buffer_view_create_info.buffer],
     Format:        buffer_view_create_info.format,
     Offset:        buffer_view_create_info.offset,
-    Range:         buffer_view_create_info.range)
+    Range:         buffer_view_create_info.Range)
   if pView == null { vkErrorNullPointer("VkBufferView") }
   pView[0] = handle
   BufferViews[handle] = bufferViewObject
