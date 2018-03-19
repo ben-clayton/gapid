@@ -33,6 +33,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -41,6 +42,8 @@ var externals = map[string]string{
 	"com_github_golang_protobuf": filepath.Join("github.com", "golang", "protobuf"),
 	"com_github_google_protobuf": filepath.Join("github.com", "google", "protobuf"),
 	"com_github_pkg_errors":      filepath.Join("github.com", "pkg", "errors"),
+	"org_golang_google_grpc":     filepath.Join("google.golang.org", "grpc"),
+	"org_golang_x_net":           filepath.Join("golang.org", "x", "net"),
 	"llvm":                       "llvm",
 }
 
@@ -54,6 +57,17 @@ func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
+	}
+}
+
+func osGenRoot(projectRoot string) (string, error) {
+	switch runtime.GOOS {
+	case "darwin":
+		return filepath.Join(projectRoot, "bazel-out", "darwin-fastbuild", "bin"), nil
+	case "linux":
+		return filepath.Join(projectRoot, "bazel-out", "k8-fastbuild", "bin"), nil
+	default:
+		return "", fmt.Errorf("%v is not a supported OS", runtime.GOOS)
 	}
 }
 
@@ -81,13 +95,16 @@ func run() error {
 			hasPrefix(fusedRoot).not(),                            // Don't traverse the fused root
 			hasPrefix(filepath.Join(projectRoot, "bazel-")).not(), // Don't traverse the bazel directories
 		)).
-		ifTrue(and(isFile, hasSuffix(".go"))). // Only consider .go files
+		ifTrue(and(isFile, or(hasSuffix(".go"), hasSuffix(".h")))). // Only consider .go and .h files
 		mapping(func(path string) string {
 			return filepath.Join(fusedRoot, "src", "github.com", "google", "gapid", rel(projectRoot, path))
 		})
 
 	// Collect all the bazel generated file mappings.
-	genRoot := filepath.Join(projectRoot, "bazel-out", "darwin-fastbuild", "bin")
+	genRoot, err := osGenRoot(projectRoot)
+	if err != nil {
+		return err
+	}
 	genMapping := collect(genRoot, always).ifTrue(and(
 		isFile,
 		contains("github.com"),

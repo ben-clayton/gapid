@@ -29,12 +29,14 @@
     "fmt"¶
 ¶
     "github.com/google/gapid/core/data/protoconv"¶
+    "github.com/google/gapid/core/memory/arena"¶
     "github.com/google/gapid/gapis/api/{{Global "OutputDir"}}/{{Global "Store"}}"¶
     "github.com/google/gapid/gapis/memory"¶
     "github.com/google/gapid/gapis/memory/memory_pb"¶
   «)¶
   ¶
   // Just in case it is not used¶
+  var _ arena.Arena¶
   var _ fmt.Stringer¶
   var _ memory.PoolID¶
   var _ memory_pb.Slice¶
@@ -48,7 +50,7 @@
       «},¶
       func(ctx context.Context, in *{{$p}}) (*State, error) {»¶
         ϟrefs := &protoconv.FromProtoContext{}¶
-        return StateFrom(in, ϟrefs), nil¶
+        return StateFrom(ctx, in, ϟrefs), nil¶
       «},¶
     «)¶
   «}¶
@@ -59,18 +61,18 @@
     to := &{{$p}}{}¶
     {{range $g := $.Globals}}
       {{if (GetAnnotation $g "serialize")}}
-        {{Template "Convert.To" "Field" $g "Outer" "State"}}
+        {{Template "Convert.To" "Field" $g}}
       {{end}}
     {{end}}
     return to¶
   «}¶
   ¶
   // StateFrom builds a State from the storage form.¶
-  func StateFrom(from *{{$p}}, ϟrefs *protoconv.FromProtoContext) *State {»¶
+  func StateFrom(ctx context.Context, from *{{$p}}, ϟrefs *protoconv.FromProtoContext) *State {»¶
     ϟa := &State{}¶
     {{range $g := $.Globals}}
       {{if (GetAnnotation $g "serialize")}}
-        {{Template "Convert.From" "Field" $g "Outer" "State"}}
+        {{Template "Convert.From" "Field" $g}}
       {{end}}
     {{end}}
     return ϟa¶

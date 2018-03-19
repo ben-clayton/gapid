@@ -38,8 +38,8 @@ type CustomState struct {
 	IsRebuilding      bool
 	pushMarkerGroup   func(name string, next bool, ty MarkerType)
 	popMarkerGroup    func(ty MarkerType)
-	postBindSparse    func(binds *QueuedSparseBinds)
-	queuedCommands    map[*CommandReference]QueuedCommand
+	postBindSparse    func(binds QueuedSparseBindsʳ)
+	queuedCommands    map[CommandReferenceʳ]QueuedCommand
 	initialCommands   map[VkCommandBuffer][]api.Cmd
 }
 
@@ -78,12 +78,12 @@ func (*State) Root(ctx context.Context, p *path.State) (path.Node, error) {
 
 // SetupInitialState recreates the command lamdas from the state block.
 // These are not encoded so we have to set them up here.
-func (c *State) SetupInitialState(ctx context.Context) {
+func (c *State) SetupInitialState(ctx context.Context, s *api.GlobalState) {
 	c.InitializeCustomState()
 }
 
 func (c *State) InitializeCustomState() {
-	c.queuedCommands = make(map[*CommandReference]QueuedCommand)
+	c.queuedCommands = make(map[CommandReferenceʳ]QueuedCommand)
 	c.initialCommands = make(map[VkCommandBuffer][]api.Cmd)
 }
 
@@ -165,7 +165,7 @@ func (API) ResolveSynchronization(ctx context.Context, d *sync.Data, c *path.Cap
 	// Stacks of markers to be opened in the next subcommand for each VkQueue
 	markersToOpen := map[VkQueue][]*markerInfo{}
 	s.pushMarkerGroup = func(name string, next bool, ty MarkerType) {
-		vkQu := (s.CurrentSubmission).(*VkQueueSubmit).Queue
+		vkQu := (s.CurrentSubmission).(*VkQueueSubmit).Queue()
 		if next {
 			// Add to the to-open marker stack, marker will be opened in the next
 			// subcommand
@@ -185,7 +185,7 @@ func (API) ResolveSynchronization(ctx context.Context, d *sync.Data, c *path.Cap
 		}
 	}
 	s.popMarkerGroup = func(ty MarkerType) {
-		vkQu := (s.CurrentSubmission).(*VkQueueSubmit).Queue
+		vkQu := (s.CurrentSubmission).(*VkQueueSubmit).Queue()
 		stack := markerStack[vkQu]
 		if len(stack) == 0 {
 			log.D(ctx, "Cannot pop marker with type: %v, no open marker with same type at: VkQueueSubmit ID: %v, SubCmdIdx: %v",
@@ -238,7 +238,7 @@ func (API) ResolveSynchronization(ctx context.Context, d *sync.Data, c *path.Cap
 		// Finally, no matter whether the comming subcommand is in a different
 		// command buffer or submission batch, If there are pending markers in the
 		// to-open stack, begin new groups for those pending markers.
-		vkQu := (s.CurrentSubmission).(*VkQueueSubmit).Queue
+		vkQu := (s.CurrentSubmission).(*VkQueueSubmit).Queue()
 		stack := markerStack[vkQu]
 		fullCmdIdx := api.SubCmdIdx{uint64(submissionMap[s.CurrentSubmission])}
 		fullCmdIdx = append(fullCmdIdx, s.SubCmdIdx...)
@@ -293,8 +293,8 @@ func (API) ResolveSynchronization(ctx context.Context, d *sync.Data, c *path.Cap
 		k := submissionMap[s.CurrentSubmission]
 		id := api.CmdNoID
 
-		if initialCommands, ok := s.initialCommands[data.Buffer]; ok {
-			id = commandMap[initialCommands[data.CommandIndex]]
+		if initialCommands, ok := s.initialCommands[data.Buffer()]; ok {
+			id = commandMap[initialCommands[data.CommandIndex()]]
 		}
 
 		if v, ok := d.SubcommandReferences[k]; ok {
@@ -324,7 +324,7 @@ func (API) ResolveSynchronization(ctx context.Context, d *sync.Data, c *path.Cap
 		}
 
 		// Update the End value for all unclosed debug marker groups
-		vkQu := (s.CurrentSubmission).(*VkQueueSubmit).Queue
+		vkQu := (s.CurrentSubmission).(*VkQueueSubmit).Queue()
 		for _, ms := range markerStack[vkQu] {
 			// If the last subcommand is in a secondary command buffer and current
 			// recording debug marker groups are opened in a primary command buffer,
@@ -337,8 +337,8 @@ func (API) ResolveSynchronization(ctx context.Context, d *sync.Data, c *path.Cap
 
 	s.AddCommand = func(a interface{}) {
 		data := a.(*CommandReference)
-		if initialCommands, ok := s.initialCommands[data.Buffer]; ok {
-			commandMap[initialCommands[data.CommandIndex]] = i
+		if initialCommands, ok := s.initialCommands[data.Buffer()]; ok {
+			commandMap[initialCommands[data.CommandIndex()]] = i
 		}
 	}
 
@@ -398,7 +398,7 @@ func (API) FlattenSubcommandIdx(idx api.SubCmdIdx, data *sync.Data, initialCall 
 // RecoverMidExecutionCommand returns a virtual command, used to describe the
 // a subcommand that was created before the start of the trace
 func (API) RecoverMidExecutionCommand(ctx context.Context, c *path.Capture, dat interface{}) (api.Cmd, error) {
-	cr, ok := dat.(*CommandReference)
+	cr, ok := dat.(CommandReferenceʳ)
 	if !ok {
 		return nil, fmt.Errorf("Not a command reference")
 	}
@@ -410,8 +410,8 @@ func (API) RecoverMidExecutionCommand(ctx context.Context, c *path.Capture, dat 
 	}
 	s := GetState(st)
 
-	cb := CommandBuilder{Thread: 0}
-	_, a, err := AddCommand(ctx, cb, cr.Buffer, st, st, GetCommandArgs(ctx, cr, s))
+	cb := CommandBuilder{Thread: 0, Arena: st.Arena}
+	_, a, err := AddCommand(ctx, cb, cr.Buffer(), st, st, GetCommandArgs(ctx, cr, s))
 	if err != nil {
 		return nil, log.Errf(ctx, err, "Invalid Command")
 	}

@@ -24,6 +24,7 @@ import (
 	"github.com/google/gapid/core/assert"
 	"github.com/google/gapid/core/event/task"
 	"github.com/google/gapid/core/log"
+	"github.com/google/gapid/core/memory/arena"
 	"github.com/google/gapid/core/net/grpcutil"
 	"github.com/google/gapid/core/os/device"
 	"github.com/google/gapid/core/os/device/bind"
@@ -125,7 +126,7 @@ func init() {
 	cfg.DeviceScanDone = deviceScanDone
 
 	ctx = database.Put(ctx, database.NewInMemory(ctx))
-	cb := gles.CommandBuilder{Thread: 0}
+	cb := gles.CommandBuilder{Thread: 0, Arena: arena.New()}
 	h := &capture.Header{Abi: device.WindowsX86_64}
 	cmds, draw, swap := samples.DrawTexturedSquare(ctx, cb, false, h.Abi.MemoryLayout)
 	p, err := capture.New(ctx, "sample", h, cmds)

@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/gapid/core/assert"
 	"github.com/google/gapid/core/log"
+	"github.com/google/gapid/core/memory/arena"
 	"github.com/google/gapid/core/os/device"
 	"github.com/google/gapid/core/os/device/bind"
 	"github.com/google/gapid/gapis/api"
@@ -38,6 +39,9 @@ func TestDeadCommandRemoval(t *testing.T) {
 	ctx = bind.PutRegistry(ctx, bind.NewRegistry())
 	ctx = database.Put(ctx, database.NewInMemory(ctx))
 
+	a := arena.New()
+	defer a.Dispose()
+
 	// Keep the given command alive in the optimization.
 	isLive := map[api.Cmd]bool{}
 	live := func(cmd api.Cmd) api.Cmd { isLive[cmd] = true; return cmd }
@@ -46,42 +50,40 @@ func TestDeadCommandRemoval(t *testing.T) {
 	isDead := map[api.Cmd]bool{}
 	dead := func(cmd api.Cmd) api.Cmd { isDead[cmd] = true; return cmd }
 
-	programInfoA := &gles.LinkProgramExtra{
-		LinkStatus: gles.GLboolean_GL_TRUE,
-		ActiveResources: &gles.ActiveProgramResources{
-			DefaultUniformBlock: gles.NewUniformIndexːProgramResourceʳᵐ().Add(0, &gles.ProgramResource{
-				Name: "uniforms",
-				Type: gles.GLenum_GL_FLOAT_VEC4,
-				Locations: gles.NewU32ːGLintᵐ().
-					Add(0, 0).Add(1, 1).Add(2, 2).Add(3, 3).Add(4, 4).
-					Add(5, 5).Add(6, 6).Add(7, 7).Add(8, 8).Add(9, 9),
-				ArraySize: 10,
-			}),
-		},
-	}
+	programUniformsA := gles.MakeProgramResourceʳ(a)
+	programUniformsA.SetName("uniforms")
+	programUniformsA.SetType(gles.GLenum_GL_FLOAT_VEC4)
+	programUniformsA.SetArraySize(10)
+	programUniformsA.SetLocations(gles.NewU32ːGLintᵐ(a).
+		Add(0, 0).Add(1, 1).Add(2, 2).Add(3, 3).Add(4, 4).
+		Add(5, 5).Add(6, 6).Add(7, 7).Add(8, 8).Add(9, 9))
+	programResourcesA := gles.MakeActiveProgramResourcesʳ(a)
+	programResourcesA.SetDefaultUniformBlock(gles.NewUniformIndexːProgramResourceʳᵐ(a).Add(0, programUniformsA))
+	programInfoA := gles.MakeLinkProgramExtra(a)
+	programInfoA.SetLinkStatus(gles.GLboolean_GL_TRUE)
+	programInfoA.SetActiveResources(programResourcesA)
 
-	programInfoB := &gles.LinkProgramExtra{
-		LinkStatus: gles.GLboolean_GL_TRUE,
-		ActiveResources: &gles.ActiveProgramResources{
-			DefaultUniformBlock: gles.NewUniformIndexːProgramResourceʳᵐ().Add(0, &gles.ProgramResource{
-				Name:      "sampler",
-				Type:      gles.GLenum_GL_SAMPLER_CUBE,
-				Locations: gles.NewU32ːGLintᵐ().Add(0, 0),
-				ArraySize: 1,
-			}),
-		},
-	}
+	programSamplerB := gles.MakeProgramResourceʳ(a)
+	programSamplerB.SetName("sampler")
+	programSamplerB.SetType(gles.GLenum_GL_SAMPLER_CUBE)
+	programSamplerB.SetLocations(gles.NewU32ːGLintᵐ(a).Add(0, 0))
+	programSamplerB.SetArraySize(1)
+	programResourcesB := gles.MakeActiveProgramResourcesʳ(a)
+	programResourcesB.SetDefaultUniformBlock(gles.NewUniformIndexːProgramResourceʳᵐ(a).Add(0, programSamplerB))
+	programInfoB := gles.MakeLinkProgramExtra(a)
+	programInfoB.SetLinkStatus(gles.GLboolean_GL_TRUE)
+	programInfoB.SetActiveResources(programResourcesB)
 
 	ctxHandle1 := memory.BytePtr(1)
 	ctxHandle2 := memory.BytePtr(2)
 	displayHandle := memory.BytePtr(3)
 	surfaceHandle := memory.BytePtr(4)
-	cb := gles.CommandBuilder{Thread: 0}
+	cb := gles.CommandBuilder{Thread: 0, Arena: a}
 	prologue := []api.Cmd{
 		cb.EglCreateContext(displayHandle, surfaceHandle, surfaceHandle, memory.Nullptr, ctxHandle1),
 		api.WithExtras(
 			cb.EglMakeCurrent(displayHandle, surfaceHandle, surfaceHandle, ctxHandle1, 0),
-			gles.NewStaticContextStateForTest(), gles.NewDynamicContextStateForTest(64, 64, false)),
+			gles.NewStaticContextStateForTest(a), gles.NewDynamicContextStateForTest(a, 64, 64, false)),
 		cb.GlCreateProgram(1),
 		cb.GlCreateProgram(2),
 		cb.GlCreateProgram(3),
@@ -165,7 +167,7 @@ func TestDeadCommandRemoval(t *testing.T) {
 			// Draw in context 2
 			cb.EglCreateContext(displayHandle, memory.Nullptr, memory.Nullptr, memory.Nullptr, ctxHandle2),
 			api.WithExtras(
-				cb.EglMakeCurrent(displayHandle, surfaceHandle, surfaceHandle, ctxHandle2, 0), gles.NewStaticContextStateForTest(), gles.NewDynamicContextStateForTest(64, 64, false)),
+				cb.EglMakeCurrent(displayHandle, surfaceHandle, surfaceHandle, ctxHandle2, 0), gles.NewStaticContextStateForTest(a), gles.NewDynamicContextStateForTest(a, 64, 64, false)),
 			cb.GlCreateProgram(1),
 			api.WithExtras(cb.GlLinkProgram(1), programInfoA),
 			cb.GlUseProgram(1),

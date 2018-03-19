@@ -15,17 +15,14 @@
  */}}
 
 {{/* ---- Includes ---- */}}
-{{Include "cpp_common.tmpl"}}
-
-{{/* ---- Overrides ---- */}}
-{{Global "C++.StringTypeOverride" "gapil_string"}}
+{{Include "c_common.tmpl"}}
 
 {{$filename := "ctypes.h" }}
 {{$ | Macro "Types" | Reflow 4 | Write $filename}}
 
 {{define "Types"}}
   {{AssertType $ "API"}}
-  {{Template "C++.Copyright"}}
+  {{Template "C.Copyright"}}
   {{$guard := print "GAPIS_" (Upper (Global "API")) "_CTYPES_H"}}
 ¶
   #ifndef {{$guard}}
@@ -36,32 +33,22 @@
   #include <stdbool.h>
   typedef uint8_t void_t;
 ¶
-  {{range $c := $.Classes}}
-    {{Template "ForwardDeclareType" $c}}
-  {{end}}
+  {{ForEach $.Classes    "ForwardDeclareType" | JoinWith "\n"}}¶
+  {{ForEach $.References "ForwardDeclareType" | JoinWith "\n"}}¶
+
+  {{ForEach $.Enums      "DeclareType" | JoinWith "\n"}}¶
+  {{ForEach $.Pseudonyms "DeclareType" | JoinWith "\n"}}¶
+  {{ForEach $.Maps       "DeclareType" | JoinWith "\n"}}¶
+  {{ForEach $.References "DeclareType" | JoinWith "\n"}}¶
+  {{ForEach $.Classes    "DeclareType" | JoinWith "\n"}}¶
+
+  {{ForEach (AllCommands $) "DeclareCommand" | JoinWith "\n"}}¶
 ¶
-  {{range $e := $.Enums}}
-    {{Template "DeclareType" $e}}
-  {{end}}
-¶
-  {{range $p := $.Pseudonyms}}
-    {{Template "DeclareType" $p}}
-  {{end}}
-¶
-  {{range $m := $.Maps}}
-    {{Template "DeclareType" $m}}
-  {{end}}
-¶
-  {{range $c := $.Classes}}
-    {{Template "DeclareType" $c}}
-  {{end}}
-¶
-  {{range $c := AllCommands $}}
-    {{Template "DeclareCommand" $c}}
-  {{end}}
+  {{Template "DeclareState" $}}
 ¶
   #endif // {{$guard}}
 {{end}}
+
 
 {{/*
 -------------------------------------------------------------------------------
@@ -69,48 +56,11 @@
 -------------------------------------------------------------------------------
 */}}
 {{define "ForwardDeclareType"}}
-  {{if not (IsBuiltin $)}}
-    {{if IsClass $}}struct __{{Template "C.Type" $}};
-      typedef struct __{{Template "C.Type" $}} {{Template "C.Type" $}};
-    {{end}}
+  {{     if IsClass     $}}struct {{Template "C.Type" $}};¶typedef struct {{Template "C.Type" $}} {{Template "C.Type" $}};
+  {{else if IsReference $}}struct {{Template "C.TypeName" $}};¶typedef struct {{Template "C.TypeName" $}} {{Template "C.TypeName" $}};
   {{end}}
 {{end}}
 
-
-{{/*
--------------------------------------------------------------------------------
-  Emits the C type for the specified AST type.
--------------------------------------------------------------------------------
-*/}}
-{{define "C.Type"}}
-  {{if not (IsType $)}}{{Template "C.Type" (TypeOf $)}}
-  {{else if IsVoid        $}}void_t
-  {{else if IsBool        $}}bool
-  {{else if IsInt         $}}int
-  {{else if IsUint        $}}unsigned int
-  {{else if IsSize        $}}size_t
-  {{else if IsChar        $}}char
-  {{else if IsU8          $}}uint8_t
-  {{else if IsS8          $}}int8_t
-  {{else if IsU16         $}}uint16_t
-  {{else if IsS16         $}}int16_t
-  {{else if IsF32         $}}float
-  {{else if IsU32         $}}uint32_t
-  {{else if IsS32         $}}int32_t
-  {{else if IsF64         $}}double
-  {{else if IsU64         $}}uint64_t
-  {{else if IsS64         $}}int64_t
-  {{else if IsEnum        $}}{{$.Name}}
-  {{else if IsReference   $}}{{Template "C.Type" $.To}}_ref
-  {{else if IsString      $}}string*
-  {{else if IsStaticArray $}}{{Template "C.Type" $.ValueType}}
-  {{else if IsSlice       $}}{{Template "C++.TypeName" $.To}}_slice
-  {{else if IsPointer     $}}{{Template "C.Type" $.To}}{{if $.Const}} const{{end}}*
-  {{else if IsMap         $}}{{Template "C++.TypeName" $}}
-  {{else if IsPseudonym   $}}{{Template "C++.TypeName" $}}
-  {{else}}{{Template "C++.TypeName" $}}
-  {{end}}
-{{end}}
 
 {{/*
 -------------------------------------------------------------------------------
@@ -123,15 +73,15 @@
     {{$key  := printf "ApiType%vDeclared" $.Name}}
     {{if not (Global $key)}}
       {{Global $key "true"}}
-      {{     if IsClass       $}}{{Template "DeclareClass"     $}}
-      {{else if IsEnum        $}}{{Template "DeclareEnum"      $}}
-      {{else if IsMap         $}}{{Template "DeclareMap"       $}}
-      {{else if IsPseudonym   $}}{{Template "DeclarePseudonym" $}}
-      {{else if IsPointer     $}}{{Template "DeclareType"      $.To}}
-      {{else if IsReference   $}}{{Template "DeclareRef"       $}}
-      {{else if IsStaticArray $}}{{Template "DeclareType"      $.ValueType}}
-      {{else if IsSlice       $}}{{Template "DeclareSlice"     $}}
-      {{else}}{{Error "DeclareType does not support type '%T'" $}}
+      {{     if IsClass       $}}{{Template "DeclareClass"       $}}
+      {{else if IsEnum        $}}{{Template "DeclareEnum"        $}}
+      {{else if IsMap         $}}{{Template "DeclareMap"         $}}
+      {{else if IsPseudonym   $}}{{Template "DeclarePseudonym"   $}}
+      {{else if IsPointer     $}}{{Template "DeclareType"        $.To}}
+      {{else if IsReference   $}}{{Template "DeclareReference"   $}}
+      {{else if IsStaticArray $}}{{Template "DeclareStaticArray" $}}
+      {{else if IsSlice       $}}
+      {{else}}{{Error "DeclareType does not support type '%T'"   $}}
       {{end}}
     {{end}}
   {{end}}
@@ -146,20 +96,22 @@
 */}}
 {{define "DeclareClass"}}
   {{AssertType $ "Class"}}
+
   {{range $f := $.Fields}}
     {{Template "DeclareType" (TypeOf $f)}}
   {{end}}
 
-  {{$name := Macro "C++.TypeName" $}}
-  typedef struct __{{$name}} {
+  {{$name := Macro "C.TypeName" $}}
+  typedef struct {{$name}} {
     {{range $f := $.Fields}}
-      {{Template "C.Type" $f}} {{$f.Name}}{{if IsStaticArray $f.Type}}[{{$f.Type.Size}}]{{end}};
+      {{Template "C.Type" $f}} {{CFieldName $f.Name}};
     {{end}}
     {{if not (len $.Fields)}}
-      uint8_t __dummy; // At least one field so Cgo sees the type.
+      uint8_t dummy; // At least one field so Cgo sees the type.
     {{end}}
   } {{$name}};¶
 {{end}}
+
 
 {{/*
 -------------------------------------------------------------------------------
@@ -179,7 +131,7 @@
 {{/*
 -------------------------------------------------------------------------------
   Emits the declaration of the map's key and value types (if it is not already
-  declared) followed by the map's declaration as a gapil::Map.
+  declared) followed by the declaration of the map and its functions.
 -------------------------------------------------------------------------------
 */}}
 {{define "DeclareMap"}}
@@ -188,57 +140,76 @@
   {{Template "DeclareType" $.KeyType}}
   {{Template "DeclareType" $.ValueType}}
 
-  typedef struct __{{Template "C++.TypeName" $}}_element {
-    uint64_t used;
-    {{Template "C.Type" $.KeyType}} first;
-    {{Template "C.Type" $.ValueType}} second;
-  } {{Template "C++.TypeName" $}}_element;
+  {{$name := print (Macro "C.TypeName" $)}}
+  {{$elem := print $name "_element"}}
+  {{$key := Macro "C.Type" $.KeyType}}
+  {{$val := Macro "C.Type" $.ValueType}}
 
-  typedef struct __{{Template "C++.TypeName" $}}_map {
+  typedef struct {{$elem}} {
+    uint64_t used;
+    {{$key}} key;
+    {{$val}} value;
+  } {{$elem}};
+
+  typedef struct {{$name}} {
     uint32_t ref_count;
-    struct arena* arena;
+    arena* arena;
     uint64_t count;
     uint64_t capacity;
-    {{Template "C.Type" $}}_element* elements;
-  } {{Template "C++.TypeName" $}}_map;
-  typedef struct {{Template "C.Type" $}}_map* {{Template "C++.TypeName" $}};
+    {{$elem}}* elements;
+  } {{$name}};
+
+  {{$mangled := Macro "C.Mangle" $}}
+  {{$global := print "declared-" $mangled}}
+  {{if not (Global $global)}}
+    {{Global $global "true"}}
+    {{$key := Macro "C.SimplifiedType" $.KeyType}}
+    void*      {{$mangled}}__index(void* map, {{$key}} key, GAPIL_BOOL insert);
+    void       {{$mangled}}__remove(void* map, {{$key}} key);
+    GAPIL_BOOL {{$mangled}}__contains(void* map, {{$key}} key);
+    void       {{$mangled}}__clear(void* map);
+  {{end}}
 ¶
 {{end}}
 
+
 {{/*
 -------------------------------------------------------------------------------
-  Emits the declaration of the ref
+  Emits the C declaration of the StaticArray typedef
 -------------------------------------------------------------------------------
 */}}
-{{define "DeclareRef"}}
+{{define "DeclareStaticArray"}}
+  {{AssertType $ "StaticArray"}}
+
+  {{Template "DeclareType" $.ValueType}}
+
+  typedef {{Template "C.Type" $.ValueType}} {{Template "C.TypeName" $}}[{{$.Size}}];
+¶
+{{end}}
+
+
+{{/*
+-------------------------------------------------------------------------------
+  Emits the C declaration of the Reference type
+-------------------------------------------------------------------------------
+*/}}
+{{define "DeclareReference"}}
   {{AssertType $ "Reference"}}
 
   {{Template "DeclareType" $.To}}
 
-  typedef struct __{{Template "C++.TypeName" $.To}}_ref_data {
+  {{$name := Macro "C.TypeName" $}}
+
+  typedef struct {{$name}} {
     uint32_t ref_count;
-    struct arena* arena;
+    arena* arena;
     {{Template "C.Type" $.To}} val;
-  } {{Template "C++.TypeName" $.To}}_ref_data;
-
-  typedef {{Template "C.Type" $.To}}_ref_data* {{Template "C++.TypeName" $.To}}_ref;
+  } {{Template "C.TypeName" $}};
 ¶
+  {{$mangled := Macro "C.Mangle" $}}
+  {{$name}}* {{$mangled}}__clone({{$name}}* object, arena* arena);
 {{end}}
 
-{{define "DeclareSlice"}}
-  {{AssertType $ "Slice"}}
-  {{if not (IsBuiltin $.To)}}
-    {{Error "DeclareSlice can only handle builtin types. Got: '%T'" $.To}}
-  {{end}}
-
-  typedef struct __{{Template "C++.TypeName" $.To}}_slice {
-    pool* pool;
-    void* root;
-    {{Template "C.Type" $.To}}* base;
-    uint64_t size;
-  } {{Template "C++.TypeName" $.To}}_slice;
-¶
-{{end}}
 
 {{/*
 -------------------------------------------------------------------------------
@@ -247,16 +218,40 @@
 -------------------------------------------------------------------------------
 */}}
 {{define "DeclareEnum"}}
-  typedef {{Template "C++.EnumType" $}} {{$.Name}};
+  typedef {{Template "C.EnumType" $}} {{$.Name}};
 {{end}}
 
+
+{{/*
+-------------------------------------------------------------------------------
+  Emits the C declaration of the Command
+-------------------------------------------------------------------------------
+*/}}
 {{define "DeclareCommand"}}
-  {{$name := Macro "CmdName" $}}
-  typedef struct __{{$name}} {
+  {{range $p := $.FullParameters}}
+    {{Template "DeclareType" $p.Type}}
+  {{end}}
+
+  typedef struct {{$.Name}} {
     uint64_t thread_id;
-    {{range $p := $.CallParameters}}
-      {{Template "C.Type" $p}} {{$p.Name}}{{if IsStaticArray $p.Type}}[{{$p.Type.Size}}]{{end}};
+    {{range $p := $.FullParameters}}
+      {{Template "C.Type" $p}} {{$p.Name | CFieldName}};
     {{end}}
-    {{if not (IsVoid $.Return.Type)}}{{Template "C.Type" $.Return.Type}} _return;{{end}}
-  } {{$name}};
+  } {{$.Name}};
+
+  {{$.Name}}* {{$.Name}}__clone({{$.Name}}* object, arena* arena);
+{{end}}
+
+
+{{/*
+-------------------------------------------------------------------------------
+  Emits the C declaration of the State
+-------------------------------------------------------------------------------
+*/}}
+{{define "DeclareState"}}
+  typedef struct State {
+    {{range $g := $.Globals}}
+      {{Template "C.Type" $g}} {{$g.Name | CFieldName}};
+    {{end}}
+  } State;
 {{end}}

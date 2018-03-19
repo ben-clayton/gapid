@@ -52,7 +52,7 @@ func (f *refRel) build(
 		})
 		newCount := s.Add(oldCount, s.Scalar(uint32(1)))
 		if debugLogRefCounts {
-			c.Log(s, log.Info, f.name+" ref_count: %d -> %d", oldCount, newCount)
+			c.Log(s, log.Info, f.name+" %p ref_count: %d -> %d", refPtr, oldCount, newCount)
 		}
 		refPtr.Store(newCount)
 	})
@@ -69,7 +69,7 @@ func (f *refRel) build(
 		})
 		newCount := s.Sub(oldCount, s.Scalar(uint32(1)))
 		if debugLogRefCounts {
-			c.Log(s, log.Info, f.name+" ref_count: %d -> %d", oldCount, newCount)
+			c.Log(s, log.Info, f.name+" %p ref_count: %d -> %d", refPtr, oldCount, newCount)
 		}
 		refPtr.Store(newCount)
 		s.If(s.Equal(newCount, s.Scalar(uint32(0))), func() {

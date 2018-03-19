@@ -54,15 +54,15 @@ type B struct {
 	Bool bool
 }
 
-func (*B) Caller() api.CmdID                                                  { return api.CmdNoID }
-func (*B) SetCaller(api.CmdID)                                                {}
-func (*B) Thread() uint64                                                     { return 1 }
-func (*B) SetThread(uint64)                                                   {}
-func (*B) CmdName() string                                                    { return "B" }
-func (*B) API() api.API                                                       { return nil }
-func (*B) CmdFlags(context.Context, api.CmdID, *api.GlobalState) api.CmdFlags { return 0 }
-func (*B) Extras() *api.CmdExtras                                             { return nil }
-func (*B) Mutate(context.Context, api.CmdID, *api.GlobalState, *builder.Builder) error {
+func (b *B) Caller() api.CmdID                                                  { return api.CmdNoID }
+func (b *B) SetCaller(api.CmdID)                                                {}
+func (b *B) Thread() uint64                                                     { return 1 }
+func (b *B) SetThread(uint64)                                                   {}
+func (b *B) CmdName() string                                                    { return "B" }
+func (b *B) API() api.API                                                       { return nil }
+func (b *B) CmdFlags(context.Context, api.CmdID, *api.GlobalState) api.CmdFlags { return 0 }
+func (b *B) Extras() *api.CmdExtras                                             { return nil }
+func (b *B) Mutate(context.Context, api.CmdID, *api.GlobalState, *builder.Builder) error {
 	return nil
 }
 

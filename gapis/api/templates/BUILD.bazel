@@ -52,13 +52,6 @@ api_template(
 )
 
 api_template(
-    name = "ctypes_go",
-    includes = [":templates"],
-    outputs = ["ctypes.go"],
-    template = "go_ctypes.go.tmpl",
-)
-
-api_template(
     name = "ctypes_h",
     includes = [":templates"],
     outputs = ["ctypes.h"],

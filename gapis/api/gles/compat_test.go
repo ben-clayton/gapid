@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/gapid/core/assert"
 	"github.com/google/gapid/core/log"
+	"github.com/google/gapid/core/memory/arena"
 	"github.com/google/gapid/core/os/device"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/api/gles"
@@ -47,8 +48,11 @@ func TestGlVertexAttribPointerCompatTest(t *testing.T) {
 	ctx := log.Testing(t)
 	ctx = database.Put(ctx, database.NewInMemory(ctx))
 
+	a := arena.New()
+	defer a.Dispose()
+
 	h := &capture.Header{Abi: device.AndroidARMv7a}
-	a := h.Abi.MemoryLayout
+	ml := h.Abi.MemoryLayout
 	capturePath, err := capture.New(ctx, "test", h, []api.Cmd{})
 	if err != nil {
 		panic(err)
@@ -63,9 +67,11 @@ func TestGlVertexAttribPointerCompatTest(t *testing.T) {
 		},
 	}}
 
-	transform, err := compat(ctx, dev, func(ctx context.Context, cmdId api.CmdID, cmd api.Cmd, err error) {
-		t.Error(err)
-	})
+	onCompatError := func(ctx context.Context, id api.CmdID, cmd api.Cmd, err error) {
+		log.E(ctx, "%v %v: %v", id, cmd, err)
+	}
+
+	transform, err := compat(ctx, dev, onCompatError)
 	if err != nil {
 		log.E(ctx, "Error creating compatability transform: %v", err)
 		return
@@ -75,17 +81,17 @@ func TestGlVertexAttribPointerCompatTest(t *testing.T) {
 	indices := []uint16{0, 1, 2, 1, 2, 3}
 	mw := &testcmd.Writer{S: newState(ctx)}
 	ctxHandle, displayHandle, surfaceHandle := p(1), p(2), p(3)
-	cb := gles.CommandBuilder{Thread: 0}
+	cb := gles.CommandBuilder{Thread: 0, Arena: a}
 	eglMakeCurrent := cb.EglMakeCurrent(displayHandle, surfaceHandle, surfaceHandle, ctxHandle, 0)
-	eglMakeCurrent.Extras().Add(gles.NewStaticContextStateForTest(), gles.NewDynamicContextStateForTest(64, 64, true))
+	eglMakeCurrent.Extras().Add(gles.NewStaticContextStateForTest(a), gles.NewDynamicContextStateForTest(a, 64, 64, true))
 	api.ForeachCmd(ctx, []api.Cmd{
 		cb.EglCreateContext(displayHandle, memory.Nullptr, memory.Nullptr, memory.Nullptr, ctxHandle),
 		eglMakeCurrent,
 		cb.GlEnableVertexAttribArray(0),
 		cb.GlVertexAttribPointer(0, 2, gles.GLenum_GL_FLOAT, gles.GLboolean(0), 8, p(0x100000)).
-			AddRead(memory.Store(ctx, a, p(0x100000), positions)),
+			AddRead(memory.Store(ctx, ml, p(0x100000), positions)),
 		cb.GlDrawElements(gles.GLenum_GL_TRIANGLES, gles.GLsizei(len(indices)), gles.GLenum_GL_UNSIGNED_SHORT, p(0x200000)).
-			AddRead(memory.Store(ctx, a, p(0x200000), indices)),
+			AddRead(memory.Store(ctx, ml, p(0x200000), indices)),
 	}, func(ctx context.Context, id api.CmdID, cmd api.Cmd) error {
 		transform.Transform(ctx, api.CmdNoID, cmd, mw)
 		return nil
@@ -101,10 +107,10 @@ func TestGlVertexAttribPointerCompatTest(t *testing.T) {
 
 		if _, ok := cmd.(*gles.GlDrawElements); ok {
 			ctx := gles.GetContext(s, cmd.Thread())
-			vao := ctx.Bound.VertexArray
-			array := vao.VertexAttributeArrays.Get(0)
-			binding := array.Binding
-			if binding.Buffer != nil && array.Pointer.Address() == 0 {
+			vao := ctx.Bound().VertexArray()
+			array := vao.VertexAttributeArrays().Get(0)
+			binding := array.Binding()
+			if !binding.Buffer().IsNil() && array.Pointer() == 0 {
 				found = true
 				return api.Break // Success
 			} else {

@@ -33,6 +33,7 @@ import (
 	"github.com/google/gapid/core/event/task"
 	"github.com/google/gapid/core/image"
 	"github.com/google/gapid/core/log"
+	"github.com/google/gapid/core/memory/arena"
 	"github.com/google/gapid/core/os/device"
 	"github.com/google/gapid/core/os/device/bind"
 	"github.com/google/gapid/gapis/api"
@@ -185,6 +186,7 @@ func newFixture(ctx context.Context) (context.Context, *Fixture) {
 		device:       dev,
 		memoryLayout: memoryLayout,
 		s:            s,
+		cb:           gles.CommandBuilder{Arena: arena.New()},
 	}
 }
 
@@ -319,11 +321,12 @@ func (f *Fixture) initContext(ctx context.Context, width, height int, preserveBu
 }
 
 func (f *Fixture) makeCurrent(eglSurface, eglContext memory.Pointer, width, height int, preserveBuffersOnSwap bool) api.Cmd {
+	a := f.s.Arena
 	eglTrue := gles.EGLBoolean(1)
 	return api.WithExtras(
 		f.cb.EglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext, eglTrue),
-		gles.NewStaticContextStateForTest(),
-		gles.NewDynamicContextStateForTest(width, height, preserveBuffersOnSwap),
+		gles.NewStaticContextStateForTest(a),
+		gles.NewDynamicContextStateForTest(a, width, height, preserveBuffersOnSwap),
 	)
 }
 
@@ -434,6 +437,7 @@ func (f Fixture) generateCaptureWithIssues(ctx context.Context) (*path.Capture, 
 	texLoc := gles.UniformLocation(0)
 
 	s := api.NewStateWithEmptyAllocator(f.memoryLayout)
+	a := s.Arena
 
 	textureNames := []gles.TextureId{1}
 	textureNamesR := f.s.AllocDataOrPanic(ctx, textureNames)
@@ -447,30 +451,32 @@ func (f Fixture) generateCaptureWithIssues(ctx context.Context) (*path.Capture, 
 		gles.BuildProgram(ctx, s, f.cb, vs, fs, prog, textureVSSource, textureFSSource)...,
 	)
 
+	uniformTex := gles.MakeProgramResourceʳ(a)
+	uniformTex.SetType(gles.GLenum_GL_SAMPLER_2D)
+	uniformTex.SetName("tex")
+	uniformTex.SetArraySize(1)
+	uniformTex.Locations().Add(0, gles.GLint(texLoc))
+
+	positionIn := gles.MakeProgramResourceʳ(a)
+	positionIn.SetType(gles.GLenum_GL_FLOAT_VEC3)
+	positionIn.SetName("position")
+	positionIn.SetArraySize(1)
+	positionIn.Locations().Add(0, gles.GLint(pos))
+
+	resources := gles.MakeActiveProgramResourcesʳ(a)
+	resources.DefaultUniformBlock().Add(0, uniformTex)
+	resources.ProgramInputs().Add(0, positionIn)
+
+	lpe := gles.MakeLinkProgramExtra(a)
+	lpe.SetLinkStatus(gles.GLboolean_GL_TRUE)
+	lpe.SetActiveResources(resources)
+
 	cmds = append(cmds,
 		f.cb.GlEnable(gles.GLenum_GL_DEPTH_TEST), // Required for depth-writing
 		f.cb.GlClearColor(0.0, 1.0, 0.0, 1.0),
 		f.cb.GlClear(gles.GLbitfield_GL_COLOR_BUFFER_BIT|gles.GLbitfield_GL_2X_BIT_ATI),
 
-		api.WithExtras(
-			f.cb.GlLinkProgram(prog),
-			&gles.LinkProgramExtra{
-				LinkStatus: gles.GLboolean_GL_TRUE,
-				ActiveResources: &gles.ActiveProgramResources{
-					DefaultUniformBlock: gles.NewUniformIndexːProgramResourceʳᵐ().Add(0, &gles.ProgramResource{
-						Type:      gles.GLenum_GL_SAMPLER_2D,
-						Name:      "tex",
-						ArraySize: 1,
-						Locations: gles.NewU32ːGLintᵐ().Add(0, gles.GLint(texLoc)),
-					}),
-					ProgramInputs: gles.NewU32ːProgramResourceʳᵐ().Add(0, &gles.ProgramResource{
-						Type:      gles.GLenum_GL_FLOAT_VEC3,
-						Name:      "position",
-						ArraySize: 1,
-						Locations: gles.NewU32ːGLintᵐ().Add(0, gles.GLint(pos)),
-					}),
-				},
-			}),
+		api.WithExtras(f.cb.GlLinkProgram(prog), lpe),
 		f.cb.GlUseProgram(missingProg),
 		f.cb.GlLabelObjectEXT(gles.GLenum_GL_TEXTURE, 123, gles.GLsizei(someString.Range().Size), someString.Ptr()).AddRead(someString.Data()),
 		f.cb.GlGetError(0),
@@ -515,6 +521,8 @@ func (f Fixture) generateDrawTriangleCapture(ctx context.Context) (*path.Capture
 // generateDrawTriangleCaptureEx generates a capture with several frames containing
 // a rotating triangle of color RGB(fr, fg, fb) on a RGB(br, bg, bb) background.
 func (f Fixture) generateDrawTriangleCaptureEx(ctx context.Context, br, bg, bb, fr, fg, fb gles.GLfloat) (*path.Capture, traceVerifier) {
+	a := f.s.Arena
+
 	vs, fs, prog, pos := gles.ShaderId(f.newID()), gles.ShaderId(f.newID()), gles.ProgramId(f.newID()), gles.AttributeLocation(0)
 	angleLoc := gles.UniformLocation(0)
 	cmds, _, eglSurface := f.initContext(ctx, 64, 64, false)
@@ -531,26 +539,28 @@ func (f Fixture) generateDrawTriangleCaptureEx(ctx context.Context, br, bg, bb, 
 
 	triangleVerticesR := f.s.AllocDataOrPanic(ctx, triangleVertices)
 
+	uniformAngle := gles.MakeProgramResourceʳ(a)
+	uniformAngle.SetType(gles.GLenum_GL_FLOAT)
+	uniformAngle.SetName("angle")
+	uniformAngle.SetArraySize(1)
+	uniformAngle.Locations().Add(0, gles.GLint(angleLoc))
+
+	positionIn := gles.MakeProgramResourceʳ(a)
+	positionIn.SetType(gles.GLenum_GL_FLOAT_VEC3)
+	positionIn.SetName("position")
+	positionIn.SetArraySize(1)
+	positionIn.Locations().Add(0, gles.GLint(pos))
+
+	resources := gles.MakeActiveProgramResourcesʳ(a)
+	resources.DefaultUniformBlock().Add(0, uniformAngle)
+	resources.ProgramInputs().Add(0, positionIn)
+
+	lpe := gles.MakeLinkProgramExtra(a)
+	lpe.SetLinkStatus(gles.GLboolean_GL_TRUE)
+	lpe.SetActiveResources(resources)
+
 	cmds = append(cmds,
-		api.WithExtras(
-			f.cb.GlLinkProgram(prog),
-			&gles.LinkProgramExtra{
-				LinkStatus: gles.GLboolean_GL_TRUE,
-				ActiveResources: &gles.ActiveProgramResources{
-					DefaultUniformBlock: gles.NewUniformIndexːProgramResourceʳᵐ().Add(0, &gles.ProgramResource{
-						Type:      gles.GLenum_GL_FLOAT,
-						Name:      "angle",
-						ArraySize: 1,
-						Locations: gles.NewU32ːGLintᵐ().Add(0, gles.GLint(angleLoc)),
-					}),
-					ProgramInputs: gles.NewU32ːProgramResourceʳᵐ().Add(0, &gles.ProgramResource{
-						Type:      gles.GLenum_GL_FLOAT_VEC3,
-						Name:      "position",
-						ArraySize: 1,
-						Locations: gles.NewU32ːGLintᵐ().Add(0, gles.GLint(pos)),
-					}),
-				},
-			}),
+		api.WithExtras(f.cb.GlLinkProgram(prog), lpe),
 		f.cb.GlUseProgram(prog),
 		gles.GetUniformLocation(ctx, f.s, f.cb, prog, "angle", angleLoc),
 		f.cb.GlUniform1f(angleLoc, gles.GLfloat(0)),
@@ -650,6 +660,7 @@ func TestExportAndImportCapture(t *testing.T) {
 // the current context.
 func TestResizeRenderer(t *testing.T) {
 	ctx, f := newFixture(log.Testing(t))
+	a := f.s.Arena
 
 	triangleVerticesR := f.s.AllocDataOrPanic(ctx, triangleVertices)
 
@@ -658,20 +669,22 @@ func TestResizeRenderer(t *testing.T) {
 	cmds = append(cmds,
 		gles.BuildProgram(ctx, f.s, f.cb, vs, fs, prog, simpleVSSource, simpleFSSource(1.0, 0.0, 0.0))...,
 	)
+
+	positionIn := gles.MakeProgramResourceʳ(a)
+	positionIn.SetType(gles.GLenum_GL_FLOAT_VEC3)
+	positionIn.SetName("position")
+	positionIn.SetArraySize(1)
+	positionIn.Locations().Add(0, gles.GLint(pos))
+
+	resources := gles.MakeActiveProgramResourcesʳ(a)
+	resources.ProgramInputs().Add(0, positionIn)
+
+	lpe := gles.MakeLinkProgramExtra(a)
+	lpe.SetLinkStatus(gles.GLboolean_GL_TRUE)
+	lpe.SetActiveResources(resources)
+
 	cmds = append(cmds,
-		api.WithExtras(
-			f.cb.GlLinkProgram(prog),
-			&gles.LinkProgramExtra{
-				LinkStatus: gles.GLboolean_GL_TRUE,
-				ActiveResources: &gles.ActiveProgramResources{
-					ProgramInputs: gles.NewU32ːProgramResourceʳᵐ().Add(0, &gles.ProgramResource{
-						Type:      gles.GLenum_GL_FLOAT_VEC3,
-						Name:      "position",
-						ArraySize: 1,
-						Locations: gles.NewU32ːGLintᵐ().Add(0, gles.GLint(pos)),
-					}),
-				},
-			}),
+		api.WithExtras(f.cb.GlLinkProgram(prog), lpe),
 		f.cb.GlUseProgram(prog),
 		gles.GetAttribLocation(ctx, f.s, f.cb, prog, "position", pos),
 		f.cb.GlEnableVertexAttribArray(pos),

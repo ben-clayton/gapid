@@ -54,10 +54,11 @@ func DrawTexturedSquare(ctx context.Context, cb gles.CommandBuilder, sharedConte
 			gl_FragColor = texture2D(tex, texcoord);
 		}`
 
-	b := newBuilder(ctx, ml)
+	b := newBuilder(ctx, cb, ml)
 	vs, fs, prog, pos := b.newShaderID(), b.newShaderID(), b.newProgramID(), gles.AttributeLocation(0)
 	eglContext, eglSurface, eglDisplay := b.newEglContext(128, 128, memory.Nullptr, false)
 	texLoc := gles.UniformLocation(0)
+	a := b.state.Arena
 
 	textureNames := []gles.TextureId{1}
 	textureNamesPtr := b.data(ctx, textureNames)
@@ -76,26 +77,29 @@ func DrawTexturedSquare(ctx context.Context, cb gles.CommandBuilder, sharedConte
 
 	// Build the program resource
 	b.program(ctx, vs, fs, prog, textureVSSource, textureFSSource)
+
+	uniformTex := gles.MakeProgramResourceʳ(a)
+	uniformTex.SetType(gles.GLenum_GL_SAMPLER_2D)
+	uniformTex.SetName("tex")
+	uniformTex.SetArraySize(1)
+	uniformTex.Locations().Add(0, gles.GLint(texLoc))
+
+	positionIn := gles.MakeProgramResourceʳ(a)
+	positionIn.SetType(gles.GLenum_GL_FLOAT_VEC3)
+	positionIn.SetName("position")
+	positionIn.SetArraySize(1)
+	positionIn.Locations().Add(0, gles.GLint(pos))
+
+	resources := gles.MakeActiveProgramResourcesʳ(a)
+	resources.DefaultUniformBlock().Add(0, uniformTex)
+	resources.ProgramInputs().Add(0, positionIn)
+
+	lpe := gles.MakeLinkProgramExtra(a)
+	lpe.SetLinkStatus(gles.GLboolean_GL_TRUE)
+	lpe.SetActiveResources(resources)
+
 	b.cmds = append(b.cmds,
-		api.WithExtras(
-			cb.GlLinkProgram(prog),
-			&gles.LinkProgramExtra{
-				LinkStatus: gles.GLboolean_GL_TRUE,
-				ActiveResources: &gles.ActiveProgramResources{
-					DefaultUniformBlock: gles.NewUniformIndexːProgramResourceʳᵐ().Add(0, &gles.ProgramResource{
-						Type:      gles.GLenum_GL_SAMPLER_2D,
-						Name:      "tex",
-						ArraySize: 1,
-						Locations: gles.NewU32ːGLintᵐ().Add(0, gles.GLint(texLoc)),
-					}),
-					ProgramInputs: gles.NewU32ːProgramResourceʳᵐ().Add(0, &gles.ProgramResource{
-						Type:      gles.GLenum_GL_FLOAT_VEC3,
-						Name:      "position",
-						ArraySize: 1,
-						Locations: gles.NewU32ːGLintᵐ().Add(0, gles.GLint(pos)),
-					}),
-				},
-			}),
+		api.WithExtras(cb.GlLinkProgram(prog), lpe),
 		gles.GetUniformLocation(ctx, b.state, cb, prog, "tex", texLoc),
 	)
 

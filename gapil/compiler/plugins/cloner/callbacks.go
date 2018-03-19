@@ -22,7 +22,7 @@ import "github.com/google/gapid/core/codegen"
 //#include "gapil/runtime/cc/cloner.h"
 import "C"
 
-// callbacks are the runtime functions used to do the cloing.
+// callbacks are the runtime functions used to do the cloning.
 type callbacks struct {
 	createCloneTracker  codegen.Function
 	destroyCloneTracker codegen.Function

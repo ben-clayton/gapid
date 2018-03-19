@@ -20,6 +20,7 @@ import (
 	"github.com/google/gapid/core/data/deep"
 	"github.com/google/gapid/core/data/id"
 	"github.com/google/gapid/core/data/protoconv"
+	"github.com/google/gapid/core/memory/arena"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/api/gles/gles_pb"
 )
@@ -86,69 +87,6 @@ func init() {
 	)
 }
 
-// FindCompileShaderExtra searches for the CompileShaderExtra in the extras,
-// returning the CompileShaderExtra if found, otherwise nil.
-func FindCompileShaderExtra(extras *api.CmdExtras, forShader *Shader) *CompileShaderExtra {
-	for _, e := range extras.All() {
-		if pi, ok := e.(*CompileShaderExtra); ok {
-			// There can be several of those extras - pick the right one.
-			if pi.ID == forShader.ID {
-				clone, err := deep.Clone(pi)
-				if err != nil {
-					panic(err)
-				}
-				return clone.(*CompileShaderExtra)
-			}
-		}
-	}
-	return nil
-}
-
-// FindLinkProgramExtra searches for the LinkProgramExtra in the extras,
-// returning the LinkProgramExtra if found, otherwise nil.
-func FindLinkProgramExtra(extras *api.CmdExtras) *LinkProgramExtra {
-	for _, e := range extras.All() {
-		if pi, ok := e.(*LinkProgramExtra); ok {
-			clone, err := deep.Clone(pi)
-			if err != nil {
-				panic(err)
-			}
-			return clone.(*LinkProgramExtra)
-		}
-	}
-	return nil
-}
-
-// FindValidateProgramExtra searches for the ValidateProgramExtra in the extras,
-// returning the ValidateProgramExtra if found, otherwise nil.
-func FindValidateProgramExtra(extras *api.CmdExtras) *ValidateProgramExtra {
-	for _, e := range extras.All() {
-		if pi, ok := e.(*ValidateProgramExtra); ok {
-			clone, err := deep.Clone(pi)
-			if err != nil {
-				panic(err)
-			}
-			return clone.(*ValidateProgramExtra)
-		}
-	}
-	return nil
-}
-
-// FindValidateProgramPipelineExtra searches for the ValidateProgramPipelineExtra in the extras,
-// returning the ValidateProgramPipelineExtra if found, otherwise nil.
-func FindValidateProgramPipelineExtra(extras *api.CmdExtras) *ValidateProgramPipelineExtra {
-	for _, e := range extras.All() {
-		if pi, ok := e.(*ValidateProgramPipelineExtra); ok {
-			clone, err := deep.Clone(pi)
-			if err != nil {
-				panic(err)
-			}
-			return clone.(*ValidateProgramPipelineExtra)
-		}
-	}
-	return nil
-}
-
 // FindErrorState searches for the ErrorState in the extras, returning the
 // ErrorState if found, otherwise nil.
 func FindErrorState(extras *api.CmdExtras) *ErrorState {
@@ -175,47 +113,82 @@ func FindEGLImageData(extras *api.CmdExtras) *EGLImageData {
 	return nil
 }
 
-// FindStaticContextState searches for the StaticContextState in the extras,
-// returning the StaticContextState if found, otherwise nil.
-func FindStaticContextState(extras *api.CmdExtras) *StaticContextState {
+// FindCompileShaderExtra searches for the CompileShaderExtra in the extras,
+// returning the CompileShaderExtra if found, otherwise nil.
+func FindCompileShaderExtra(a arena.Arena, extras *api.CmdExtras, forShader Shaderʳ) CompileShaderExtraʳ {
 	for _, e := range extras.All() {
-		if cs, ok := e.(*StaticContextState); ok {
-			clone, err := deep.Clone(cs)
-			if err != nil {
-				panic(err)
+		if pi, ok := e.(CompileShaderExtra); ok {
+			// There can be several of those extras - pick the right one.
+			if pi.ID() == forShader.ID() {
+				return MakeCompileShaderExtraʳ(a).Set(pi).Clone(a)
 			}
-			return clone.(*StaticContextState)
 		}
 	}
-	return nil
+	return NilCompileShaderExtraʳ
+}
+
+// FindLinkProgramExtra searches for the LinkProgramExtra in the extras,
+// returning the LinkProgramExtra if found, otherwise nil.
+func FindLinkProgramExtra(a arena.Arena, extras *api.CmdExtras) LinkProgramExtraʳ {
+	for _, e := range extras.All() {
+		if pi, ok := e.(LinkProgramExtra); ok {
+			return MakeLinkProgramExtraʳ(a).Set(pi).Clone(a)
+		}
+	}
+	return NilLinkProgramExtraʳ
+}
+
+// FindValidateProgramExtra searches for the ValidateProgramExtra in the extras,
+// returning the ValidateProgramExtra if found, otherwise nil.
+func FindValidateProgramExtra(a arena.Arena, extras *api.CmdExtras) ValidateProgramExtraʳ {
+	for _, e := range extras.All() {
+		if pi, ok := e.(ValidateProgramExtra); ok {
+			return MakeValidateProgramExtraʳ(a).Set(pi).Clone(a)
+		}
+	}
+	return NilValidateProgramExtraʳ
+}
+
+// FindValidateProgramPipelineExtra searches for the ValidateProgramPipelineExtra in the extras,
+// returning the ValidateProgramPipelineExtra if found, otherwise nil.
+func FindValidateProgramPipelineExtra(a arena.Arena, extras *api.CmdExtras) ValidateProgramPipelineExtraʳ {
+	for _, e := range extras.All() {
+		if pi, ok := e.(ValidateProgramPipelineExtra); ok {
+			return MakeValidateProgramPipelineExtraʳ(a).Set(pi).Clone(a)
+		}
+	}
+	return NilValidateProgramPipelineExtraʳ
+}
+
+// FindStaticContextState searches for the StaticContextState in the extras,
+// returning the StaticContextState if found, otherwise nil.
+func FindStaticContextState(a arena.Arena, extras *api.CmdExtras) StaticContextStateʳ {
+	for _, e := range extras.All() {
+		if cs, ok := e.(StaticContextState); ok {
+			return MakeStaticContextStateʳ(a).Set(cs).Clone(a)
+		}
+	}
+	return NilStaticContextStateʳ
 }
 
 // FindDynamicContextState searches for the DynamicContextState in the extras,
 // returning the DynamicContextState if found, otherwise nil.
-func FindDynamicContextState(extras *api.CmdExtras) *DynamicContextState {
+func FindDynamicContextState(a arena.Arena, extras *api.CmdExtras) DynamicContextStateʳ {
 	for _, e := range extras.All() {
-		if cs, ok := e.(*DynamicContextState); ok {
-			clone, err := deep.Clone(cs)
-			if err != nil {
-				panic(err)
-			}
-			return clone.(*DynamicContextState)
+		if cs, ok := e.(DynamicContextState); ok {
+			return MakeDynamicContextStateʳ(a).Set(cs).Clone(a)
 		}
 	}
-	return nil
+	return NilDynamicContextStateʳ
 }
 
 // FindAndroidNativeBufferExtra searches for the AndroidNativeBufferExtra in the extras,
 // returning the AndroidNativeBufferExtra if found, otherwise nil.
-func FindAndroidNativeBufferExtra(extras *api.CmdExtras) *AndroidNativeBufferExtra {
+func FindAndroidNativeBufferExtra(a arena.Arena, extras *api.CmdExtras) AndroidNativeBufferExtraʳ {
 	for _, e := range extras.All() {
-		if di, ok := e.(*AndroidNativeBufferExtra); ok {
-			clone, err := deep.Clone(di)
-			if err != nil {
-				panic(err)
-			}
-			return clone.(*AndroidNativeBufferExtra)
+		if di, ok := e.(AndroidNativeBufferExtra); ok {
+			return MakeAndroidNativeBufferExtraʳ(a).Set(di).Clone(a)
 		}
 	}
-	return nil
+	return NilAndroidNativeBufferExtraʳ
 }

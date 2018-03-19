@@ -30,9 +30,10 @@ type builder struct {
 	lastID uint
 }
 
-func newBuilder(ctx context.Context, ml *device.MemoryLayout) *builder {
+func newBuilder(ctx context.Context, cb gles.CommandBuilder, ml *device.MemoryLayout) *builder {
 	return &builder{
-		state: api.NewStateWithEmptyAllocator(ml),
+		CommandBuilder: cb,
+		state:          api.NewStateWithEmptyAllocator(ml),
 	}
 }
 
@@ -76,11 +77,12 @@ func (b *builder) newEglContext(width, height int, eglShareContext memory.Pointe
 }
 
 func (b *builder) makeCurrent(eglDisplay, eglSurface, eglContext memory.Pointer, width, height int, preserveBuffersOnSwap bool) {
+	a := b.state.Arena
 	eglTrue := gles.EGLBoolean(1)
 	b.cmds = append(b.cmds, api.WithExtras(
 		b.EglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext, eglTrue),
-		gles.NewStaticContextStateForTest(),
-		gles.NewDynamicContextStateForTest(width, height, preserveBuffersOnSwap),
+		gles.NewStaticContextStateForTest(a),
+		gles.NewDynamicContextStateForTest(a, width, height, preserveBuffersOnSwap),
 	))
 }
 

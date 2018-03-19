@@ -31,13 +31,13 @@ func undefinedFramebuffer(ctx context.Context, device *device.Instance) transfor
 		out.MutateAndWrite(ctx, id, cmd)
 		s := out.State()
 		c := GetContext(s, cmd.Thread())
-		if c == nil || !c.Other.Initialized {
+		if c.IsNil() || !c.Other().Initialized() {
 			return // We can't do anything without a context.
 		}
-		if eglMakeCurrent, ok := cmd.(*EglMakeCurrent); ok && !seenSurfaces[eglMakeCurrent.Draw] {
+		if eglMakeCurrent, ok := cmd.(*EglMakeCurrent); ok && !seenSurfaces[eglMakeCurrent.Draw()] {
 			// Render the undefined pattern for new contexts.
 			drawUndefinedFramebuffer(ctx, id, cmd, device, s, c, out)
-			seenSurfaces[eglMakeCurrent.Draw] = true
+			seenSurfaces[eglMakeCurrent.Draw()] = true
 		}
 		if cmd.CmdFlags(ctx, id, s).IsStartOfFrame() {
 			if _, ok := cmd.(*EglSwapBuffersWithDamageKHR); ok {
@@ -53,14 +53,14 @@ func undefinedFramebuffer(ctx context.Context, device *device.Instance) transfor
 				// BUG: https://github.com/google/gapid/issues/846.
 				return
 			}
-			if c != nil && !c.Other.PreserveBuffersOnSwap {
+			if !c.Other().PreserveBuffersOnSwap() {
 				drawUndefinedFramebuffer(ctx, id, cmd, device, s, c, out)
 			}
 		}
 	})
 }
 
-func drawUndefinedFramebuffer(ctx context.Context, id api.CmdID, cmd api.Cmd, device *device.Instance, s *api.GlobalState, c *Context, out transform.Writer) error {
+func drawUndefinedFramebuffer(ctx context.Context, id api.CmdID, cmd api.Cmd, device *device.Instance, s *api.GlobalState, c Contextʳ, out transform.Writer) error {
 	const (
 		aScreenCoordsLocation AttributeLocation = 0
 
@@ -89,7 +89,7 @@ func drawUndefinedFramebuffer(ctx context.Context, id api.CmdID, cmd api.Cmd, de
 	positions := []float32{-1., -1., 1., -1., -1., 1., 1., 1.}
 
 	dID := id.Derived()
-	cb := CommandBuilder{Thread: cmd.Thread()}
+	cb := CommandBuilder{Thread: cmd.Thread(), Arena: s.Arena}
 	t := newTweaker(out, id, cb)
 
 	// Temporarily change rasterizing/blending state and enable VAP 0.
@@ -106,10 +106,12 @@ func drawUndefinedFramebuffer(ctx context.Context, id api.CmdID, cmd api.Cmd, de
 	out.MutateAndWrite(ctx, dID, cb.GlBindAttribLocation(programID, aScreenCoordsLocation, tmp0.Ptr()).
 		AddRead(tmp0.Data()))
 	tmp0.Free()
-	out.MutateAndWrite(ctx, dID, api.WithExtras(cb.GlLinkProgram(programID), &LinkProgramExtra{
-		LinkStatus:      GLboolean_GL_TRUE,
-		ActiveResources: &ActiveProgramResources{},
-	}))
+
+	extra := MakeLinkProgramExtra(s.Arena)
+	extra.SetLinkStatus(GLboolean_GL_TRUE)
+	extra.SetActiveResources(MakeActiveProgramResourcesʳ(s.Arena))
+	out.MutateAndWrite(ctx, dID, api.WithExtras(cb.GlLinkProgram(programID), extra))
+
 	t.glUseProgram(ctx, programID)
 
 	bufferID := t.glGenBuffer(ctx)

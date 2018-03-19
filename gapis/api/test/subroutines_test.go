@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/gapid/core/assert"
 	"github.com/google/gapid/core/log"
+	"github.com/google/gapid/core/memory/arena"
 	"github.com/google/gapid/core/os/device"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/database"
@@ -28,10 +29,12 @@ import (
 func TestSubAdd(t *testing.T) {
 	ctx := log.Testing(t)
 	ctx = database.Put(ctx, database.NewInMemory(ctx))
-	cb := CommandBuilder{Thread: 0}
+	a := arena.New()
+	defer a.Dispose()
+	cb := CommandBuilder{Thread: 0, Arena: a}
 	s := api.NewStateWithEmptyAllocator(device.Little32)
 	api.MutateCmds(ctx, s, nil, cb.CmdAdd(10, 20))
-	got, err := GetState(s).Ints.Read(ctx, nil, s, nil)
+	got, err := GetState(s).Ints().Read(ctx, nil, s, nil)
 	expected := []memory.Int{30}
 	if assert.For(ctx, "err").ThatError(err).Succeeded() {
 		assert.For(ctx, "got").ThatSlice(got).Equals(expected)

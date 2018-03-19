@@ -1,4 +1,4 @@
-// Copyright (C) 2017 Google Inc.
+// Copyright (C) 2018 Google Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,13 +18,20 @@ import (
 	"context"
 
 	"github.com/google/gapid/core/image"
-	"github.com/google/gapid/core/math/interval"
+	"github.com/google/gapid/gapil/constset"
 	"github.com/google/gapid/gapis/api"
-	"github.com/google/gapid/gapis/service/path"
+	"github.com/google/gapid/gapis/replay/builder"
 )
 
 type CustomState struct{}
 
+// ConstantSets returns the constant set pack for the API.
+func (API) ConstantSets() *constset.Pack { return nil }
+
+// GetFramebufferAttachmentInfo returns the width, height, and format of the
+// specified framebuffer attachment.
+// It also returns an API specific index that maps the given attachment into
+// an API specific representation.
 func (API) GetFramebufferAttachmentInfo(
 	ctx context.Context,
 	after []uint64,
@@ -34,27 +41,11 @@ func (API) GetFramebufferAttachmentInfo(
 	return 0, 0, 0, nil, nil
 }
 
-func (API) Context(*api.GlobalState, uint64) api.Context { return nil }
-
-// Root returns the path to the root of the state to display. It can vary based
-// on filtering mode. Returning nil, nil indicates there is no state to show at
-// this point in the capture.
-func (s *State) Root(ctx context.Context, p *path.State) (path.Node, error) {
-	return nil, nil
-}
-
-func (*State) SetupInitialState(ctx context.Context, s *api.GlobalState) {}
-
-func (s *State) InitializeCustomState() {}
-
-func (*State) RebuildState(ctx context.Context, s *api.GlobalState) ([]api.Cmd, interval.U64RangeList) {
-	return nil, nil
-}
-
-func (c *State) preMutate(ctx context.Context, s *api.GlobalState, cmd api.Cmd) error {
+// Context returns the active context for the given state.
+func (API) Context(state *api.GlobalState, thread uint64) api.Context {
 	return nil
 }
 
-func (i Remapped) remap(cmd api.Cmd, s *api.GlobalState) (interface{}, bool) {
-	return i, true
-}
+func (State) InitializeCustomState() {}
+
+func (*Foo) Mutate(context.Context, api.CmdID, *api.GlobalState, *builder.Builder) error { return nil }
