@@ -277,7 +277,7 @@
   {{if not (or (Macro "IsInternal" $.ValueType) (IsAny $.ValueType))}}
     func (arr {{Template "Go.Type" $}}) value(ϟb *builder.Builder, ϟc api.Cmd, ϟg *api.GlobalState) value.Pointer {
       if len(arr) > 0 {
-        for _, e := range arr {
+        for _, e := range arr.All() {
           {{Template "PushInput" "Type" $.ValueType "Name" "e"}}
         }
         return ϟb.Buffer(len(arr))

@@ -18,41 +18,43 @@
 {{Include "go_common.tmpl"}}
 {{Include "c_common.tmpl"}}
 
-{{$ | Macro "api.go" | GoFmt | Write "api.go"}}
+{{$filename := "api.go" }}
+{{$ | Macro "Types" | Reflow 4 | Write $filename}}
 
-{{define "api.go"}}
+{{define "Types"}}
   {{AssertType $ "API"}}
   {{template "Go.GeneratedHeader" (Global "OutputDir")}}
+¶
+// #include "{{Global "GeneratedPath"}}/ctypes.h"
+// #include <stdlib.h> // C.free
+import "C"
 
-import (
-    "context"
-    "fmt"
-    "reflect"
-    "sort"
+import (»
+  "context"
+  "fmt"
+  "reflect"
+  "unsafe"
 
-    "github.com/google/gapid/core/data"
-    "github.com/google/gapid/core/data/binary"
-    "github.com/google/gapid/core/data/dictionary"
-    "github.com/google/gapid/core/data/id"
-    "github.com/google/gapid/core/math/u64"
-    "github.com/google/gapid/core/memory/arena"
-	  "github.com/google/gapid/core/os/device"
-    "github.com/google/gapid/gapis/replay"
-    "github.com/google/gapid/gapis/replay/builder"
-    "github.com/google/gapid/gapis/replay/protocol"
-    "github.com/google/gapid/gapis/replay/value"
-    "github.com/google/gapid/gapis/service/path"
-
-    ϟapi "github.com/google/gapid/gapis/api"
-    ϟmem "github.com/google/gapid/gapis/memory"
-)
-
+  "github.com/google/gapid/core/data"
+  "github.com/google/gapid/core/data/binary"
+  "github.com/google/gapid/core/data/id"
+  "github.com/google/gapid/core/data/slice"
+  "github.com/google/gapid/core/math/u64"
+  "github.com/google/gapid/core/memory/arena"
+  "github.com/google/gapid/core/os/device"
+  "github.com/google/gapid/gapis/replay"
+  "github.com/google/gapid/gapis/replay/builder"
+  "github.com/google/gapid/gapis/replay/protocol"
+  "github.com/google/gapid/gapis/replay/value"
+  "github.com/google/gapid/gapis/service/path"
+  ϟapi "github.com/google/gapid/gapis/api"
+  ϟmem "github.com/google/gapid/gapis/memory"
+«)
+¶
   var ( // Don't error if these packages aren't used.
-    _ = dictionary.Entry{}
-    _ = protocol.OpCall
-    _ = sort.IntSlice(nil)
+    _ = slice.New
+    _ = (protocol.Opcode)(0)
   )
-
 ¶
   {{template "Go.CommentHeader" "Enums"}}
   {{ForEach $.Enums "DeclareEnum" | JoinWith "\n"}}
@@ -110,6 +112,19 @@ import (
       panic(err)
     }
   }
+¶
+  func stringToC(a arena.Arena, s string) *C.string {
+    data := C.CString(s)
+    defer C.free((unsafe.Pointer)(data))
+    return C.gapil_make_string((*C.arena)(a.Pointer), (C.uint64_t)(len(s)), (unsafe.Pointer)(data))
+  }
+¶
+  func poolToC(a arena.Arena, id ϟmem.PoolID) *C.pool {
+    pool := (*C.pool)(a.Allocate(int(unsafe.Sizeof(C.pool{})), int(unsafe.Alignof(C.pool{}))))
+    pool.id = C.uint32_t(id)
+    pool.ref_count = 0x3fffffff // TEMP
+    return pool
+  }
 {{end}}
 
 
@@ -165,7 +180,8 @@ import (
   {{$el := Macro "Go.Type" $ty.ValueType}}
 
   type {{$name}} struct {
-    data *[{{$ty.Size}}]{{$el}}
+    c *{{Template "CgoType" $}}
+    a arena.Arena
     uncompareable
   }
 
@@ -173,7 +189,8 @@ import (
   var Nil{{$name}} = New{{$name}}(constantArena)
 
   func New{{$name}}(ϟa arena.Arena, els... {{$el}}) {{$name}} {
-    out := {{$name}}{ data: &[{{$ty.Size}}]{{$el}}{} }
+    c := {{Template "Allocate" "Arena" "ϟa" "Type" (Macro "CgoTypeNoPtr" $)}}
+    out := {{$name}}{c: c, a: ϟa}
     for i := 0; i < {{$ty.Size}}; i++ {
       if i < len(els) {
         out.Set(i, els[i])
@@ -184,18 +201,23 @@ import (
     return out
   }
 
-  func (a {{$name}}) Get(i int) {{$el}} { return a.data[i] }
+  func (a {{$name}}) Get(i int) {{$el}} {
+    if i > {{$ty.Size}} {
+      panic(fmt.Errorf("Index out of range (i: %v, max: %v)", i, {{$ty.Size}}))
+    }
+    return {{Template "CToGo" "Type" $ty.ValueType "Name" "a.c[i]" "Arena" "a.a"}}
+  }
 
-  func (a {{$name}}) Set(i int, v {{$el}}) { a.data[i] = v }
+  func (a {{$name}}) Set(i int, v {{$el}}) {
+    if i > {{$ty.Size}} {
+      panic(fmt.Errorf("Index out of range (i: %v, max: %v)", i, {{$ty.Size}}))
+    }
+    a.c[i] = {{Template "GoToC" "Type" $ty.ValueType "Name" "v" "Arena" "a.a"}}
+  }
 
   // Equals returns true if the array is equal to o.
   func (a {{$name}}) Equals(o {{$name}}) bool {
-    for i, c := 0, {{$ty.Size}}; i < c; i++ {
-      if !({{Template "Go.Equal" "Type" $ty.ValueType "LHS" "a.Get(i)" "RHS" "o.Get(i)"}}) {
-        return false
-      }
-    }
-    return true
+    return a.c == o.c
   }
 
   // Encode encodes this static array to the encoder.
@@ -224,10 +246,10 @@ import (
   {{end}}
 
   // Clone makes a deep copy of this static array, using ϟa for allocations.
-  func (m {{$name}}) Clone(ϟa arena.Arena) {{$name}} {
-    out := {{$name}}{ data: &[{{$ty.Size}}]{{$el}}{} }
+  func (a {{$name}}) Clone(ϟa arena.Arena) {{$name}} {
+    out := New{{$name}}(ϟa)
     for i := 0; i < {{$ty.Size}}; i++ {
-      out.Set(i, {{Template "Clone" "Type" $ty.ValueType "Src" "m.Get(i)"}})
+      out.Set(i, {{Template "Clone" "Type" $ty.ValueType "Src" "a.Get(i)"}})
     }
     return out
   }
@@ -242,111 +264,104 @@ import (
 {{define "DeclareMap"}}
   {{AssertType $ "Map"}}
 
-  {{$name  := $.Name}}
-  {{$key   := Macro "Go.Type" $.KeyType}}
-  {{$value := Macro "Go.Type" $.ValueType}}
+  {{$name    := Macro "Go.TypeName" $}}
+  {{$key     := Macro "Go.Type" $.KeyType}}
+  {{$val     := Macro "Go.Type" $.ValueType}}
+  {{$cval    := Macro "CgoType" $.ValueType}}
+  {{$mangled := Macro "C.Mangle" $}}
 
   type {{$name}} struct {
-    Map *map[{{$key}}]{{$value}}
-    a   arena.Arena
+    c {{Template "CgoType" $}}
   }
 
   func New{{$name}}(ϟa arena.Arena) {{$name}} {
-    return {{$name}} { &map[{{$key}}]{{$value}}{}, ϟa }
+    m := {{Template "Allocate" "Arena" "ϟa" "Type" (Macro "CgoTypeNoPtr" $)}}
+    m.ref_count = 0x3fffffff // TEMP
+    m.arena = (*C.arena)(ϟa.Pointer)
+    m.count = 0
+    m.capacity = 0
+    m.elements = nil
+    return {{$name}}{c: m}
   }
 
-  // Arena returns the memory arena used to allocate this map.
-  func (m {{$name}}) Arena() arena.Arena { return m.a }
+  func (m {{$name}}) String() string { return fmt.Sprint(m.All()) }
 
-  func (m {{$name}}) Get(key {{$key}}) {{$value}} {
-    ϟa := m.a; _ = ϟa
-    v, ok := (*m.Map)[key]
-    if !ok {
-      v = {{Template "Go.Null" $.ValueType}}
-    }
+  // Arena returns the memory arena used to allocate this map.
+  func (m {{$name}}) Arena() arena.Arena { return arena.Arena{(unsafe.Pointer)(m.c.arena) } }
+
+  func (m {{$name}}) Get(k {{$key}}) {{$val}} {
+    v, _ := m.Lookup(k)
     return v
   }
 
-  func (m {{$name}}) Lookup(key {{$key}}) (v {{$value}}, ok bool) {
-    ϟa := m.a; _ = ϟa
-    if m.Map != nil {
-      v, ok = (*m.Map)[key]
+  func (m {{$name}}) Lookup(k {{$key}}) ({{$val}}, bool) {
+    ϟa := m.Arena(); _ = ϟa
+    ck := {{Template "GoToC" "Type" $.KeyType "Name" "k" "Arena" "ϟa"}}
+    {{Template "DeferReleaseGoToC" "Object" "ck" "Type" $.KeyType}}
+    ptr := (*{{$cval}})(C.{{$mangled}}__index((unsafe.Pointer)(m.c), ({{Template "CgoSimplifiedType" $.KeyType}})(ck), C.GAPIL_FALSE))
+    if ptr == nil {
+      return {{Template "Go.Null" $.ValueType}}, false
     }
-    {{if $init := Macro "Go.Null" $.ValueType}}
-      if !ok {
-        v = {{$init}}
-      }
-    {{end}}
-    return
+    return {{Template "CToGo" "Type" $.ValueType "Name" "(*ptr)" "Arena" "ϟa"}}, true
   }
 
-  func (m {{$name}}) Add(key {{$key}}, val {{$value}}) {{$name}} {
-    (*m.Map)[key] = val
+  func (m {{$name}}) Add(k {{$key}}, v {{$val}}) {{$name}} {
+    ck := {{Template "GoToC" "Type" $.KeyType   "Name" "k" "Arena" "m.Arena()"}}
+    cv := {{Template "GoToC" "Type" $.ValueType "Name" "v" "Arena" "m.Arena()"}}
+    {{Template "DeferReleaseGoToC" "Object" "ck" "Type" $.KeyType}}
+    *(*{{$cval}})(C.{{$mangled}}__index((unsafe.Pointer)(m.c), ({{Template "CgoSimplifiedType" $.KeyType}})(ck), C.GAPIL_TRUE)) = cv
     return m
   }
 
-  func (m {{$name}}) Contains(key {{$key}}) (ok bool) {
-    if m.Map != nil {
-      _, ok = (*m.Map)[key]
-    }
-    return
+  func (m {{$name}}) Contains(k {{$key}}) bool {
+    ck := {{Template "GoToC" "Type" $.KeyType "Name" "k" "Arena" "m.Arena()"}}
+    {{Template "DeferReleaseGoToC" "Object" "ck" "Type" $.KeyType}}
+    return C.{{$mangled}}__contains((unsafe.Pointer)(m.c), ({{Template "CgoSimplifiedType" $.KeyType}})(ck)) != 0
   }
 
-  func (m {{$name}}) Remove(key {{$key}}) {
-    if m.Map != nil {
-      delete(*m.Map, key)
-    }
+  func (m {{$name}}) Remove(k {{$key}}) {
+    ck := {{Template "GoToC" "Type" $.KeyType "Name" "k" "Arena" "m.Arena()"}}
+    {{Template "DeferReleaseGoToC" "Object" "ck" "Type" $.KeyType}}
+    C.{{$mangled}}__remove((unsafe.Pointer)(m.c), ({{Template "CgoSimplifiedType" $.KeyType}})(ck))
+  }
+
+  func (m {{$name}}) Clear() {
+    C.{{$mangled}}__clear((unsafe.Pointer)(m.c))
   }
 
   func (m {{$name}}) Len() int {
-    if m.Map != nil {
-      return len(*m.Map)
+    return int(m.c.count)
+  }
+
+  func (m {{$name}}) Keys() ([]{{$key}}) {
+    out := make([]{{$key}}, 0, m.c.count)
+    arr := (*[1<<30]{{Template "CgoTypeNoPtr" $}}_element)((unsafe.Pointer)(m.c.elements))
+    for i, c := 0, int(m.c.capacity); i < c; i++ {
+      if el := arr[i]; el.used == C.GAPIL_MAP_ELEMENT_FULL {
+        out = append(out, {{Template "CToGo" "Type" $.KeyType "Name" "el.key" "Arena" "m.Arena()"}})
+      }
     }
-    return 0
+    slice.Sort(out)
+    return out
+  }
+
+  // Clone makes a deep copy of this map, using ϟa for allocations.
+  func (c {{$name}}) Clone(ϟa arena.Arena) {{$name}} {
+    panic("TODO")
   }
 
   // All returns this {{$name}} as a Go map.
-  func (m {{$name}}) All() map[{{$key}}]{{$value}} {
-    if m.Map != nil {
-      return *m.Map
+  func (m {{$name}}) All() (map[{{$key}}]{{$val}}) {
+    out := make(map[{{$key}}]{{$val}}, m.c.count)
+    arr := (*[1<<30]{{Template "CgoTypeNoPtr" $}}_element)((unsafe.Pointer)(m.c.elements))
+    for i, c := 0, int(m.c.capacity); i < c; i++ {
+      if el := arr[i]; el.used == C.GAPIL_MAP_ELEMENT_FULL {
+        k := {{Template "CToGo" "Type" $.KeyType   "Name" "el.key"   "Arena" "m.Arena()"}}
+        v := {{Template "CToGo" "Type" $.ValueType "Name" "el.value" "Arena" "m.Arena()"}}
+        out[k] = v
+      }
     }
-    return nil
-  }
-
-  {{$sorted := (print $name "_SortKeys")}}
-  type {{$sorted}} []{{$key}}
-
-  func (s {{$sorted}}) Len() int           { return len(s) }
-  func (s {{$sorted}}) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-
-  {{if Macro "IsSortable" $.KeyType}}
-    func (s {{$sorted}}) Less(i, j int) bool { return s[i] < s[j] }
-  {{else}}
-    // Not naturally sorted {{$key}}, using fmt.Sprint
-    func (s {{$sorted}}) Less(i, j int) bool { return fmt.Sprint(s[i]) < fmt.Sprint(s[j]) }
-  {{end}}
-
-  func (m {{$name}}) Keys() []{{$key}} {
-    if m.Map == nil {
-      return nil
-    }
-    s := make({{$sorted}}, len(*m.Map))
-    i := 0
-    for k, _ := range *m.Map {
-      s[i] = k
-      i++
-    }
-    sort.Sort(s)
-    return s
-  }
-
-  // Clone makes a deep copy of this map.
-  func (m {{$name}}) Clone(ϟa arena.Arena) {{$name}} {
-    out := make(map[{{$key}}]{{$value}}, len(*m.Map))
-    for k, v := range *m.Map {
-      out[{{Template "Clone" "Type" $.KeyType "Src" "k"}}] = {{Template "Clone" "Type" $.ValueType "Src" "v"}}
-    }
-    return {{$name}}{Map: &out}
+    return out
   }
 {{end}}
 
@@ -359,12 +374,11 @@ import (
 {{define "DeclareReference"}}
   {{AssertType $ "Reference"}}
 
-  {{$name := Macro "Go.TypeName" $}}
-  {{$to   := Macro "Go.TypeName" $.To}}
-  {{$data := print (GoPrivateName $to) "Data"}}
+  {{$name    := Macro "Go.TypeName" $}}
+  {{$mangled := Macro "C.Mangle" $}}
 
   type {{$name}} struct {
-    data *{{$data}}
+    c {{Template "CgoType" $}}
   }
 
   // Nil{{$name}} is a nil-pointer reference.
@@ -385,25 +399,22 @@ import (
 
   // Format implements fmt.Formatter to print the reference.
   func (c {{$name}}) Format(f fmt.State, r rune) {
-    fmt.Fprintf(f, "{{$name}}<%p>", c.data)
+    fmt.Fprintf(f, "{{$name}}<%p>", c.c)
   }
 
   // IsNil returns true if the {{$name}} is a nil pointer.
-  func (c {{$name}}) IsNil() bool { return c.data == nil }
+  func (c {{$name}}) IsNil() bool { return c.c == nil }
 
   // SetNil nullifies this reference.
-  func (c {{$name}}) SetNil() { c.data = nil }
+  func (c {{$name}}) SetNil() { c.c = nil }
 
-  // Clone makes a deep copy of this reference.
+  // Arena returns the memory arena used to allocate this reference.
+  func (c {{$name}}) Arena() arena.Arena { return arena.Arena{(unsafe.Pointer)(c.c.arena) } }
+
+  // Clone makes a deep copy of this reference, using ϟa for allocations.
   func (c {{$name}}) Clone(ϟa arena.Arena) {{$name}} {
-    if c.IsNil() { return Nil{{$name}} }
     return {{$name}}{
-      data: &{{$data}}{
-        {{range $f := $.To.Fields}}
-          {{$name := $f.Name | GoPrivateName}}
-          {{$name}}: c.data.{{Template "Clone" "Type" $f.Type "Src" $name}},
-        {{end}}
-      },
+      c: C.{{$mangled}}__clone(c.c, (*C.arena)(ϟa.Pointer)),
     }
   }
 
@@ -423,17 +434,16 @@ import (
 
   {{$to := Macro "Go.Type" $.To}}
   func (c {{$name}}) Get() {{$to}} {
-    d := *c.data
-    return {{$to}}{data: &d}
+    return {{$to}}{c: &c.c.val, a: arena.Arena{unsafe.Pointer(c.c.arena)}}
   }
 
   func (c {{$name}}) Set(v {{$to}}) {{$name}} {
-    *c.data = *v.data
+    c.c.val = *v.c
     return c
   }
 
   {{range $f := $.To.Fields}}
-    {{Template "DeclareGetterSetter" "Struct" $name "Prefix" "data" "Name" $f.Name "Type" $f.Type}}
+    {{Template "DeclareGetterSetter" "Struct" $name "Prefix" "val" "Name" $f.Name "Type" $f.Type}}
   {{end}}
 
   // New{{$name}} returns a new {{$name}} reference with the given fields.
@@ -442,13 +452,13 @@ import (
       , {{$f.Name | GoPrivateName}} {{Template "Go.Type" $f}}§
     {{end}}
   ) {{$name}} {
-    return {{$name}}{
-      data: &{{$data}}{
-        {{range $f := $.To.Fields}}
-          {{$f.Name | GoPrivateName}}: {{$f.Name | GoPrivateName}},
-        {{end}}
-      },
-    }
+    ϟc := {{Template "Allocate" "Arena" "ϟa" "Type" (Macro "CgoTypeNoPtr" $)}}
+    ϟc.ref_count = 0x3fffffff // TEMP
+    ϟc.arena = (*C.arena)(ϟa.Pointer)
+    {{range $f := $.To.Fields}}
+      ϟc.val.{{$f.Name | CFieldName}} = {{Template "GoToC" "Type" (TypeOf $f) "Name" ($f.Name | GoPrivateName) "Arena" "ϟa"}}
+    {{end}}
+    return {{$name}}{ϟc}
   }
 
   // Make{{$name}} returns a new {{$name}} reference with the default field values.
@@ -484,14 +494,14 @@ import (
   {{$el_is_ptr  := IsPointer ($s.To | Underlying | Unpack) }}
   {{$el_is_class := IsClass  ($s.To | Underlying | Unpack) }}
 
-  // {{$slice_ty}} is a slice of {{$el_ty}}.
-  type {{$slice_ty}} struct {
-    root  uint64      // Original pointer this slice derives from.
-    base  uint64      // Address of first element.
-    size  uint64      // Total size of the slice in bytes.
-    count uint64      // Number of elements in the slice.
-    pool  ϟmem.PoolID // The pool identifier.
+  {{$name := Macro "Go.TypeName" $}}
+
+  type {{$name}} struct {
+    c *C.slice
   }
+
+  // Nil{{$slice_ty}} is a zero {{$slice_ty}}.
+  var Nil{{$slice_ty}} = {{$slice_ty}}{c: &C.slice{}}
 
   {{if $el_is_char}}
     // Make{{$slice_ty}}FromString returns a {{$slice_ty}} backed by a new
@@ -500,9 +510,11 @@ import (
       id, pool := ϟg.Memory.New()
       pool.Write(0, ϟmem.Blob([]byte(str)))
       return {{$slice_ty}}{
-        size:  uint64(len(str)),
-        count: uint64(len(str)),
-        pool:  id,
+        c: &C.slice{
+          size:  C.uint64_t(len(str)),
+          count: C.uint64_t(len(str)),
+          pool:  poolToC(ϟg.Arena, id),
+        },
       }
     }
   {{end}}
@@ -510,7 +522,7 @@ import (
   // Assign sets all fields of this slice from different slice. Needed for cloning.
   func (s *{{$slice_ty}}) Assign(v interface{}) bool {
     if v, ok := v.({{$slice_ty}}); ok {
-      *s = v
+      *s.c = *v.c // TODO: Pool refcounting
       return true
     }
     return false
@@ -520,11 +532,13 @@ import (
   // TODO: This is a temporary function while migrating to apic compile.
   func New{{$slice_ty}}(a arena.Arena, root, base, size, count uint64, pool ϟmem.PoolID) {{$slice_ty}} {
     return {{$slice_ty}}{
-      root:  root,
-      base:  base,
-      size:  size,
-      count: count,
-      pool:  pool,
+      c: &C.slice{
+        root:  unsafe.Pointer(uintptr(root)),
+        base:  unsafe.Pointer(uintptr(base)),
+        size:  C.uint64_t(size),
+        count: C.uint64_t(count),
+        pool:  poolToC(a, pool),
+      },
     }
   }
 
@@ -533,9 +547,11 @@ import (
     ϟl, ϟa := ϟg.MemoryLayout, ϟg.Arena; _, _ = ϟl, ϟa
     id, _ := ϟg.Memory.New()
     return {{$slice_ty}}{
-      size:  count * {{Template "Go.SizeOf" $s.To}},
-      count: count,
-      pool:  id,
+      c: &C.slice{
+        size:  C.uint64_t(count * {{Template "Go.SizeOf" $s.To}}),
+        count: C.uint64_t(count),
+        pool:  poolToC(ϟg.Arena, id),
+      },
     }
   }
 
@@ -543,28 +559,35 @@ import (
   func (s {{$slice_ty}}) Clone(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder) {{$slice_ty}} {
     s.OnRead(ϟctx, ϟc, ϟg, ϟb)
     id, dst := ϟg.Memory.New()
-    dst.Write(0, ϟg.Memory.MustGet(s.pool).Slice(s.Range()))
+    dst.Write(0, ϟg.Memory.MustGet(s.Pool()).Slice(s.Range()))
     return {{$slice_ty}}{
-      size:  s.size,
-      count: s.count,
-      pool: id,
+      c: &C.slice{
+        size:  C.uint64_t(s.Size()),
+        count: C.uint64_t(s.Count()),
+        pool:  poolToC(ϟg.Arena, id),
+      },
     }
   }
 
   // Root returns the original pointer this slice derives from.
-  func (s {{$slice_ty}}) Root() uint64 { return s.root }
+  func (s {{$slice_ty}}) Root() uint64 { return uint64(uintptr(s.c.root)) /* TODO: Translate pointer */ }
 
   // Base returns the address of first element.
-  func (s {{$slice_ty}}) Base() uint64 { return s.base }
+  func (s {{$slice_ty}}) Base() uint64 { return uint64(uintptr(s.c.base)) /* TODO: Translate pointer */ }
 
   // Count returns the number of elements in the slice.
-  func (s {{$slice_ty}}) Count() uint64 { return s.count }
+  func (s {{$slice_ty}}) Count() uint64 { return uint64(s.c.count) }
 
   // Size returns the size of the slice in bytes.
-  func (s {{$slice_ty}}) Size() uint64 { return s.size }
+  func (s {{$slice_ty}}) Size() uint64 { return uint64(s.c.size) }
 
   // Pool returns the the pool identifier.
-  func (s {{$slice_ty}}) Pool() ϟmem.PoolID { return s.pool }
+  func (s {{$slice_ty}}) Pool() ϟmem.PoolID {
+    if s.c.pool == nil {
+      return ϟmem.ApplicationPool
+    }
+    return ϟmem.PoolID(s.c.pool.id)
+  }
 
   // ElementType returns the reflect.Type of the elements in the slice.
   func (s {{$slice_ty}}) ElementType() reflect.Type {
@@ -620,11 +643,13 @@ import (
       newCount := s.Size() / elSize
       newSize := newCount * elSize
       return {{$slice_ty}}{
-        root:  s.Root(),
-        base:  s.Base(),
-        pool:  s.Pool(),
-        size:  newSize,
-        count: newCount,
+        c: &C.slice{
+          pool:  poolToC(a, s.Pool()),
+          root:  unsafe.Pointer(uintptr(s.Root())),
+          base:  unsafe.Pointer(uintptr(s.Base())),
+          size:  C.uint64_t(newSize),
+          count: C.uint64_t(newCount),
+        },
       }
     }
 
@@ -814,11 +839,13 @@ import (
       elSize = s.Size() / s.Count()
     }
     return {{$slice_ty}}{
-      root:  s.root,
-      base:  s.base + start * elSize,
-      size:  newCount * elSize,
-      count: newCount,
-      pool:  s.pool,
+      c: &C.slice{
+        pool:  s.c.pool, // TODO
+        root:  unsafe.Pointer(uintptr(s.Root())),
+        base:  unsafe.Pointer(uintptr(s.Base() + start * elSize)),
+        size:  C.uint64_t(newCount * elSize),
+        count: C.uint64_t(newCount),
+      },
     }
   }
 
@@ -854,6 +881,8 @@ import (
 */}}
 {{define "DeclarePointer"}}
   {{AssertType $ "Pointer" "Pseudonym"}}
+
+  {{$name := Macro "Go.TypeName" $}}
 
   {{$p          := $ | Underlying | Unpack                 }}
   {{$slice_ty   := Macro "Go.Type"   $p.Slice              }}
@@ -970,11 +999,13 @@ import (
     elSize := p.ElementSize(ϟl)
     count := end-start
     return {{$slice_ty}}{
-      root:  uint64(p),
-      base:  uint64(p) + start * elSize,
-      size:  count * elSize,
-      count: count,
-      pool:  ϟmem.ApplicationPool,
+      c: &C.slice{
+        pool:  nil, // TODO
+        root:  unsafe.Pointer(uintptr(uint64(p))),
+        base:  unsafe.Pointer(uintptr(uint64(p) + start * elSize)),
+        size:  C.uint64_t((count) * elSize),
+        count: C.uint64_t(count),
+      },
     }
   }
 
@@ -1053,17 +1084,13 @@ import (
 */}}
 {{define "DeclareClass"}}
   {{AssertType $ "Class"}}
+
   {{$name := Macro "Go.TypeName" $}}
-  {{$data := print (GoPrivateName $name) "Data"}}
 
   type {{$name}} struct {
-    data *{{$data}}
-    a    arena.Arena
+    c *{{Template "CgoType" $}}
+    a arena.Arena
     uncompareable
-  }
-
-  type {{$data}} struct {
-    {{Template "ClassFields" $}}
   }
 
   // Nil{{$name}} is a {{$name}} with default values in all fields.
@@ -1079,7 +1106,7 @@ import (
   }
 
   {{range $f := $.Fields}}
-    {{Template "DeclareGetterSetter" "Struct" $name "Prefix" "data" "Name" $f.Name "Type" $f.Type}}
+    {{Template "DeclareGetterSetter" "Struct" $name "Name" $f.Name "Type" $f.Type}}
   {{end}}
 
   // Arena returns the memory arena used to allocate this class.
@@ -1093,11 +1120,12 @@ import (
     {{end}}
   ) {{$name}} {
     return {{$name}}{
-      data: &{{$data}} {
+      c: &{{Template "CgoType" $}} { §
         {{range $f := $.Fields}}
-          {{$f.Name | GoPrivateName}}: {{$f.Name | GoPrivateName}}, §
+          {{$f.Name | CFieldName}}: {{Template "GoToC" "Type" (TypeOf $f) "Name" ($f.Name | GoPrivateName) "Arena" "ϟa"}}, §
         {{end}}
       },
+      a: ϟa,
     }
   }
 
@@ -1129,12 +1157,7 @@ import (
 
   // Equals returns true if the class fields are equal to those of o.
   func (c {{$name}}) Equals(o {{$name}}) bool {
-    return true
-    {{range $f := $.Fields}}
-      {{$lhs := print "c.data." ($f.Name | GoPrivateName)}}
-      {{$rhs := print "o.data." ($f.Name | GoPrivateName)}}
-      § && {{Template "Go.Equal" "Type" $f.Type "LHS" $lhs "RHS" $rhs}}
-    {{end}}
+    return c.c == o.c
   }
 
   {{if IsStorageType $}}
@@ -1202,16 +1225,9 @@ import (
     }
   {{end}}
 
-  // Clone makes a deep copy of this class.
+  // Clone makes a deep copy of this class, using ϟa for allocations.
   func (c {{$name}}) Clone(ϟa arena.Arena) {{$name}} {
-    return {{$name}}{
-      data: &{{$data}}{
-        {{range $f := $.Fields}}
-          {{$name := $f.Name | GoPrivateName}}
-          {{$name}}: c.data.{{Template "Clone" "Type" $f.Type "Src" $name}},
-        {{end}}
-      },
-    }
+    panic("TODO");
   }
 {{end}}
 
@@ -1223,28 +1239,23 @@ import (
 */}}
 {{define "DeclareCommand"}}
   {{AssertType $ "Function"}}
-  {{$name       := $ | GoCommandName}}
-  {{$ret        := not (IsVoid $.Return.Type)}}
-  {{$isDrawCall := GetAnnotation $ "draw_call"}}
-  {{$isPFN      := GetAnnotation $ "pfn"}}
-  {{template "Go.CommentHeader" $name}}
+
+  {{$name := $.Name | Title}}
+  {{$ret  := not (IsVoid $.Return.Type)}}
 
   type {{$name}} struct {
-    extras ϟapi.CmdExtras
+    c *C.{{$.Name}}
     caller ϟapi.CmdID
-    thread uint64
-    {{range $p := $.FullParameters}}
-      {{$p | GoPrivateName}} {{Template "Go.Type" $p}} {{Template "CommandParameterTags" $p}}
-    {{end}}
+    extras ϟapi.CmdExtras
     arena arena.Arena
   }
 
   // Arena returns the memory arena used to allocate this command.
   func (ϟc *{{$name}}) Arena() arena.Arena { return ϟc.arena }
 
-  func (ϟc *{{$name}}) Thread() uint64 { return ϟc.thread }
+  func (ϟc *{{$name}}) Thread() uint64 { return uint64(ϟc.c.thread_id) }
 
-  func (ϟc *{{$name}}) SetThread(v uint64) { ϟc.thread = v }
+  func (ϟc *{{$name}}) SetThread(v uint64) { ϟc.c.thread_id = C.uint64_t(v) }
 
   func (ϟc *{{$name}}) Caller() ϟapi.CmdID { return ϟc.caller }
 
@@ -1328,20 +1339,17 @@ import (
 
   {{range $p := $.FullParameters}}
     {{$pname := Macro "Go.Parameter" $p}}
-    {{Template "DeclareGetterSetter" "Struct" $name "Name" $p.Name "Type" $p.Type "PtrMethod" "true"}}¶
+    {{Template "DeclareGetterSetter" "Struct" $name "Name" $p.Name "Type" $p.Type}}¶
   {{end}}
 
   // Clone returns a shallow clone of the command. Extras are shared.
   func (ϟc *{{$name}}) Clone(ϟa arena.Arena) *{{$name}} {
-    out := &{{$name}}{
-      extras: ϟc.extras,
+    return &{{$name}}{
+      c:      C.{{$.Name}}__clone(ϟc.c, (*C.arena)(ϟa.Pointer)),
       caller: ϟc.caller,
-      thread: ϟc.thread,
+      extras: ϟc.extras,
+      arena:  ϟa,
     }
-    {{range $p := $.FullParameters}}
-      out.{{$p | GoPrivateName}} = {{Template "Clone" "Type" $p.Type "Src" (print "ϟc." ($p | GoPrivateName))}}
-    {{end}}
-    return out
   }
 {{end}}
 
@@ -1376,11 +1384,12 @@ import (
             {{end}}
           {{end}}
         ) *{{$name}} {
-        out := &{{$name}} {§
+        out := &{{$name}}{
+          c:      {{Template "Allocate" "Arena" "cb.Arena" "Type" (print "C." $c.Name)}},
           caller: ϟapi.CmdNoID,
-          thread: cb.Thread,
           arena:  cb.Arena,
         }
+        out.SetThread(cb.Thread)
         {{range $p := $c.FullParameters}}
           {{if $p | TypeOf | Underlying | IsPointer}}
             out.Set{{GoPublicName $p.Name}}({{Template "Go.Type" $p}}({{$p.Name | GoPrivateName}}.Address()))
@@ -1404,15 +1413,13 @@ import (
   {{AssertType $ "API"}}
 
   type State struct {
-    {{range $g := $.Globals}}
-      {{GoPrivateName $g.Name}} {{Template "Go.Type" $g}}
-    {{end}}
+    c *C.State
     a arena.Arena
     CustomState `hidden:"true" nobox:"true"`
   }
 
   {{range $g := $.Globals}}
-    {{Template "DeclareGetterSetter" "Struct" "State" "Name" $g.Name "Type" $g.Type "PtrMethod" "true"}}¶
+    {{Template "DeclareGetterSetter" "Struct" "State" "Name" $g.Name "Type" $g.Type}}¶
   {{end}}
 
   // Arena returns the memory arena used to allocate the state.
@@ -1422,7 +1429,10 @@ import (
 
   // NewState returns a new, uninitialized state.
   func NewState(ϟa arena.Arena) *State {
-    return &State{a: ϟa}
+    return &State{
+      c: {{Template "Allocate" "Arena" "ϟa" "Type" "C.State"}},
+      a: ϟa,
+    }
   }
 
   // Init initializes the state.
@@ -1455,9 +1465,10 @@ import (
     }
   }
 
-	// Clone returns a deep copy of this state object.
+  // Clone returns a deep copy of this state object, using ϟa for allocations.
   func (g *State) Clone(ϟa arena.Arena) ϟapi.State {
-    out := &State{CustomState: g.CustomState}
+    out := NewState(ϟa)
+    out.CustomState = g.CustomState
     {{range $g := $.Globals}}
       {{$name := $g.Name | GoPublicName}}
       out.Set{{$name}}({{Template "Clone" "Type" $g.Type "Src" (print "g." $name "()")}})
@@ -1493,8 +1504,8 @@ import (
     return uint8({{$.Index}})
   }
 
-	// CreateCmd constructs and returns a new command with the specified name.
-	func (API) CreateCmd(name string) ϟapi.Cmd {
+  // CreateCmd constructs and returns a new command with the specified name.
+  func (API) CreateCmd(name string) ϟapi.Cmd {
     switch name {
       {{range $c := AllCommands $}}
         {{if not (GetAnnotation $c "pfn")}}
@@ -1571,59 +1582,6 @@ import (
 
 {{/*
 -------------------------------------------------------------------------------
-  Emits non-empty if the specified item can be sorted in Go using '<'.
--------------------------------------------------------------------------------
-*/}}
-
-{{define "IsSortable"}}
-  {{AssertType $ "Type"}}
-  {{     if IsPseudonym     $}}{{Macro "IsSortable" $.To}}
-  {{else if IsBool          $}}true
-  {{else if IsInt           $}}true
-  {{else if IsUint          $}}true
-  {{else if IsChar          $}}true
-  {{else if IsU8            $}}true
-  {{else if IsS8            $}}true
-  {{else if IsU16           $}}true
-  {{else if IsS16           $}}true
-  {{else if IsF32           $}}true
-  {{else if IsU32           $}}true
-  {{else if IsS32           $}}true
-  {{else if IsF64           $}}true
-  {{else if IsU64           $}}true
-  {{else if IsS64           $}}true
-  {{else if IsString        $}}true
-  {{else if IsEnum          $}}true
-  {{else}}
-  {{end}}
-{{end}}
-
-
-{{/*
--------------------------------------------------------------------------------
-  Emits a the tags for the given command parameter.
--------------------------------------------------------------------------------
-*/}}
-{{define "CommandParameterTags"}}
-  {{AssertType $ "Parameter"}}
-
-  {{$cs := ConstantSetIndex $}}
-
-  `§
-  {{if $.IsReturn}}
-    result:"true"§
-  {{else}}
-    param:"{{$.Name}}"§
-  {{end}}
-  {{if ge $cs 0}}§
-    •constset:"{{$cs}}"§
-  {{end}}§
-  `
-{{end}}
-
-
-{{/*
--------------------------------------------------------------------------------
   Emits a the logic to add flags to the local variable out based on the flag
   expression.
 -------------------------------------------------------------------------------
@@ -1672,33 +1630,18 @@ import (
 -------------------------------------------------------------------------------
 */}}
 {{define "DeclareGetterSetter"}}
-  {{$g   := Macro "Go.Type" $.Type}}
-  {{$get := GoPublicName $.Name}}
-  {{$set := printf "Set%v" $get}}
-  {{$field  := print ((Strings "c" $.Prefix) | JoinWith ".") "." (GoPrivateName $.Name) }}
+  {{$g      := Macro "Go.Type" $.Type}}
+  {{$get    := GoPublicName $.Name}}
+  {{$set    := printf "Set%v" $get}}
+  {{$field  := print ((Strings "c" "c" $.Prefix) | JoinWith ".") "." (CFieldName $.Name) }}
 
-  {{$ty := Underlying $.Type}}
-  {{if $.PtrMethod}}
-    func (c *{{$.Struct}}) {{$get}}() {{$g}} { return {{$field}} }
-    func (c *{{$.Struct}}) {{$set}}(v {{$g}}) { {{$field}} = v }
-  {{else}}
-    func (c {{$.Struct}}) {{$get}}() {{$g}} { return {{$field}} }
-    func (c {{$.Struct}}) {{$set}}(v {{$g}}) { {{$field}} = v }
-  {{end}}
-{{end}}
+  func (c {{$.Struct}}) {{$get}}() {{$g}} {
+    return {{Template "CToGo" "Type" $.Type "Name" $field "Arena" "c.Arena()"}}
+  }
 
-
-{{/*
--------------------------------------------------------------------------------
-  Emits a list of fields of the specified class.
--------------------------------------------------------------------------------
-*/}}
-{{define "ClassFields"}}
-  {{AssertType $ "Class"}}
-  {{range $v := $.Fields}}
-    {{$name := $v.Name | GoPrivateName}}
-    {{$name}} {{Template "Go.Type" $v}}
-  {{end}}
+  func (c {{$.Struct}}) {{$set}}(v {{$g}}) {
+    {{$field}} = {{Template "GoToC" "Type" $.Type "Name" "v" "Arena" "c.Arena()"}}
+  }
 {{end}}
 
 
@@ -1736,4 +1679,127 @@ import (
   {{else if IsString        $.Type}}{{$.Src}}
   {{else}}{{Error "macro Clone called with unsupported type: %s" $.Name}}
   {{end}}
+{{end}}
+
+
+{{/*
+-------------------------------------------------------------------------------
+  Emits the logic to allocate an instance of type T with the arena A.
+-------------------------------------------------------------------------------
+*/}}
+{{define "Allocate"}}
+  (*{{$.Type}})({{$.Arena}}.Allocate(int(unsafe.Sizeof({{$.Type}}{})), int(unsafe.Alignof({{$.Type}}{}))))
+{{end}}
+
+
+{{/*
+-------------------------------------------------------------------------------
+  Emits the logic to convert a variable from C to Go.
+-------------------------------------------------------------------------------
+*/}}
+{{define "CToGo"}}
+  {{AssertType $.Type "Type"}}
+
+  {{$ty := $.Type | Underlying}}
+
+  {{     if IsClass       $ty}} {{Template "Go.Type" $.Type}}{ c: &{{$.Name}}, a: {{$.Arena}} }
+  {{else if IsSlice       $ty}} {{Template "Go.Type" $.Type}}{ c: &{{$.Name}} }
+  {{else if IsStaticArray $ty}} {{Template "Go.Type" $.Type}}{ c: (*{{Template "CgoTypeNoPtr" $.Type}})(&{{$.Name}}), a: {{$.Arena}} }
+  {{else if IsReference   $ty}} {{Template "Go.Type" $.Type}}{ c: {{$.Name}} }
+  {{else if IsMap         $ty}} {{Template "Go.Type" $.Type}}{ c: {{$.Name}} }
+  {{else if IsString      $ty}} C.GoStringN((*C.char)(unsafe.Pointer(&{{$.Name}}.data[0])), (C.int)({{$.Name}}.length))
+  {{else                     }} {{Template "Go.Type" $.Type}}({{$.Name}})
+  {{end}}
+{{end}}
+
+
+{{/*
+-------------------------------------------------------------------------------
+  Emits the logic to convert a variable from Go to C.
+-------------------------------------------------------------------------------
+*/}}
+{{define "GoToC"}}
+  {{AssertType $.Type "Type"}}
+
+  {{$ty := $.Type | Underlying}}
+
+  {{     if IsClass       $ty}} *{{$.Name}}.c
+  {{else if IsSlice       $ty}} *{{$.Name}}.c
+  {{else if IsStaticArray $ty}} *{{$.Name}}.c
+  {{else if IsReference   $ty}} {{$.Name}}.c
+  {{else if IsMap         $ty}} {{$.Name}}.c
+  {{else if IsString      $ty}} stringToC({{$.Arena}}, {{$.Name}})
+  {{else                     }} ({{Template "CgoTypeNoPtr" $.Type}})({{$.Name}})
+  {{end}}
+{{end}}
+
+
+{{/*
+-------------------------------------------------------------------------------
+  Emits the logic to release the temporary object allocated by GoToC
+  at the end of the current function.
+  If the type is not one that GoToC allocates a temporary for, then nothing is
+  emitted.
+-------------------------------------------------------------------------------
+*/}}
+{{define "DeferReleaseGoToC"}}
+  {{AssertType $.Type "Type"}}
+
+  {{$ty := $.Type | Underlying}}
+  {{$mangled := Macro "C.Mangle" $ty}}
+
+  {{if IsString $ty}}defer C.gapil_string_release({{$.Object}})
+  {{end}}
+{{end}}
+
+
+{{/*
+-------------------------------------------------------------------------------
+  Emits the logic to release the reference-counted object.
+  If the object is not reference-counted then nothing is emitted.
+-------------------------------------------------------------------------------
+*/}}
+{{define "Release"}}
+  {{AssertType $.Type "Type"}}
+
+  {{$ty := $.Type | Underlying}}
+  {{$mangled := Macro "C.Mangle" $ty}}
+
+  {{     if IsString    $ty}}C.gapil_string_release({{$.Object}})
+  {{else if IsSlice     $ty}}C.gapil_slice_release({{$.Object}})
+  {{else if IsReference $ty}}C.{{$mangled}}__release((unsafe.Pointer)({{$.Object}}))
+  {{else if IsMap       $ty}}C.{{$mangled}}__release((unsafe.Pointer)({{$.Object}}))
+  {{end}}
+{{end}}
+
+
+{{/*
+-------------------------------------------------------------------------------
+  Emits the Cgo type name (without pointer for ref-types)
+-------------------------------------------------------------------------------
+*/}}
+{{define "CgoTypeNoPtr"}}
+  C.{{Macro "C.Type" $ | TrimSuffix "*"}}
+{{end}}
+
+
+{{/*
+-------------------------------------------------------------------------------
+  Emits the Cgo type (with pointer for ref-types)
+-------------------------------------------------------------------------------
+*/}}
+{{define "CgoType"}}
+  {{$c := Macro "C.Type" $}}
+  {{if (HasSuffix $c "*")}}*{{end}}C.{{$c | TrimSuffix "*"}}
+{{end}}
+
+
+{{/*
+-------------------------------------------------------------------------------
+  Emits the Cgo simplified type (see C.SimplifiedType)
+-------------------------------------------------------------------------------
+*/}}
+{{define "CgoSimplifiedType"}}
+  {{$c := Macro "C.SimplifiedType" $}}
+  {{if (HasSuffix $c "*")}}*{{end}}C.{{$c | TrimSuffix "*"}}
 {{end}}
