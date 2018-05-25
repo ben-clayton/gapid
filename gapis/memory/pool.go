@@ -178,7 +178,7 @@ func (m *Pools) New() (id PoolID, p *Pool) {
 // NewAt creates and returns a new Pool with a specific ID, fails if it cannot
 func (m *Pools) NewAt(id PoolID) *Pool {
 	if _, ok := m.pools[id]; ok {
-		panic("Could not create given pool")
+		panic(fmt.Errorf("Pool with id %v already exists", id))
 	}
 	p := &Pool{}
 	m.pools[id] = p
@@ -197,15 +197,20 @@ func (m *Pools) Get(id PoolID) (*Pool, error) {
 	if p, ok := m.pools[id]; ok {
 		return p, nil
 	}
-	return nil, fmt.Errorf("Pool %v not found", id)
+	l := interval.U64RangeList{}
+	for id := range m.pools {
+		interval.Merge(&l, interval.U64Span{Start: uint64(id), End: uint64(id) + 1}, true)
+	}
+	return nil, fmt.Errorf("Pool %v not found. Pools: %v", id, l)
 }
 
 // MustGet returns the Pool with the given id, or panics if it's not found.
 func (m *Pools) MustGet(id PoolID) *Pool {
-	if p, ok := m.pools[id]; ok {
-		return p
+	p, err := m.Get(id)
+	if err != nil {
+		panic(err)
 	}
-	panic(fmt.Errorf("Pool %v not found", id))
+	return p
 }
 
 // ApplicationPool returns the application memory pool.

@@ -26,17 +26,12 @@ import (
 	"github.com/google/gapid/core/os/device"
 	"github.com/google/gapid/gapir/client"
 	"github.com/google/gapid/gapis/api"
+	"github.com/google/gapid/gapis/capture"
 	"github.com/google/gapid/gapis/database"
 	"github.com/google/gapid/gapis/memory"
-	"github.com/google/gapid/gapis/replay/builder"
 	"github.com/google/gapid/gapis/replay/opcode"
 	"github.com/google/gapid/gapis/replay/protocol"
 )
-
-type write struct {
-	at  memory.Pointer
-	src memory.Data
-}
 
 type expected struct {
 	opcodes   []interface{}
@@ -45,35 +40,41 @@ type expected struct {
 }
 
 type test struct {
-	writes   []write
 	cmds     []api.Cmd
 	expected expected
 }
 
-func (test test) check(ctx context.Context, ca, ra *device.MemoryLayout) {
-	b := builder.New(ra)
-	s := api.NewStateWithEmptyAllocator(device.Little32)
-	s.MemoryLayout = ca
+func (test test) check(ctx context.Context, cl, rl *device.MemoryLayout) {
+	ca := &device.ABI{MemoryLayout: cl}
+	ra := &device.ABI{MemoryLayout: rl}
 
-	for _, w := range test.writes {
-		s.Memory.ApplicationPool().Write(w.at.Address(), w.src)
+	header := &capture.Header{ABI: ca}
+	cp, err := capture.New(ctx, arena.New(), "test", header, nil, test.cmds)
+	if !assert.For(ctx, "Build Capture").ThatError(err).Succeeded() {
+		return
+	}
+	c, err := capture.Resolve(capture.Put(ctx, cp))
+	if !assert.For(ctx, "Resolve Capture").ThatError(err).Succeeded() {
+		return
 	}
 
-	api.ForeachCmd(ctx, test.cmds, func(ctx context.Context, id api.CmdID, cmd api.Cmd) error {
-		b.BeginCommand(uint64(id), 0)
-		cmd.Mutate(ctx, id, s, b, nil)
-		b.CommitCommand()
-		return nil
-	})
+	env := c.Env().InitState().Execute().Replay(ra).Build(ctx)
+	defer env.Dispose()
 
-	payload, _, _, err := b.Build(ctx)
-	assert.For(ctx, "Build opcodes").ThatError(err).Succeeded()
+	for i, c := range test.cmds {
+		env.Execute(ctx, api.CmdID(i), c)
+	}
 
-	ops := bytes.NewBuffer(payload.Opcodes)
-	gotOpcodes, err := opcode.Disassemble(ops, device.LittleEndian)
-	assert.For(ctx, "Dissasemble opcodes").ThatError(err).Succeeded()
-	assert.For(ctx, "Opcodes").ThatSlice(gotOpcodes).Equals(test.expected.opcodes)
+	payload, err := env.BuildReplay(ctx)
+	if assert.For(ctx, "Build").ThatError(err).Succeeded() {
+		got, err := opcode.Disassemble(bytes.NewReader(payload.Opcodes), device.LittleEndian)
+		if assert.For(ctx, "Disassemble").ThatError(err).Succeeded() {
+			assert.For(ctx, "opcodes").ThatSlice(got).Equals(test.expected.opcodes)
+		}
+	}
+
 	checkResource(ctx, payload.Resources, test.expected.resources)
+
 	assert.For(ctx, "Constants").ThatSlice(payload.Constants).Equals(test.expected.constants)
 }
 

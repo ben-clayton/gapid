@@ -467,8 +467,10 @@ func (c *C) message(s *S, e *semantic.MessageValue) *codegen.Value {
 	for i, a := range e.Arguments {
 		val := c.expression(s, a.Value)
 		c.reference(s, val, a.Field.Type)
+		any := c.packAny(s, a.Field.Type, val)
+		c.reference(s, any, semantic.AnyType)
 		args.Index(i, MsgArgName).Store(s.Scalar(a.Field.Name()))
-		args.Index(i, MsgArgValue).Store(c.packAny(s, a.Field.Type, val))
+		args.Index(i, MsgArgValue).Store(any)
 	}
 	args.Index(len(e.Arguments)).Store(s.Zero(c.T.MsgArg))
 

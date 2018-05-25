@@ -31,7 +31,6 @@ import (
 	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapil/semantic"
 	"github.com/google/gapid/gapis/api"
-	"github.com/google/gapid/gapis/capture"
 	"github.com/google/gapid/gapis/database"
 	"github.com/google/gapid/gapis/replay/opcode"
 	"github.com/google/gapid/gapis/replay/protocol"
@@ -319,8 +318,6 @@ func (t test) run(ctx context.Context) (succeeded bool) {
 
 	ctx = database.Put(ctx, database.NewInMemory(ctx))
 
-	c := &capture.Capture{}
-
 	processor := gapil.NewProcessor()
 	processor.Loader = gapil.NewDataLoader([]byte(t.src))
 	a, errs := processor.Resolve(t.name + ".api")
@@ -340,13 +337,23 @@ func (t test) run(ctx context.Context) (succeeded bool) {
 		return false
 	}
 
-	exec := executor.New(program, false)
-	env := exec.NewEnv(ctx, c)
+	e, err := program.Codegen.Executor(true)
+	if err != nil {
+		panic(err)
+	}
+
+	module := e.GlobalAddress(program.Module)
+
+	exec := executor.New(ctx, executor.Config{}, module)
+	env := exec.NewEnv(ctx)
 	defer env.Dispose()
 
+	cmds := make([]api.Cmd, len(a.Functions))
 	for i, f := range a.Functions {
-		cmd := &testutils.Cmd{N: f.Name(), D: t.data}
-		err = env.Execute(ctx, cmd, api.CmdID(baseCmdID+i))
+		cmds[i] = &testutils.Cmd{N: f.Name(), I: i, AI: int(a.Index), D: t.data}
+	}
+	res := env.ExecuteN(ctx, api.CmdID(baseCmdID), cmds)
+	for _, err := range res {
 		if !assert.For(ctx, "Execute").ThatError(err).Succeeded() {
 			return false
 		}
@@ -356,7 +363,7 @@ func (t test) run(ctx context.Context) (succeeded bool) {
 		fmt.Println(program.Dump())
 	}
 
-	payload, err := replay.Build(env)
+	payload, err := env.BuildReplay(ctx)
 	succeeded = assert.For(ctx, "Build").ThatError(err).Succeeded()
 	if succeeded {
 		got, err := opcode.Disassemble(bytes.NewReader(payload.Opcodes), device.LittleEndian)

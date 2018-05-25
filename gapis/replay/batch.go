@@ -24,6 +24,7 @@ import (
 	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/core/os/device"
 	"github.com/google/gapid/core/os/device/bind"
+	exec "github.com/google/gapid/gapil/executor"
 	gapir "github.com/google/gapid/gapir/client"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/capture"
@@ -31,7 +32,6 @@ import (
 	"github.com/google/gapid/gapis/replay/builder"
 	"github.com/google/gapid/gapis/replay/executor"
 	"github.com/google/gapid/gapis/replay/scheduler"
-	"github.com/google/gapid/gapis/resolve/initialcmds"
 	"github.com/google/gapid/gapis/service/path"
 )
 
@@ -120,6 +120,9 @@ func (m *manager) execute(
 	}
 
 	ctx = capture.Put(ctx, capturePath)
+	env := c.Env().InitState().Execute().Build(ctx)
+	defer env.Dispose()
+	ctx = exec.PutEnv(ctx, env)
 	ctx = log.V{
 		"capture": captureID,
 		"device":  d.Instance().GetName(),
@@ -144,12 +147,9 @@ func (m *manager) execute(
 
 	b := builder.New(replayABI.MemoryLayout)
 
-	_, ranges, err := initialcmds.InitialCommands(ctx, capturePath)
+	// _, ranges, err := initialcmds.InitialCommands(ctx, capturePath)
 
-	out := &adapter{
-		state:   c.NewUninitializedState(ctx).ReserveMemory(ranges),
-		builder: b,
-	}
+	out := &adapter{env: env, builder: b}
 
 	generatorReplayTimer.Time(func() {
 		ctx := status.Start(ctx, "Generate")
@@ -213,17 +213,17 @@ func (m *manager) execute(
 // adapter conforms to the the transformer.Writer interface, performing replay
 // writes on each command.
 type adapter struct {
-	state   *api.GlobalState
+	env     *exec.Env
 	builder *builder.Builder
 }
 
 func (w *adapter) State() *api.GlobalState {
-	return w.state
+	return w.env.State
 }
 
 func (w *adapter) MutateAndWrite(ctx context.Context, id api.CmdID, cmd api.Cmd) {
 	w.builder.BeginCommand(uint64(id), cmd.Thread())
-	if err := cmd.Mutate(ctx, id, w.state, w.builder, nil); err == nil {
+	if err := cmd.Mutate(ctx, id, w.env.State, w.builder, nil); err == nil {
 		w.builder.CommitCommand()
 	} else {
 		w.builder.RevertCommand(err)

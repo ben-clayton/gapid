@@ -32,8 +32,8 @@ type refRel struct {
 }
 
 func (f *refRel) declare(c *C, name, ref, rel string, ty codegen.Type) {
-	f.reference = c.M.Function(c.T.Void, ref, ty).LinkOnceODR().Inline()
-	f.release = c.M.Function(c.T.Void, rel, ty).LinkOnceODR().Inline()
+	f.reference = c.M.Function(c.T.Void, ref, ty).LinkPrivate().Inline()
+	f.release = c.M.Function(c.T.Void, rel, ty).LinkPrivate().Inline()
 	f.name = name
 }
 
@@ -102,12 +102,12 @@ func (c *C) declareRefRels() {
 	}
 
 	sli := refRel{}
-	sli.declare(c, "slice", "gapil_slice_reference", "gapil_slice_release", c.T.Sli)
+	sli.declare(c, "slice", "slice_reference", "slice_release", c.T.Sli)
 	c.refRels.tys[slicePrototype] = sli
 	c.refRels.impls[slicePrototype] = sli
 
 	str := refRel{}
-	str.declare(c, "string", "gapil_string_reference", "gapil_string_release", c.T.StrPtr)
+	str.declare(c, "string", "string_reference", "string_release", c.T.StrPtr)
 	c.refRels.tys[semantic.StringType] = str
 	c.refRels.impls[semantic.StringType] = str
 

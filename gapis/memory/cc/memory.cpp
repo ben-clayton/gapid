@@ -122,9 +122,9 @@ class Memory {
  public:
   Memory(core::Arena*);
 
-  void* read(slice* sli);
-  void write(slice* sli, const void* data);
-  void copy(slice* dst, slice* src);
+  void* read(gapil_gapil_slice* sli);
+  void write(gapil_gapil_slice* sli, const void* data);
+  void copy(gapil_gapil_slice* dst, gapil_gapil_slice* src);
 
  private:
   Pool* get_pool(uint64_t id);
@@ -135,17 +135,17 @@ class Memory {
 
 Memory::Memory(core::Arena* a) : arena_(a) {}
 
-void* Memory::read(slice* sli) {
+void* Memory::read(gapil_slice* sli) {
   auto pool = get_pool(sli->pool);
   return pool->read(arena_, sli->base, sli->size);
 }
 
-void Memory::write(slice* sli, const void* data) {
+void Memory::write(gapil_slice* sli, const void* data) {
   auto pool = get_pool(sli->pool);
   return pool->write(arena_, sli->base, sli->size, data);
 }
 
-void Memory::copy(slice* dst, slice* src) {
+void Memory::copy(gapil_slice* dst, gapil_slice* src) {
   auto d = get_pool(dst->pool);
   auto s = get_pool(src->pool);
   auto size = std::min(dst->size, src->size);
@@ -170,17 +170,17 @@ void memory_destroy(memory* mem) {
   delete m;
 }
 
-void* memory_read(memory* mem, slice* sli) {
+void* memory_read(memory* mem, gapil_slice* sli) {
   auto m = reinterpret_cast<Memory*>(mem);
   return m->read(sli);
 }
 
-void memory_write(memory* mem, slice* sli, const void* data) {
+void memory_write(memory* mem, gapil_slice* sli, const void* data) {
   auto m = reinterpret_cast<Memory*>(mem);
   return m->write(sli, data);
 }
 
-void memory_copy(memory* mem, slice* dst, slice* src) {
+void memory_copy(memory* mem, gapil_slice* dst, gapil_slice* src) {
   auto m = reinterpret_cast<Memory*>(mem);
   return m->copy(dst, src);
 }

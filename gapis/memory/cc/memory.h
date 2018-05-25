@@ -26,9 +26,9 @@ struct memory;
 memory* memory_create(arena*);
 void memory_destroy(memory*);
 
-void* memory_read(memory*, slice* sli);
-void memory_write(memory*, slice* sli, const void* data);
-void memory_copy(memory*, slice* dst, slice* src);
+void* memory_read(memory*, gapil_slice* sli);
+void memory_write(memory*, gapil_slice* sli, const void* data);
+void memory_copy(memory*, gapil_slice* dst, gapil_slice* src);
 
 #ifdef __cplusplus
 }  // extern "C"
