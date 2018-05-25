@@ -25,11 +25,11 @@ import (
 	"github.com/google/gapid/core/data/id"
 	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/core/os/device/bind"
+	exec "github.com/google/gapid/gapil/executor"
 	gapir "github.com/google/gapid/gapir/client"
 	"github.com/google/gapid/gapis/capture"
 	"github.com/google/gapid/gapis/database"
 	"github.com/google/gapid/gapis/replay/builder"
-	"github.com/google/gapid/gapis/resolve/initialcmds"
 	"github.com/google/gapid/gapis/service/path"
 )
 
@@ -84,9 +84,13 @@ func ExportReplay(ctx context.Context, pCapture *path.Capture, pDevice *path.Dev
 	}
 	ctx = log.V{"replay target ABI": replayABI}.Bind(ctx)
 
+	env := c.Env().InitState().Execute().Replay(replayABI).Build(ctx)
+	defer env.Dispose()
+	ctx = exec.PutEnv(ctx, env)
+
 	b := builder.New(replayABI.MemoryLayout)
 
-	_, ranges, err := initialcmds.InitialCommands(ctx, pCapture)
+	// _, ranges, err := initialcmds.InitialCommands(ctx, pCapture)
 
 	generatorReplayTimer.Time(func() {
 		err = generator.Replay(
@@ -99,10 +103,8 @@ func ExportReplay(ctx context.Context, pCapture *path.Capture, pDevice *path.Dev
 			}},
 			d.Instance(),
 			c,
-			&adapter{
-				state:   c.NewUninitializedState(ctx).ReserveMemory(ranges),
-				builder: b,
-			})
+			&adapter{env: env, builder: b},
+		)
 	})
 
 	if err != nil {

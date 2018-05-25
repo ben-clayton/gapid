@@ -18,10 +18,10 @@ import (
 	"context"
 
 	"github.com/google/gapid/core/app/analytics"
+	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/api/sync"
 	"github.com/google/gapid/gapis/capture"
-	"github.com/google/gapid/gapis/database"
 	"github.com/google/gapid/gapis/messages"
 	"github.com/google/gapid/gapis/service"
 	"github.com/google/gapid/gapis/service/path"
@@ -30,58 +30,49 @@ import (
 // GlobalState resolves the global *api.GlobalState at a requested point in a
 // capture.
 func GlobalState(ctx context.Context, p *path.GlobalState, r *path.ResolveConfig) (*api.GlobalState, error) {
-	obj, err := database.Build(ctx, &GlobalStateResolvable{Path: p, Config: r})
-	if err != nil {
-		return nil, err
-	}
-	return obj.(*api.GlobalState), nil
-}
+	ctx = setupContext(ctx, p.After.Capture, r)
 
-// State resolves the specific API state at a requested point in a capture.
-func State(ctx context.Context, p *path.State, r *path.ResolveConfig) (interface{}, error) {
-	return database.Build(ctx, &StateResolvable{Path: p, Config: r})
-}
-
-// Resolve implements the database.Resolver interface.
-func (r *GlobalStateResolvable) Resolve(ctx context.Context) (interface{}, error) {
-	ctx = setupContext(ctx, r.Path.After.Capture, r.Config)
-
-	cmdIdx := r.Path.After.Indices[0]
-	allCmds, err := Cmds(ctx, r.Path.After.Capture)
+	cmdIdx := p.After.Indices[0]
+	allCmds, err := Cmds(ctx, p.After.Capture)
 	if err != nil {
 		return nil, err
 	}
 
-	sd, err := SyncData(ctx, r.Path.After.Capture)
+	c, err := capture.Resolve(ctx)
 	if err != nil {
 		return nil, err
 	}
-	cmds, err := sync.MutationCmdsFor(ctx, r.Path.After.Capture, sd, allCmds, api.CmdID(cmdIdx), r.Path.After.Indices[1:], false)
+
+	env := c.Env().InitState().Execute().Build(ctx)
+	// defer env.Dispose() // TODO: How do we deal with state lifetime here?
+	ctx = executor.PutEnv(ctx, env)
+
+	sd, err := SyncData(ctx, p.After.Capture)
+	if err != nil {
+		return nil, err
+	}
+	cmds, err := sync.MutationCmdsFor(ctx, p.After.Capture, sd, allCmds, api.CmdID(cmdIdx), p.After.Indices[1:], false)
 	if err != nil {
 		return nil, err
 	}
 
 	defer analytics.SendTiming("resolve", "global-state")(analytics.Count(len(cmds)))
 
-	s, err := capture.NewState(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	err = api.ForeachCmd(ctx, cmds, func(ctx context.Context, id api.CmdID, cmd api.Cmd) error {
-		cmd.Mutate(ctx, id, s, nil, nil)
+		env.Execute(ctx, id, cmd)
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	return s, nil
+
+	return env.State, nil
 }
 
-// Resolve implements the database.Resolver interface.
-func (r *StateResolvable) Resolve(ctx context.Context) (interface{}, error) {
-	ctx = setupContext(ctx, r.Path.After.Capture, r.Config)
-	obj, _, _, err := state(ctx, r.Path, r.Config)
+// State resolves the specific API state at a requested point in a capture.
+func State(ctx context.Context, p *path.State, r *path.ResolveConfig) (interface{}, error) {
+	ctx = capture.Put(ctx, p.After.Capture)
+	obj, _, _, err := state(ctx, p, r)
 	return obj, err
 }
 
@@ -119,7 +110,7 @@ func state(ctx context.Context, p *path.State, r *path.ResolveConfig) (interface
 	abs := path.Transform(root, func(n path.Node) path.Node {
 		switch n := n.(type) {
 		case *path.State:
-			return APIStateAfter(p.After, a.ID())
+			return APIStateAfter(ctx, p.After, a.ID())
 		default:
 			return n
 		}
@@ -134,7 +125,7 @@ func state(ctx context.Context, p *path.State, r *path.ResolveConfig) (interface
 }
 
 // APIStateAfter returns an absolute path to the API state after c.
-func APIStateAfter(c *path.Command, a api.ID) path.Node {
+func APIStateAfter(ctx context.Context, c *path.Command, a api.ID) path.Node {
 	p := &path.GlobalState{After: c}
 	return p.Field("APIs").MapIndex(a)
 }

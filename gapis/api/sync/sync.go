@@ -24,6 +24,7 @@ import (
 	"context"
 
 	"github.com/google/gapid/core/app/status"
+	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/api/transform"
 	"github.com/google/gapid/gapis/capture"
@@ -96,6 +97,10 @@ func MutationCmdsFor(ctx context.Context, c *path.Capture, data *Data, cmds []ap
 		return nil, err
 	}
 
+	env := rc.Env().InitState().Execute().Build(ctx)
+	defer env.Dispose()
+	ctx = executor.PutEnv(ctx, env)
+
 	fullCommand := api.SubCmdIdx{uint64(id)}
 	fullCommand = append(fullCommand, subindex...)
 
@@ -144,7 +149,8 @@ func MutationCmdsFor(ctx context.Context, c *path.Capture, data *Data, cmds []ap
 	if isTrivial {
 		return cmds[0 : id+1], nil
 	}
-	w := &writer{rc.NewState(ctx), nil}
+
+	w := &writer{env.State, nil}
 	transforms.Transform(ctx, cmds, w)
 
 	return w.cmds, nil
@@ -169,15 +175,18 @@ func MutateWithSubcommands(ctx context.Context, c *path.Capture, cmds []api.Cmd,
 	if err != nil {
 		return err
 	}
-	s := rc.NewState(ctx)
+
+	env := rc.Env().InitState().Execute().Build(ctx)
+	defer env.Dispose()
+	ctx = executor.PutEnv(ctx, env)
 
 	return api.ForeachCmd(ctx, cmds, func(ctx context.Context, id api.CmdID, cmd api.Cmd) error {
 		if sync, ok := cmd.API().(SynchronizedAPI); ok {
-			sync.MutateSubcommands(ctx, id, cmd, s, preSubCmdCb, postSubCmdCb)
+			sync.MutateSubcommands(ctx, id, cmd, env.State, preSubCmdCb, postSubCmdCb)
 		} else {
-			cmd.Mutate(ctx, id, s, nil, nil)
+			cmd.Mutate(ctx, id, env.State, nil, nil)
 		}
-		postCmdCb(s, api.SubCmdIdx{uint64(id)}, cmd)
+		postCmdCb(env.State, api.SubCmdIdx{uint64(id)}, cmd)
 		return nil
 	})
 }

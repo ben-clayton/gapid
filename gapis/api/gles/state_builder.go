@@ -23,9 +23,9 @@ import (
 	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/core/math/interval"
 	"github.com/google/gapid/core/memory/arena"
+	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/memory"
-	"github.com/google/gapid/gapis/replay/value"
 )
 
 type stateBuilder struct {
@@ -37,7 +37,6 @@ type stateBuilder struct {
 	tmpArena        arena.Arena      // The arena to use for temporary allocations
 	seen            map[interface{}]bool
 	memoryIntervals interval.U64RangeList
-	cloneCtx        api.CloneContext
 }
 
 // RebuildState returns a set of commands which, if executed on a new clean
@@ -50,15 +49,15 @@ func (API) RebuildState(ctx context.Context, oldState *api.GlobalState) ([]api.C
 		return nil, nil
 	}
 
-	newState := api.NewStateWithAllocator(memory.NewBasicAllocator(value.ValidMemoryRanges), oldState.MemoryLayout)
+	env := executor.GetEnv(ctx)
+
 	sb := &stateBuilder{
 		oldState:        oldState,
-		newState:        newState,
-		cb:              CommandBuilder{Thread: 0, Arena: newState.Arena},
+		newState:        env.State,
+		cb:              CommandBuilder{Thread: 0, Arena: env.State.Arena},
 		tmpArena:        arena.New(),
 		seen:            map[interface{}]bool{},
 		memoryIntervals: interval.U64RangeList{},
-		cloneCtx:        api.CloneContext{},
 	}
 
 	defer sb.tmpArena.Dispose()
@@ -102,8 +101,8 @@ func (API) RebuildState(ctx context.Context, oldState *api.GlobalState) ([]api.C
 		last := d[len(d)-1]
 		if oldSlice, ok := last.Value.(memory.Slice); ok {
 			if newSlice, ok := last.Value.(memory.Slice); ok {
-				old := AsU8ˢ(sb.tmpArena, oldSlice, sb.oldState.MemoryLayout)
-				new := AsU8ˢ(sb.tmpArena, newSlice, sb.newState.MemoryLayout)
+				old := AsU8ˢ(ctx, oldSlice)
+				new := AsU8ˢ(ctx, newSlice)
 				if old.ResourceID(ctx, sb.oldState) == new.ResourceID(ctx, sb.newState) {
 					return // The pool IDs are different, but the resource IDs match exactly.
 				}
@@ -199,10 +198,10 @@ func (sb *stateBuilder) once(key interface{}) (res bool) {
 func (sb *stateBuilder) contextExtras(ctx context.Context, c Contextʳ) []api.CmdExtra {
 	r := []api.CmdExtra{}
 	if se := c.Other().StaticStateExtra(); !se.IsNil() {
-		r = append(r, se.Get().Clone(sb.cb.Arena, sb.cloneCtx))
+		r = append(r, se.Get().Clone(ctx))
 	}
 	if de := c.Other().DynamicStateExtra(); !de.IsNil() {
-		r = append(r, de.Get().Clone(sb.cb.Arena, sb.cloneCtx))
+		r = append(r, de.Get().Clone(ctx))
 	}
 	return r
 }
@@ -630,7 +629,7 @@ func (sb *stateBuilder) shaderObject(ctx context.Context, s Shaderʳ) {
 			sb.E(ctx, "Precompiled shaders not suppored yet") // TODO
 		}
 		write(ctx, cb.GlShaderSource(id, 1, sb.readsData(ctx, sb.readsData(ctx, e.Source())), memory.Nullptr))
-		write(ctx, api.WithExtras(cb.GlCompileShader(id), e.Get().Clone(cb.Arena, sb.cloneCtx)))
+		write(ctx, api.WithExtras(cb.GlCompileShader(id), e.Get().Clone(ctx)))
 	}
 	write(ctx, cb.GlShaderSource(id, 1, sb.readsData(ctx, sb.readsData(ctx, s.Source())), memory.Nullptr))
 }
@@ -675,12 +674,12 @@ func (sb *stateBuilder) programObject(ctx context.Context, p Programʳ, firstSha
 			firstShaderID++
 			write(ctx, cb.GlCreateShader(t, shaderID))
 			write(ctx, cb.GlShaderSource(shaderID, 1, sb.readsData(ctx, sb.readsData(ctx, s.Source())), memory.Nullptr))
-			write(ctx, api.WithExtras(cb.GlCompileShader(shaderID), s.Get().Clone(cb.Arena, sb.cloneCtx)))
+			write(ctx, api.WithExtras(cb.GlCompileShader(shaderID), s.Get().Clone(ctx)))
 			write(ctx, cb.GlAttachShader(id, shaderID))
 			attachedShaders = append(attachedShaders, shaderID)
 		}
 
-		write(ctx, api.WithExtras(cb.GlLinkProgram(id), p.LinkExtra().Get().Clone(cb.Arena, sb.cloneCtx)))
+		write(ctx, api.WithExtras(cb.GlLinkProgram(id), p.LinkExtra().Get().Clone(ctx)))
 		write(ctx, cb.GlUseProgram(id))
 		for _, u := range p.ActiveResources().DefaultUniformBlock().All() {
 			if loc, ok := u.Locations().Lookup(0); ok {
@@ -696,7 +695,7 @@ func (sb *stateBuilder) programObject(ctx context.Context, p Programʳ, firstSha
 		}
 	}
 	if !p.ValidateExtra().IsNil() {
-		write(ctx, api.WithExtras(cb.GlValidateProgram(id), p.ValidateExtra().Get().Clone(cb.Arena, sb.cloneCtx)))
+		write(ctx, api.WithExtras(cb.GlValidateProgram(id), p.ValidateExtra().Get().Clone(ctx)))
 	}
 
 	for _, s := range p.Shaders().All() {
@@ -773,7 +772,7 @@ func (sb *stateBuilder) pipelineObject(ctx context.Context, pipe Pipelineʳ) {
 	write(ctx, cb.GlUseProgramStages(id, GLbitfield_GL_TESS_EVALUATION_SHADER_BIT, pipe.TessEvaluationShader().GetID()))
 	write(ctx, cb.GlUseProgramStages(id, GLbitfield_GL_GEOMETRY_SHADER_BIT, pipe.GeometryShader().GetID()))
 	if !pipe.ValidateExtra().IsNil() {
-		write(ctx, api.WithExtras(cb.GlValidateProgramPipeline(id), pipe.ValidateExtra().Get().Clone(cb.Arena, sb.cloneCtx)))
+		write(ctx, api.WithExtras(cb.GlValidateProgramPipeline(id), pipe.ValidateExtra().Get().Clone(ctx)))
 	}
 	write(ctx, cb.GlBindProgramPipeline(0))
 }

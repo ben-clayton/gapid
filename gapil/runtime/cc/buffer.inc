@@ -25,7 +25,7 @@ class Buffer {
   // Reader is a buffer stream reader.
   class Reader {
    public:
-    inline Reader(buffer* buf);
+    inline Reader(gapil_buffer* buf);
 
     // read copies sizeof(T) bytes from the current read position to out.
     // If there is enough data left in the buffer to read a full T then true is
@@ -35,7 +35,7 @@ class Buffer {
     inline bool read(T* out);
 
    private:
-    buffer* buf_;
+    gapil_buffer* buf_;
     uint64_t offset_;
   };
 
@@ -68,7 +68,7 @@ class Buffer {
 
   // release_ownership returns the underlying buffer, and prevents the buffer
   // from being automatically freed when this Buffer is destructed.
-  inline buffer release_ownership();
+  inline gapil_buffer release_ownership();
 
  private:
   Buffer() = delete;
@@ -76,7 +76,7 @@ class Buffer {
   Buffer(Buffer&&) = delete;
   Buffer& operator=(const Buffer&) = delete;
 
-  buffer buf_;
+  gapil_buffer buf_;
   bool owns_buf_;
 };
 
@@ -91,7 +91,7 @@ Buffer::~Buffer() {
   }
 }
 
-Buffer::Reader::Reader(buffer* buf) : buf_(buf), offset_(0) {}
+Buffer::Reader::Reader(gapil_buffer* buf) : buf_(buf), offset_(0) {}
 
 template <typename T>
 bool Buffer::Reader::read(T* out) {
@@ -125,7 +125,7 @@ bool Buffer::write(uint64_t offset, const T& data) {
   return true;
 }
 
-buffer Buffer::release_ownership() {
+gapil_buffer Buffer::release_ownership() {
   owns_buf_ = false;
   return buf_;
 }

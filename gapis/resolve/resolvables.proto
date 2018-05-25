@@ -107,16 +107,6 @@ message ResourceMetaResolvable {
   path.ResolveConfig config = 3;
 }
 
-message GlobalStateResolvable {
-  path.GlobalState path = 1;
-  path.ResolveConfig config = 2;
-}
-
-message StateResolvable {
-  path.State path = 1;
-  path.ResolveConfig config = 2;
-}
-
 message SynchronizationResolvable {
   path.Capture capture = 1;
 }

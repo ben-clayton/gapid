@@ -12,45 +12,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package replay
+package executor
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"unsafe"
 
 	"github.com/google/gapid/core/data/slice"
-	"github.com/google/gapid/gapil/executor"
+	"github.com/google/gapid/gapil/compiler/plugins/replay"
 	replaysrv "github.com/google/gapid/gapir/replay_service"
 )
 
 // #include "gapil/runtime/cc/replay/replay.h"
 //
-// typedef gapil_replay_data* (TGetReplayData) (context*);
-// gapil_replay_data* get_replay_data(TGetReplayData* func, context* ctx) { return func(ctx); }
+// typedef gapil_replay_data* (TGetReplayData) (gapil_context*);
+// gapil_replay_data* get_replay_data(TGetReplayData* func, gapil_context* ctx) { return func(ctx); }
 import "C"
 
-func replayData(env *executor.Env) (*C.gapil_replay_data, error) {
-	pfn := env.Executor.FunctionAddress(GetReplayData)
+// BuildReplay builds the replay payload for execution.
+func (e *Env) BuildReplay(ctx context.Context) (replaysrv.Payload, error) {
+	pfn := e.Executor.Symbol(replay.GetReplayData)
 	if pfn == nil {
-		return nil, fmt.Errorf("Program did not export the function to get the replay opcodes")
+		return replaysrv.Payload{}, fmt.Errorf("Program did not export the function to get the replay opcodes")
 	}
 
 	gro := (*C.TGetReplayData)(pfn)
-	ctx := (*C.context)(env.CContext())
+	c := (*C.gapil_context)(e.CContext())
 
-	return C.get_replay_data(gro, ctx), nil
-}
+	data := C.get_replay_data(gro, c)
 
-// Build builds the replay payload for execution.
-func Build(env *executor.Env) (replaysrv.Payload, error) {
-	data, err := replayData(env)
-	if err != nil {
-		return replaysrv.Payload{}, err
-	}
-
-	ctx := (*C.context)(env.CContext())
-	C.gapil_replay_build(ctx, data)
+	C.gapil_replay_build(c, data)
 
 	resources := slice.Cast(
 		slice.Bytes(unsafe.Pointer(data.resources.data), uint64(data.resources.size)),
@@ -59,6 +52,7 @@ func Build(env *executor.Env) (replaysrv.Payload, error) {
 	payload := replaysrv.Payload{
 		Opcodes:   slice.Bytes(unsafe.Pointer(data.stream.data), uint64(data.stream.size)),
 		Resources: make([]*replaysrv.ResourceInfo, len(resources)),
+		Constants: slice.Bytes(unsafe.Pointer(data.constants.data), uint64(data.constants.size)),
 	}
 
 	for i, r := range resources {

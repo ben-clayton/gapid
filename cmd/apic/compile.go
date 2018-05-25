@@ -133,6 +133,7 @@ func (v *compileVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 		TargetABI:   targetABI,
 		CaptureABI:  captureABI,
 		Namespaces:  namespaces,
+		EmitDebug:   true, // TODO: Hook up to build settings
 		EmitExec:    v.Emit.Exec,
 		EmitContext: v.Emit.Context,
 	}

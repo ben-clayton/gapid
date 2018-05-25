@@ -41,7 +41,7 @@ const (
 
 	// Fields of gapil_replay_data:
 	stream = "stream"
-	call   = "call" // void (*call)(context*)
+	call   = "call" // void (*call)(gapil_context*)
 
 	// Fields of pointer_fixup:
 	offset = "offset"

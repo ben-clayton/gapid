@@ -109,7 +109,7 @@ const char* asm_type_str(gapil_replay_asm_type ty) {
 #endif  // #if ENABLE_DEBUG_INST
 
 template <typename T>
-const core::Range<T> to_range(const buffer& buf) {
+const core::Range<T> to_range(const gapil_buffer& buf) {
   return core::Range<T>(reinterpret_cast<T*>(buf.data), buf.size / sizeof(T));
 }
 
@@ -563,7 +563,7 @@ void Builder::store(gapil_replay_asm_value dst) {
 
 }  // anonymous namespace
 
-void gapil_replay_build(context* ctx, gapil_replay_data* data) {
+void gapil_replay_build(gapil_context* ctx, gapil_replay_data* data) {
   Builder builder(ctx->arena, data);
   builder.layout_volatile_memory();
   builder.generate_opcodes();

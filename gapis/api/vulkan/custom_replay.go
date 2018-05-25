@@ -842,7 +842,7 @@ func (a *ReplayAllocateImageMemory) Mutate(ctx context.Context, id api.CmdID, s 
 		0, // MappedSize
 		0, // MappedLocation
 		0, // MemoryTypeIndex
-		MakeU8ˢ(uint64(imageSize), s),     // Data
+		MakeU8ˢ(ctx, uint64(imageSize)),   // Data
 		NilVulkanDebugMarkerInfoʳ,         // DebugInfo
 		NilMemoryDedicatedAllocationInfoʳ, // DedicatedAllocationNV
 		NilMemoryDedicatedAllocationInfoʳ, // DedicatedAllocationKHR

@@ -74,7 +74,7 @@ type State interface {
 	APIObject
 
 	// Clone returns a deep copy of the state object.
-	Clone(arena.Arena) State
+	Clone(context.Context) State
 
 	// Root returns the path to the root of the state to display. It can vary
 	// based on filtering mode. Returning nil, nil indicates there is no state

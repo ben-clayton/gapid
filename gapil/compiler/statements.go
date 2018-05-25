@@ -189,7 +189,7 @@ func (c *C) abort(s *S, n *semantic.Abort) {
 	for s := s; s != nil; s = s.parent {
 		s.exit()
 	}
-	s.Throw(s.Scalar(ErrAborted))
+	s.Call(c.callbacks.abort)
 }
 
 func (c *C) applyReads(s *S) {

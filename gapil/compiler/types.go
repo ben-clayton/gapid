@@ -28,13 +28,13 @@ import "C"
 // Types augments the codegen.Types structure.
 type Types struct {
 	codegen.Types
-	Ctx             *codegen.Struct                        // context_t
-	CtxPtr          codegen.Type                           // context_t*
-	Pool            codegen.Type                           // pool_t
-	PoolPtr         codegen.Type                           // pool_t*
-	Sli             codegen.Type                           // slice_t
-	Str             *codegen.Struct                        // string_t
-	StrPtr          codegen.Type                           // string_t*
+	Ctx             *codegen.Struct                        // gapil_context_t
+	CtxPtr          codegen.Type                           // gapil_context_t*
+	Pool            codegen.Type                           // gapil_pool_t
+	PoolPtr         codegen.Type                           // gapil_pool_t*
+	Sli             codegen.Type                           // gapil_slice_t
+	Str             *codegen.Struct                        // gapil_string_t
+	StrPtr          codegen.Type                           // gapil_string_t*
 	Arena           *codegen.Struct                        // arena_t
 	ArenaPtr        codegen.Type                           // arena_t*
 	Any             *codegen.Struct                        // gapil_any_t
@@ -49,8 +49,8 @@ type Types struct {
 	VoidPtrPtr      codegen.Type                           // void** (aliased of uint8_t**)
 	Globals         *codegen.Struct                        // API global variables structure.
 	GlobalsPtr      codegen.Type                           // Pointer to Globals.
-	Buf             codegen.Type                           // buffer_t
-	BufPtr          codegen.Type                           // buffer_t*
+	Buf             codegen.Type                           // gapil_buffer_t
+	BufPtr          codegen.Type                           // gapil_buffer_t*
 	CmdParams       map[*semantic.Function]*codegen.Struct // struct holding all command parameters and return value.
 	DataAccess      codegen.Type
 	Maps            map[*semantic.Map]*MapInfo
@@ -72,14 +72,14 @@ func (c *C) declareTypes() {
 	c.T.targetABI = c.Settings.TargetABI
 
 	c.T.Types = c.M.Types
-	c.T.Ctx = c.T.DeclareStruct("context")
+	c.T.Ctx = c.T.DeclareStruct("gapil_context")
 	c.T.CtxPtr = c.T.Pointer(c.T.Ctx)
-	c.T.Globals = c.T.DeclareStruct("globals")
+	c.T.Globals = c.T.DeclareStruct("gapil_globals")
 	c.T.GlobalsPtr = c.T.Pointer(c.T.Globals)
-	c.T.Pool = c.T.TypeOf(C.pool{})
+	c.T.Pool = c.T.TypeOf(C.gapil_pool{})
 	c.T.PoolPtr = c.T.Pointer(c.T.Pool)
-	c.T.Sli = c.T.TypeOf(C.slice{})
-	c.T.Str = c.T.TypeOf(C.string{}).(*codegen.Struct)
+	c.T.Sli = c.T.TypeOf(C.gapil_slice{})
+	c.T.Str = c.T.TypeOf(C.gapil_string{}).(*codegen.Struct)
 	c.T.StrPtr = c.T.Pointer(c.T.Str)
 	c.T.Uint8Ptr = c.T.Pointer(c.T.Uint8)
 	c.T.Any = c.T.TypeOf(C.gapil_any{}).(*codegen.Struct)
@@ -93,7 +93,7 @@ func (c *C) declareTypes() {
 	c.T.ArenaPtr = c.T.Pointer(c.T.Arena)
 	c.T.VoidPtr = c.T.Pointer(c.T.Void)
 	c.T.VoidPtrPtr = c.T.Pointer(c.T.VoidPtr)
-	c.T.Buf = c.T.TypeOf(C.buffer{})
+	c.T.Buf = c.T.TypeOf(C.gapil_buffer{})
 	c.T.BufPtr = c.T.Pointer(c.T.Buf)
 	c.T.Maps = map[*semantic.Map]*MapInfo{}
 	c.T.CmdParams = map[*semantic.Function]*codegen.Struct{}
@@ -208,10 +208,9 @@ func (c *C) buildTypes() {
 
 		// Build all the command parameter types.
 		for _, f := range api.Functions {
-			fields := make([]codegen.Field, 0, len(f.FullParameters)+1)
-			fields = append(fields, codegen.Field{Name: semantic.BuiltinThreadGlobal.Name(), Type: c.T.Uint64})
-			for _, p := range f.FullParameters {
-				fields = append(fields, codegen.Field{Name: p.Name(), Type: c.T.Target(p.Type)})
+			fields := make([]codegen.Field, len(f.FullParameters))
+			for i, p := range f.FullParameters {
+				fields[i] = codegen.Field{Name: p.Name(), Type: c.T.Target(p.Type)}
 			}
 			c.T.CmdParams[f].SetBody(false, fields...)
 		}
@@ -302,9 +301,9 @@ func (t *Types) Target(ty semantic.Type) codegen.Type {
 	case *semantic.Builtin:
 		switch ty {
 		case semantic.IntType:
-			return t.Int
-		case semantic.SizeType:
-			return t.Size
+			return t.Int64
+		case semantic.UintType, semantic.SizeType:
+			return t.Uint64
 		}
 	case *semantic.StaticArray:
 		return t.Array(t.Target(ty.ValueType), int(ty.Size))

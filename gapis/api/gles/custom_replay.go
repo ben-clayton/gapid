@@ -37,70 +37,70 @@ type objectKey struct {
 }
 
 func (i BufferId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		key, remap = objectKey{ctx.Objects().Buffers(), i}, true
+	c := GetContext(s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		key, remap = objectKey{c.Objects().Buffers(), i}, true
 	}
 	return
 }
 
 func (i FramebufferId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		key, remap = objectKey{ctx.Objects().Framebuffers(), i}, true
+	c := GetContext(s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		key, remap = objectKey{c.Objects().Framebuffers(), i}, true
 	}
 	return
 }
 
 func (i RenderbufferId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		key, remap = objectKey{ctx.Objects().Renderbuffers(), i}, true
+	c := GetContext(s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		key, remap = objectKey{c.Objects().Renderbuffers(), i}, true
 	}
 	return
 }
 
 func (i ProgramId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		key, remap = objectKey{ctx.Objects().Programs(), i}, true
+	c := GetContext(s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		key, remap = objectKey{c.Objects().Programs(), i}, true
 	}
 	return
 }
 
 func (i ShaderId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		key, remap = objectKey{ctx.Objects().Shaders(), i}, true
+	c := GetContext(s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		key, remap = objectKey{c.Objects().Shaders(), i}, true
 	}
 	return
 }
 
 func (i TextureId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		if tex := ctx.Objects().Textures().Get(i); !tex.IsNil() {
+	c := GetContext(s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		if tex := c.Objects().Textures().Get(i); !tex.IsNil() {
 			_, isDeleteCmd := cmd.(*GlDeleteTextures)
 			if eglImage := tex.EGLImage(); !eglImage.IsNil() && !isDeleteCmd {
 				// Ignore this texture and use the data that EGLImage points to.
 				// (unless it is a delete command - we do not want kill the shared data)
-				ctx := GetState(s).EGLContexts().Get(eglImage.Context())
+				c := GetState(s).EGLContexts().Get(eglImage.Context())
 				isTex2D := eglImage.Target() == EGLenum_EGL_GL_TEXTURE_2D
 				i := TextureId(eglImage.Buffer().Address())
-				if !ctx.IsNil() && isTex2D && ctx.Objects().Textures().Contains(i) {
-					return objectKey{ctx.Objects().Textures(), i}, true
+				if !c.IsNil() && isTex2D && c.Objects().Textures().Contains(i) {
+					return objectKey{c.Objects().Textures(), i}, true
 				}
 				panic(fmt.Errorf("Can not find EGL image target: %v", eglImage))
 			}
 		}
-		key, remap = objectKey{ctx.Objects().Textures(), i}, true
+		key, remap = objectKey{c.Objects().Textures(), i}, true
 	}
 	return
 }
 
 func (i UniformBlockIndex) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	program := ctx.Bound().Program().GetID()
+	c := GetContext(s, cmd.Thread())
+	program := c.Bound().Program().GetID()
 	switch cmd := cmd.(type) {
 	case *GlGetActiveUniformBlockName:
 		program = cmd.Program()
@@ -114,29 +114,29 @@ func (i UniformBlockIndex) remap(cmd api.Cmd, s *api.GlobalState) (key interface
 	return struct {
 		p Programʳ
 		i UniformBlockIndex
-	}{ctx.Objects().Programs().Get(program), i}, true
+	}{c.Objects().Programs().Get(program), i}, true
 }
 
 func (i VertexArrayId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		key, remap = objectKey{ctx.Objects().VertexArrays(), i}, true
+	c := GetContext(s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		key, remap = objectKey{c.Objects().VertexArrays(), i}, true
 	}
 	return
 }
 
 func (i QueryId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		key, remap = objectKey{ctx.Objects().Queries(), i}, true
+	c := GetContext(s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		key, remap = objectKey{c.Objects().Queries(), i}, true
 	}
 	return
 }
 
 func (i GLsync) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && !i.IsNullptr() {
-		key, remap = objectKey{ctx.Objects().SyncObjects(), i}, true
+	c := GetContext(s, cmd.Thread())
+	if !c.IsNil() && !i.IsNullptr() {
+		key, remap = objectKey{c.Objects().SyncObjects(), i}, true
 	}
 	return
 }
@@ -146,32 +146,32 @@ func (i GLsync) value(b *builder.Builder, cmd api.Cmd, s *api.GlobalState) value
 }
 
 func (i SamplerId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		key, remap = objectKey{ctx.Objects().Samplers(), i}, true
+	c := GetContext(s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		key, remap = objectKey{c.Objects().Samplers(), i}, true
 	}
 	return
 }
 
 func (i PipelineId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		key, remap = objectKey{ctx.Objects().Pipelines(), i}, true
+	c := GetContext(s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		key, remap = objectKey{c.Objects().Pipelines(), i}, true
 	}
 	return
 }
 
 func (i TransformFeedbackId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		key, remap = objectKey{ctx.Objects().TransformFeedbacks(), i}, true
+	c := GetContext(s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		key, remap = objectKey{c.Objects().TransformFeedbacks(), i}, true
 	}
 	return
 }
 
 func (i UniformLocation) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	program := ctx.Bound().Program().GetID()
+	c := GetContext(s, cmd.Thread())
+	program := c.Bound().Program().GetID()
 	switch cmd := cmd.(type) {
 	case *GlGetActiveUniform:
 		program = cmd.Program()
@@ -181,7 +181,7 @@ func (i UniformLocation) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}
 	return struct {
 		p Programʳ
 		l UniformLocation
-	}{ctx.Objects().Programs().Get(program), i}, true
+	}{c.Objects().Programs().Get(program), i}, true
 }
 
 func (i SrcImageId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
@@ -209,8 +209,8 @@ func (i DstImageId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, rem
 }
 
 func remapImageID(cmd api.Cmd, s *api.GlobalState, name GLuint, target GLenum) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && name != 0 {
+	c := GetContext(s, cmd.Thread())
+	if !c.IsNil() && name != 0 {
 		if target == GLenum_GL_RENDERBUFFER {
 			return RenderbufferId(name).remap(cmd, s)
 		}
