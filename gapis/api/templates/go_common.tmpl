@@ -84,8 +84,8 @@
 {{define "Go.Null"}}
   {{AssertType $ "Type"}}
   {{     if IsPointer       $}}{{Template "Go.Type" $}}(0)
-  {{else if IsSlice         $}}{{Template "Go.Type" $}}{}
-  {{else if IsReference     $}}Nil{{Template "Go.Type" $}}
+  {{else if IsSlice         $}}Nil{{Template "Go.Type" $}}
+  {{else if IsReference     $}}Nil{{Template "Go.TypeName" $}}
   {{else if IsMap           $}}New{{Template "Go.Type" $}}(ϟa)
   {{else if IsClass         $}}Make{{Template "Go.Type" $}}(ϟa)
   {{else if IsStaticArray   $}}New{{Template "Go.Type" $}}(ϟa)

@@ -274,7 +274,7 @@ func (t *makeAttachementReadable) Transform(ctx context.Context, id api.CmdID, c
 		allProps := externs{ctx, cmd, id, s, nil}.fetchPhysicalDeviceProperties(e.Instance(), devSlice)
 		propList := []VkPhysicalDeviceProperties{}
 		for _, dev := range devs {
-			propList = append(propList, allProps.PhyDevToProperties().Get(dev).Clone(s.Arena, api.CloneContext{}))
+			propList = append(propList, allProps.PhyDevToProperties().Get(dev).Clone(s.Arena))
 		}
 		newEnumerate := buildReplayEnumeratePhysicalDevices(ctx, s, cb, e.Instance(), numDev, devs, propList)
 		for _, e := range cmd.Extras().All() {

@@ -25,7 +25,6 @@ import (
 	"github.com/google/gapid/core/data/protoconv"
 	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/core/memory/arena"
-	"github.com/google/gapid/gapis/api"
 )
 
 func TestReferences(t *testing.T) {
@@ -94,20 +93,20 @@ func TestCloneReferences(t *testing.T) {
 	defer a.Dispose()
 
 	ctx = arena.Put(ctx, a)
-	complex := BuildComplex(a)
+	extra := CreateTestExtra(a)
 
-	cloned := complex.Clone(a, api.CloneContext{})
-	check(ctx, cloned.Data(), complex.Data(), "Data")
-	check(ctx, cloned.Object(), complex.Object(), "Object")
-	check(ctx, cloned.ObjectArray(), complex.ObjectArray(), "ObjectArray")
-	check(ctx, cloned.RefObject().Value(), complex.RefObject().Value(), "RefObject")
-	check(ctx, cloned.RefObject().Value(), complex.RefObjectAlias().Value(), "RefObjectAlias")
+	cloned := extra.Clone(a)
+	check(ctx, cloned.Data(), extra.Data(), "Data")
+	check(ctx, cloned.Object(), extra.Object(), "Object")
+	check(ctx, cloned.ObjectArray(), extra.ObjectArray(), "ObjectArray")
+	check(ctx, cloned.RefObject().Value(), extra.RefObject().Value(), "RefObject")
+	check(ctx, cloned.RefObject().Value(), extra.RefObjectAlias().Value(), "RefObjectAlias")
 	check(ctx, cloned.NilRefObject().IsNil(), true, "NilRefObject")
-	check(ctx, cloned.Entries(), complex.Entries(), "Entries")
-	check(ctx, cloned.EntriesAlias(), complex.EntriesAlias(), "EntriesAlias")
-	check(ctx, cloned.NilMap(), complex.NilMap(), "NilMap")
-	check(ctx, cloned.Strings(), complex.Strings(), "Strings")
-	check(ctx, cloned.BoolMap(), complex.BoolMap(), "BoolMap")
+	check(ctx, cloned.Entries(), extra.Entries(), "Entries")
+	check(ctx, cloned.EntriesAlias(), extra.EntriesAlias(), "EntriesAlias")
+	check(ctx, cloned.NilMap(), extra.NilMap(), "NilMap")
+	check(ctx, cloned.Strings(), extra.Strings(), "Strings")
+	check(ctx, cloned.BoolMap(), extra.BoolMap(), "BoolMap")
 	// RefEntries
 	assert.For("RefEntries.Len").That(cloned.RefEntries().Len()).Equals(complex.RefEntries().Len())
 	for _, k := range complex.RefEntries().Keys() {

@@ -199,7 +199,7 @@ func (*stencilOverdraw) rewriteImageCreate(ctx context.Context,
 		return
 	}
 
-	newCreateInfo := createInfo.Clone(a, api.CloneContext{})
+	newCreateInfo := createInfo.Clone(a)
 
 	if !newCreateInfo.PQueueFamilyIndices().IsNullptr() {
 		indices := newCreateInfo.PQueueFamilyIndices().Slice(0,
@@ -366,7 +366,7 @@ func (s *stencilOverdraw) getStencilAttachmentDescription(st *State,
 	// Clone it, but with a stencil-friendly format
 	var stencilDesc VkAttachmentDescription
 	if idx != ^uint32(0) {
-		stencilDesc = depthDesc.Clone(a, api.CloneContext{})
+		stencilDesc = depthDesc.Clone(a)
 
 		format, err := depthToStencilFormat(depthDesc.Fmt())
 		if err != nil {
@@ -655,7 +655,7 @@ func (*stencilOverdraw) createRenderPass(ctx context.Context,
 	}
 
 	attachments := rpInfo.AttachmentDescriptions().All()
-	newAttachments := rpInfo.AttachmentDescriptions().Clone(a, api.CloneContext{})
+	newAttachments := rpInfo.AttachmentDescriptions().Clone(a)
 	newAttachments.Add(uint32(newAttachments.Len()), stencilAttachment)
 	newAttachmentsData, newAttachmentsLen := unpackMapWithAllocator(allocAndRead,
 		newAttachments)
@@ -1729,7 +1729,7 @@ func (s *stencilOverdraw) createCommandBuffer(ctx context.Context,
 					device, newCmdBuffer, renderInfo, alloc,
 					addCleanup, out)
 
-				newArgs := ar.Clone(a, api.CloneContext{})
+				newArgs := ar.Clone(a)
 				newArgs.SetRenderPass(renderInfo.renderPass)
 				newArgs.SetFramebuffer(renderInfo.framebuffer)
 
@@ -1767,7 +1767,7 @@ func (s *stencilOverdraw) createCommandBuffer(ctx context.Context,
 				newArgs := ar
 				if ar.PipelineBindPoint() ==
 					VkPipelineBindPoint_VK_PIPELINE_BIND_POINT_GRAPHICS {
-					newArgs = ar.Clone(a, api.CloneContext{})
+					newArgs = ar.Clone(a)
 
 					pipe := ar.Pipeline()
 					newPipe, ok := pipelines[pipe]

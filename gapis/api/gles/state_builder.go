@@ -38,7 +38,6 @@ type stateBuilder struct {
 	tmpArena        arena.Arena      // The arena to use for temporary allocations
 	seen            map[interface{}]bool
 	memoryIntervals interval.U64RangeList
-	cloneCtx        api.CloneContext
 }
 
 func (s *State) RebuildState(ctx context.Context, oldState *api.GlobalState) ([]api.Cmd, interval.U64RangeList) {
@@ -51,7 +50,6 @@ func (s *State) RebuildState(ctx context.Context, oldState *api.GlobalState) ([]
 		tmpArena:        arena.New(),
 		seen:            map[interface{}]bool{},
 		memoryIntervals: interval.U64RangeList{},
-		cloneCtx:        api.CloneContext{},
 	}
 
 	defer sb.tmpArena.Dispose()
@@ -192,10 +190,10 @@ func (sb *stateBuilder) once(key interface{}) (res bool) {
 func (sb *stateBuilder) contextExtras(c Contextʳ) []api.CmdExtra {
 	r := []api.CmdExtra{}
 	if se := c.Other().StaticStateExtra(); !se.IsNil() {
-		r = append(r, se.Get().Clone(sb.cb.Arena, sb.cloneCtx))
+		r = append(r, se.Get().Clone(sb.cb.Arena))
 	}
 	if de := c.Other().DynamicStateExtra(); !de.IsNil() {
-		r = append(r, de.Get().Clone(sb.cb.Arena, sb.cloneCtx))
+		r = append(r, de.Get().Clone(sb.cb.Arena))
 	}
 	return r
 }
@@ -623,7 +621,7 @@ func (sb *stateBuilder) shaderObject(ctx context.Context, s Shaderʳ) {
 			sb.E(ctx, "Precompiled shaders not suppored yet") // TODO
 		}
 		write(cb.GlShaderSource(id, 1, sb.readsData(ctx, sb.readsData(ctx, e.Source())), memory.Nullptr))
-		write(api.WithExtras(cb.GlCompileShader(id), e.Get().Clone(cb.Arena, sb.cloneCtx)))
+		write(api.WithExtras(cb.GlCompileShader(id), e.Get().Clone(cb.Arena)))
 	}
 	write(cb.GlShaderSource(id, 1, sb.readsData(ctx, sb.readsData(ctx, s.Source())), memory.Nullptr))
 }
@@ -668,12 +666,12 @@ func (sb *stateBuilder) programObject(ctx context.Context, p Programʳ, firstSha
 			firstShaderID++
 			write(cb.GlCreateShader(t, shaderID))
 			write(cb.GlShaderSource(shaderID, 1, sb.readsData(ctx, sb.readsData(ctx, s.Source())), memory.Nullptr))
-			write(api.WithExtras(cb.GlCompileShader(shaderID), s.Get().Clone(cb.Arena, sb.cloneCtx)))
+			write(api.WithExtras(cb.GlCompileShader(shaderID), s.Get().Clone(cb.Arena)))
 			write(cb.GlAttachShader(id, shaderID))
 			attachedShaders = append(attachedShaders, shaderID)
 		}
 
-		write(api.WithExtras(cb.GlLinkProgram(id), p.LinkExtra().Get().Clone(cb.Arena, sb.cloneCtx)))
+		write(api.WithExtras(cb.GlLinkProgram(id), p.LinkExtra().Get().Clone(cb.Arena)))
 		write(cb.GlUseProgram(id))
 		for _, u := range p.ActiveResources().DefaultUniformBlock().All() {
 			if loc, ok := u.Locations().Lookup(0); ok {
@@ -689,7 +687,7 @@ func (sb *stateBuilder) programObject(ctx context.Context, p Programʳ, firstSha
 		}
 	}
 	if !p.ValidateExtra().IsNil() {
-		write(api.WithExtras(cb.GlValidateProgram(id), p.ValidateExtra().Get().Clone(cb.Arena, sb.cloneCtx)))
+		write(api.WithExtras(cb.GlValidateProgram(id), p.ValidateExtra().Get().Clone(cb.Arena)))
 	}
 
 	for _, s := range p.Shaders().All() {
@@ -766,7 +764,7 @@ func (sb *stateBuilder) pipelineObject(ctx context.Context, pipe Pipelineʳ) {
 	write(cb.GlUseProgramStages(id, GLbitfield_GL_TESS_EVALUATION_SHADER_BIT, pipe.TessEvaluationShader().GetID()))
 	write(cb.GlUseProgramStages(id, GLbitfield_GL_GEOMETRY_SHADER_BIT, pipe.GeometryShader().GetID()))
 	if !pipe.ValidateExtra().IsNil() {
-		write(api.WithExtras(cb.GlValidateProgramPipeline(id), pipe.ValidateExtra().Get().Clone(cb.Arena, sb.cloneCtx)))
+		write(api.WithExtras(cb.GlValidateProgramPipeline(id), pipe.ValidateExtra().Get().Clone(cb.Arena)))
 	}
 	write(cb.GlBindProgramPipeline(0))
 }

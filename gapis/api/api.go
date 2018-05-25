@@ -109,9 +109,6 @@ func Find(id ID) API {
 	return apis[id]
 }
 
-// CloneContext is used to keep track of references when cloning API objects.
-type CloneContext map[interface{}]interface{}
-
 // All returns all the registered APIs.
 func All() []API {
 	out := make([]API, 0, len(apis))
