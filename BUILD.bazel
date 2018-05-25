@@ -163,6 +163,7 @@ test_suite(
         "//gapil/compiler:go_default_xtest",
         "//gapil/compiler/mangling/c:go_default_xtest",
         "//gapil/compiler/mangling/ia64:go_default_xtest",
+        "//gapil/compiler/plugins/cloner/test:go_default_test",
         "//gapil/compiler/plugins/encoder/test:go_default_test",
         "//gapil/fuzz:go_default_xtest",
         "//gapil/parser:go_default_xtest",
