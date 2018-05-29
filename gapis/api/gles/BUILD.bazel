@@ -182,6 +182,7 @@ go_test(
     srcs = [
         "compat_test.go",
         "dead_code_elimination_test.go",
+        "markers_test.go",
         "stub_program_test.go",
     ],
     deps = [

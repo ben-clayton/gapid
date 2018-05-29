@@ -16,6 +16,7 @@
 package executor
 
 import (
+	"sync"
 	"unsafe"
 
 	"github.com/google/gapid/core/codegen"
@@ -29,6 +30,7 @@ type Executor struct {
 	exec           *codegen.Executor
 	createContext  unsafe.Pointer
 	destroyContext unsafe.Pointer
+	funcCache      sync.Map
 	globalsSize    uint64
 	cmdFunctions   map[string]unsafe.Pointer
 }
@@ -58,4 +60,14 @@ func New(prog *compiler.Program, optimize bool) *Executor {
 	}
 
 	return exec
+}
+
+// FunctionAddress returns the function address of the function with the given
+// name or nil if the function was not found.
+func (e *Executor) FunctionAddress(name string) unsafe.Pointer {
+	f, ok := e.program.Functions[name]
+	if !ok {
+		return nil
+	}
+	return e.exec.FunctionAddress(f)
 }

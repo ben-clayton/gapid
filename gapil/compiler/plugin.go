@@ -14,7 +14,12 @@
 
 package compiler
 
-import "github.com/google/gapid/core/codegen"
+import (
+	"reflect"
+
+	"github.com/google/gapid/core/codegen"
+	"github.com/google/gapid/gapil/semantic"
+)
 
 // Plugin is a extension for the compiler.
 type Plugin interface {
@@ -23,23 +28,56 @@ type Plugin interface {
 
 type plugins []Plugin
 
-func (l plugins) foreach(f func(p Plugin)) {
+func (l plugins) foreach(cb interface{}) {
+	cbV := reflect.ValueOf(cb)
+	cbT := cbV.Type()
+	if cbT.Kind() != reflect.Func || cbT.NumIn() != 1 {
+		panic("foreach() requires a function of the signature func(T)")
+	}
+	ty := cbT.In(0)
 	for _, p := range l {
-		f(p)
+		pV := reflect.ValueOf(p)
+		if pV.Type().Implements(ty) {
+			cbV.Call([]reflect.Value{pV})
+		}
 	}
 }
 
 // ContextField represents a single additional context field added by a
 // ContextDataPlugin.
 type ContextField struct {
-	Name string                       // Name of the field
-	Type codegen.Type                 // Type of the field
-	Init func(s *S) *codegen.Value    // Optional initializer
-	Term func(s *S, v *codegen.Value) // Optional terminator
+	Name string                         // Name of the field
+	Type codegen.Type                   // Type of the field
+	Init func(s *S, ptr *codegen.Value) // Optional initializer
+	Term func(s *S, ptr *codegen.Value) // Optional terminator
 }
 
 // ContextDataPlugin is the interface implemented by plugins that require
 // additional data to be stored in the runtime context.
 type ContextDataPlugin interface {
 	ContextData(*C) []ContextField
+}
+
+// FunctionExposerPlugin is the interface implemented by plugins that build
+// public functions. These functions will be exposed on the output Program.
+type FunctionExposerPlugin interface {
+	Functions() map[string]codegen.Function
+}
+
+// OnBeginCommandListener is the interface implemented by plugins that generate
+// custom logic at the start of the command.
+type OnBeginCommandListener interface {
+	OnBeginCommand(cmd *semantic.Function, s *S)
+}
+
+// OnFenceListener is the interface implemented by plugins that generate
+// custom logic at the fence of the command.
+type OnFenceListener interface {
+	OnFence(s *S)
+}
+
+// OnEndCommandListener is the interface implemented by plugins that generate
+// custom logic at the end of the command.
+type OnEndCommandListener interface {
+	OnEndCommand(cmd *semantic.Function, s *S)
 }

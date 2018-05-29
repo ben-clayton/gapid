@@ -43,9 +43,11 @@ typedef struct string_t  string;
 typedef struct context_t {
 	uint32_t    id;            // the context identifier. Can be treated as user-data.
 	uint32_t    location;      // the API source location.
+	uint64_t    cmd_id;        // the current command identifier.
 	uint32_t*   next_pool_id;  // the identifier of the next pool to be created.
 	globals*    globals;       // a pointer to the global state.
 	arena*      arena;         // the memory arena used for allocations.
+	void*       arguments;     // the arguments to the currently executing command.
 	// additional data used by compiler plugins goes here.
 } context;
 

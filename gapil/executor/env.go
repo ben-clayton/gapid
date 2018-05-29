@@ -20,6 +20,7 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/google/gapid/core/data/slice"
 	"github.com/google/gapid/core/memory/arena"
 	"github.com/google/gapid/gapil/compiler"
 	"github.com/google/gapid/gapis/api"
@@ -32,11 +33,11 @@ import (
 //
 // typedef context* (TCreateContext) (arena*);
 // typedef void     (TDestroyContext) (context*);
-// typedef uint32_t (TFunc) (void* ctx, void* args);
+// typedef uint32_t (TFunc) (void* ctx);
 //
 // static context* create_context(TCreateContext* func, arena* a) { return func(a); }
 // static void destroy_context(TDestroyContext* func, context* ctx) { func(ctx); }
-// static uint32_t call(context* ctx, void* args, TFunc* func) { return func(ctx, args); }
+// static uint32_t call(context* ctx, TFunc* func) { return func(ctx); }
 //
 // // Implemented below.
 // void* remap_pointer(context* ctx, uintptr_t pointer, uint64_t length);
@@ -89,8 +90,10 @@ type Env struct {
 	// Arena is the memory arena used by this execution environment.
 	Arena arena.Arena
 
+	// Executor is the parent executor.
+	Executor *Executor
+
 	id      envID
-	exec    *Executor
 	cCtx    *C.context      // The gapil C context.
 	goCtx   context.Context // The go context.
 	cmd     api.Cmd         // The currently executing command.
@@ -100,7 +103,7 @@ type Env struct {
 // Dispose releases the memory used by the environment.
 // Call after the env is no longer needed to avoid leaking memory.
 func (e *Env) Dispose() {
-	C.destroy_context((*C.TDestroyContext)(e.exec.destroyContext), e.cCtx)
+	C.destroy_context((*C.TDestroyContext)(e.Executor.destroyContext), e.cCtx)
 	e.Arena.Dispose()
 }
 
@@ -142,8 +145,8 @@ func (e *Executor) NewEnv(ctx context.Context, capture *capture.Capture) *Env {
 		nextEnvID++
 
 		env = &Env{
-			id:   envID(id),
-			exec: e,
+			Executor: e,
+			id:       envID(id),
 		}
 		envs[id] = env
 	}()
@@ -166,9 +169,9 @@ func (e *Executor) NewEnv(ctx context.Context, capture *capture.Capture) *Env {
 }
 
 // Execute executes the command cmd.
-func (e *Env) Execute(ctx context.Context, cmd api.Cmd) error {
+func (e *Env) Execute(ctx context.Context, cmd api.Cmd, id api.CmdID) error {
 	name := cmd.CmdName()
-	fptr, ok := e.exec.cmdFunctions[name]
+	fptr, ok := e.Executor.cmdFunctions[name]
 	if !ok {
 		return fmt.Errorf("Program has no command '%v'", name)
 	}
@@ -177,32 +180,33 @@ func (e *Env) Execute(ctx context.Context, cmd api.Cmd) error {
 	encodeCommand(cmd, buf[:])
 
 	e.cmd = cmd
+	e.cCtx.cmd_id = (C.uint64_t)(id)
 	res := e.call(ctx, fptr, (unsafe.Pointer)(&buf[0]))
 	e.cmd = nil
 
 	return res
 }
 
+// CContext returns the pointer to the c context.
+func (e *Env) CContext() unsafe.Pointer {
+	return (unsafe.Pointer)(e.cCtx)
+}
+
 // Globals returns the memory of the global state.
 func (e *Env) Globals() []byte {
-	return byteSlice((unsafe.Pointer)(e.cCtx.globals), e.exec.globalsSize)
+	return slice.Bytes((unsafe.Pointer)(e.cCtx.globals), e.Executor.globalsSize)
 }
 
 // GetBytes returns the bytes that are in the given memory range.
 func (e *Env) GetBytes(rng memory.Range) []byte {
 	basePtr := e.buffers.remap(rng)
-	return byteSlice(basePtr, rng.Size)
-}
-
-// byteSlice returns a byte-slice from the given unsafe pointer of the given
-// size in bytes.
-func byteSlice(ptr unsafe.Pointer, size uint64) []byte {
-	return ((*[1 << 30]byte)(ptr))[:size]
+	return slice.Bytes(basePtr, rng.Size)
 }
 
 func (e *Env) call(ctx context.Context, fptr, args unsafe.Pointer) error {
 	e.goCtx = ctx
-	err := compiler.ErrorCode(C.call(e.cCtx, args, (*C.TFunc)(fptr)))
+	e.cCtx.arguments = args
+	err := compiler.ErrorCode(C.call(e.cCtx, (*C.TFunc)(fptr)))
 	e.goCtx = nil
 
 	return err.Err()
@@ -216,7 +220,7 @@ func (e *Env) applyObservations(l []api.CmdObservation) {
 		}
 		data := obj.([]byte)
 		ptr := e.buffers.remap(o.Range)
-		dst := byteSlice(ptr, o.Range.Size)
+		dst := slice.Bytes(ptr, o.Range.Size)
 		copy(dst, data)
 	}
 }
@@ -251,8 +255,8 @@ func remap_pointer(c *C.context, ptr C.uintptr_t, length C.uint64_t) unsafe.Poin
 func get_code_location(c *C.context, file **C.char, line *C.uint32_t) {
 	e := env(c)
 	l := compiler.Location{File: "<unknown>"}
-	if loc := int(e.cCtx.location); loc < len(e.exec.program.Locations) {
-		l = e.exec.program.Locations[loc]
+	if loc := int(e.cCtx.location); loc < len(e.Executor.program.Locations) {
+		l = e.Executor.program.Locations[loc]
 	}
 	*file = C.CString(l.File)
 	*line = (C.uint32_t)(l.Line)

@@ -58,7 +58,9 @@ type C struct {
 	// This excludes gapil runtime symbols which have the prefix 'gapil_'.
 	Root mangling.Scope
 
-	settings  Settings
+	// Settings are the configuration values used for this compile.
+	Settings Settings
+
 	plugins   plugins
 	functions map[*semantic.Function]codegen.Function
 	ctx       struct { // Functions that operate on contexts
@@ -118,12 +120,12 @@ func Compile(api *semantic.API, mappings *resolver.Mappings, s Settings) (*Progr
 	}
 
 	c := &C{
-		M:       codegen.NewModule("api.executor", s.TargetABI),
-		API:     api,
-		Mangler: s.Mangler,
+		M:        codegen.NewModule("api.executor", s.TargetABI),
+		API:      api,
+		Mangler:  s.Mangler,
+		Settings: s,
 
 		plugins:       s.Plugins,
-		settings:      s,
 		functions:     map[*semantic.Function]codegen.Function{},
 		mappings:      mappings,
 		locationIndex: map[Location]int{},
@@ -153,32 +155,39 @@ func (c *C) program(s Settings) (*Program, error) {
 		if a.Subroutine || a.Extern {
 			continue
 		}
-		params := f.Type.Signature.Parameters[1].(codegen.Pointer).Element.(*codegen.Struct)
 		commands[f.Name] = &CommandInfo{
 			Execute:    f,
-			Parameters: params,
+			Parameters: c.T.CmdParams[a].(*codegen.Struct),
 		}
 	}
 
 	globals := &StructInfo{Type: c.T.Globals}
 
-	structs := make(map[string]*StructInfo)
+	functions := map[string]codegen.Function{}
+	c.plugins.foreach(func(p FunctionExposerPlugin) {
+		for n, f := range p.Functions() {
+			functions[n] = f
+		}
+	})
+
+	structs := map[string]*StructInfo{}
 	for _, t := range c.T.target {
 		if s, ok := t.(*codegen.Struct); ok {
 			structs[s.Name] = &StructInfo{Type: s}
 		}
 	}
 
-	maps := make(map[string]*MapInfo)
+	maps := map[string]*MapInfo{}
 	for m, mi := range c.T.Maps {
 		maps[m.Name()] = mi
 	}
 
 	return &Program{
-		Settings:       c.settings,
+		Settings:       c.Settings,
 		Commands:       commands,
 		Structs:        structs,
 		Globals:        globals,
+		Functions:      functions,
 		Maps:           maps,
 		Locations:      c.locations,
 		Module:         c.M,
@@ -227,8 +236,12 @@ func (c *C) compile() {
 	)
 
 	c.buildTypes()
+	c.buildBufferFuncs()
+	c.buildContextFuncs()
 
-	if c.settings.EmitExec {
+	c.plugins.foreach(func(p Plugin) { p.Build(c) })
+
+	if c.Settings.EmitExec {
 		for _, f := range c.API.Externs {
 			c.extern(f)
 		}
@@ -239,11 +252,6 @@ func (c *C) compile() {
 			c.command(f)
 		}
 	}
-
-	c.buildContextFuncs()
-	c.buildBufferFuncs()
-
-	c.plugins.foreach(func(p Plugin) { p.Build(c) })
 }
 
 // Build implements the function f by creating a new scope and calling do to
@@ -254,8 +262,8 @@ func (c *C) Build(f codegen.Function, do func(*S)) {
 	err(f.Build(func(jb *codegen.Builder) {
 		s := &S{
 			Builder:    jb,
+			Parameters: map[*semantic.Parameter]*codegen.Value{},
 			locals:     map[*semantic.Local]*codegen.Value{},
-			parameters: map[*semantic.Parameter]*codegen.Value{},
 		}
 		for i, p := range f.Type.Signature.Parameters {
 			if p == c.T.CtxPtr {
@@ -376,7 +384,7 @@ func (c *C) setCodeLocation(s *S, t parse.Token) {
 }
 
 func (c *C) updateCodeLocation(s *S) {
-	if c.settings.CodeLocations && s.Location != nil {
+	if c.Settings.CodeLocations && s.Location != nil {
 		s.Location.Store(s.Scalar(uint32(s.locationIdx)))
 	}
 }

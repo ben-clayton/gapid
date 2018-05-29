@@ -28,6 +28,22 @@ const (
 	retValue = "value"
 )
 
+// LoadParameters loads the command's parameters from the context's arguments
+// field and stores them into s.Parameters.
+func (c *C) LoadParameters(s *S, f *semantic.Function) {
+	params := s.Ctx.
+		Index(0, ContextArguments).
+		Load().
+		Cast(c.T.Pointer(c.T.CmdParams[f])).
+		SetName("params")
+
+	for _, p := range f.FullParameters {
+		v := params.Index(0, p.Name()).Load()
+		v.SetName(p.Name())
+		s.Parameters[p] = v
+	}
+}
+
 func (c *C) returnType(f *semantic.Function) codegen.Type {
 	fields := []codegen.Field{{Name: retError, Type: c.T.Uint32}}
 	if f.Return.Type != semantic.VoidType {
@@ -44,14 +60,11 @@ func (c *C) command(f *semantic.Function) {
 		return
 	}
 	old := c.setCurrentFunction(f)
-	out := c.M.Function(c.returnType(f), f.Name(), c.T.CtxPtr, c.T.Pointer(c.T.CmdParams[f]))
+	out := c.M.Function(c.returnType(f), f.Name(), c.T.CtxPtr)
 	c.Build(out, func(s *S) {
-		params := s.Parameter(1).SetName("params")
-		for _, p := range f.FullParameters {
-			v := params.Index(0, p.Name()).Load()
-			v.SetName(p.Name())
-			s.parameters[p] = v
-		}
+		c.LoadParameters(s, f)
+
+		c.plugins.foreach(func(p OnBeginCommandListener) { p.OnBeginCommand(f, s) })
 
 		c.applyReads(s)
 
@@ -78,7 +91,7 @@ func (c *C) subroutine(f *semantic.Function) {
 	c.functions[f] = out
 	c.Build(out, func(s *S) {
 		for i, p := range params {
-			s.parameters[p] = s.Parameter(i + 1).SetName(p.Name())
+			s.Parameters[p] = s.Parameter(i + 1).SetName(p.Name())
 		}
 		c.block(s, f.Block)
 	})
@@ -276,6 +289,7 @@ func (c *C) declareLocal(s *S, n *semantic.DeclareLocal) {
 }
 
 func (c *C) fence(s *S, n *semantic.Fence) {
+	c.plugins.foreach(func(p OnFenceListener) { p.OnFence(s) })
 	c.applyWrites(s)
 	if n.Statement != nil {
 		c.statement(s, n.Statement)
@@ -370,7 +384,7 @@ func (c *C) sliceAssign(s *S, n *semantic.SliceAssign) {
 		base.Index(index).Store(el)
 	}
 
-	if !c.settings.WriteToApplicationPool {
+	if !c.Settings.WriteToApplicationPool {
 		// Writes to the application pool are disabled by default.
 		// This can be overridden with the WriteToApplicationPool setting.
 		actuallyWrite := write
