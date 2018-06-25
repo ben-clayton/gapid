@@ -33,7 +33,7 @@
 #include <cstring>
 
 #if 0
-#define DEBUG_PRINT(...) GAPID_DEBUG(__VA_ARGS__)
+#define DEBUG_PRINT(...) GAPID_WARNING(__VA_ARGS__)
 #else
 #define DEBUG_PRINT(...)
 #endif

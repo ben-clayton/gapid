@@ -16,6 +16,7 @@ package replay
 
 import (
 	"context"
+	"unsafe"
 
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/replay/builder"
@@ -39,6 +40,7 @@ func (c Custom) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b 
 }
 
 // api.Cmd compliance
+func (Custom) ExecData() unsafe.Pointer                                           { return nil }
 func (Custom) Caller() api.CmdID                                                  { return api.CmdNoID }
 func (Custom) SetCaller(api.CmdID)                                                {}
 func (cmd Custom) Thread() uint64                                                 { return cmd.T }

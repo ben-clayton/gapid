@@ -17,6 +17,7 @@ package testutils
 import (
 	"bytes"
 	"context"
+	"unsafe"
 
 	"github.com/google/gapid/core/data/endian"
 	"github.com/google/gapid/core/data/id"
@@ -29,16 +30,26 @@ import (
 // Cmd is a custom implementation of the api.Cmd interface that simplifies
 // testing compiler generated commands.
 type Cmd struct {
-	N string  // Command name
-	D []byte  // Encoded command used by the compiler generated execute function
-	E *Extras // Command extras
-	T uint64  // Command thread
+	N    string  // Command name
+	D    []byte  // Encoded command used by the compiler generated execute function
+	E    *Extras // Command extras
+	T    uint64  // Command thread
+	data []byte
 }
 
 var _ api.Cmd = &Cmd{}
 
 // API stubs the api.Cmd interface.
 func (c *Cmd) API() api.API { return nil }
+
+// ExecData stubs the api.Cmd interface.
+func (c *Cmd) ExecData() unsafe.Pointer {
+	b := bytes.Buffer{}
+	endian.Writer(&b, device.LittleEndian).Uint64(c.T)
+	b.Write(c.D)
+	c.data = b.Bytes()
+	return (unsafe.Pointer)(&c.data[0])
+}
 
 // Caller stubs the api.Cmd interface.
 func (c *Cmd) Caller() api.CmdID { return 0 }
@@ -74,15 +85,6 @@ func (c *Cmd) Extras() *api.CmdExtras {
 
 // Mutate stubs the api.Cmd interface.
 func (c *Cmd) Mutate(context.Context, api.CmdID, *api.GlobalState, *builder.Builder) error { return nil }
-
-// Encode implements the executor.Encodable interface to encode the command to
-// a buffer used by the compiler generated execute function.
-func (c Cmd) Encode(out []byte) bool {
-	w := endian.Writer(bytes.NewBuffer(out), device.LittleEndian)
-	w.Uint64(c.T)
-	copy(out[8:], c.D)
-	return true
-}
 
 // Extras is a helper wrapper around an api.CmdExtras has helpers methods for
 // adding read and writ observations.

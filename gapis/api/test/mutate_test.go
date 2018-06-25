@@ -24,19 +24,18 @@ import (
 	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/core/memory/arena"
 	"github.com/google/gapid/core/os/device"
+	"github.com/google/gapid/gapil"
+	"github.com/google/gapid/gapil/compiler"
+	"github.com/google/gapid/gapil/compiler/plugins/replay"
+	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapir/client"
 	"github.com/google/gapid/gapis/api"
+	"github.com/google/gapid/gapis/capture"
 	"github.com/google/gapid/gapis/database"
 	"github.com/google/gapid/gapis/memory"
-	"github.com/google/gapid/gapis/replay/builder"
 	"github.com/google/gapid/gapis/replay/opcode"
 	"github.com/google/gapid/gapis/replay/protocol"
 )
-
-type write struct {
-	at  memory.Pointer
-	src memory.Data
-}
 
 type expected struct {
 	opcodes   []interface{}
@@ -45,36 +44,62 @@ type expected struct {
 }
 
 type test struct {
-	writes   []write
 	cmds     []api.Cmd
 	expected expected
 }
 
 func (test test) check(ctx context.Context, ca, ra *device.MemoryLayout) {
-	b := builder.New(ra)
-	s := api.NewStateWithEmptyAllocator(device.Little32)
-	s.MemoryLayout = ca
-
-	for _, w := range test.writes {
-		s.Memory.ApplicationPool().Write(w.at.Address(), w.src)
+	header := &capture.Header{ABI: &device.ABI{MemoryLayout: ca}}
+	cp, err := capture.New(ctx, arena.New(), "test", header, test.cmds)
+	if !assert.For(ctx, "Build Capture").ThatError(err).Succeeded() {
+		return
+	}
+	c, err := capture.Resolve(capture.Put(ctx, cp))
+	if !assert.For(ctx, "Resolve Capture").ThatError(err).Succeeded() {
+		return
 	}
 
-	api.ForeachCmd(ctx, test.cmds, func(ctx context.Context, id api.CmdID, cmd api.Cmd) error {
-		b.BeginCommand(uint64(id), 0)
-		cmd.Mutate(ctx, id, s, b)
-		b.CommitCommand()
-		return nil
-	})
+	processor := gapil.NewProcessor()
+	a, errs := processor.Resolve("test.api")
+	if !assert.For(ctx, "Resolve").ThatSlice(errs).IsEmpty() {
+		return
+	}
 
-	payload, _, _, err := b.Build(ctx)
-	assert.For(ctx, "Build opcodes").ThatError(err).Succeeded()
+	settings := compiler.Settings{
+		CaptureABI: &device.ABI{
+			MemoryLayout: ca,
+		},
+		EmitExec: true,
+		Plugins: []compiler.Plugin{
+			replay.Plugin(ra),
+		},
+	}
 
-	ops := bytes.NewBuffer(payload.Opcodes)
-	gotOpcodes, err := opcode.Disassemble(ops, device.LittleEndian)
-	assert.For(ctx, "Dissasemble opcodes").ThatError(err).Succeeded()
-	assert.For(ctx, "Opcodes").ThatSlice(gotOpcodes).Equals(test.expected.opcodes)
+	program, err := compiler.Compile(a, processor.Mappings, settings)
+	if !assert.For(ctx, "Compile").ThatError(err).Succeeded() {
+		return
+	}
+
+	exec := executor.New(program, false)
+	env := exec.NewEnv(ctx, c)
+	defer env.Dispose()
+
+	for i, c := range test.cmds {
+		env.Execute(ctx, c, api.CmdID(i))
+	}
+
+	payload, err := replay.Build(env, ra)
+	if assert.For(ctx, "Build").ThatError(err).Succeeded() {
+		got, err := opcode.Disassemble(bytes.NewReader(payload.Opcodes), device.LittleEndian)
+		if assert.For(ctx, "Disassemble").ThatError(err).Succeeded() {
+			assert.For(ctx, "opcodes").ThatSlice(got).Equals(test.expected.opcodes)
+		}
+	}
+
 	checkResource(ctx, payload.Resources, test.expected.resources)
-	assert.For(ctx, "Constants").ThatSlice(payload.Constants).Equals(test.expected.constants)
+
+	// TODO:
+	// assert.For(ctx, "Constants").ThatSlice(payload.Constants).Equals(test.expected.constants)
 }
 
 func checkResource(ctx context.Context, gotInfos []*client.ResourceInfo, expectedIDs []id.ID) {

@@ -12,24 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package executor
+package test
 
-import (
-	"fmt"
+// #include "gapil/runtime/cc/replay/replay.h"
+//
+// uint64_t test_remapped_key(context* ctx, void* v) { return *(uint32_t*)v; }
+// static void register_remap_funcs() {
+//   gapil_replay_register_remap_func("test", "remapped", &test_remapped_key);
+// }
+import "C"
 
-	"github.com/google/gapid/gapis/api"
-)
-
-type Encodable interface {
-	Encode([]byte) bool
-}
-
-func encodeCommand(cmd api.Cmd, buf []byte) {
-	e, ok := cmd.(Encodable)
-	if !ok {
-		panic(fmt.Errorf("Command '%v' is not encodable", cmd.CmdName()))
-	}
-	if !e.Encode(buf) {
-		panic(fmt.Errorf("Failed to encode command '%v'", cmd.CmdName()))
-	}
+func init() {
+	C.register_remap_funcs()
 }

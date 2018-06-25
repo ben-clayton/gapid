@@ -95,7 +95,7 @@ func TestGet(t *testing.T) {
 		{cB.Result(), uint32(3), nil},
 
 		{sA.Field("Str"), "", nil},
-		{sA.Field("Sli"), test.NewBoolˢ(a, 0, 0, 0, 0, 0), nil},
+		// {sA.Field("Sli"), test.NewBoolˢ(a, 0, 0, 0, 0, 0), nil}, // TODO: How do we test this?
 		{sA.Field("Ref"), test.NilComplexʳ, nil},
 		{sA.Field("Ptr"), test.U8ᵖ(0), nil},
 

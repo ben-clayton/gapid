@@ -192,12 +192,9 @@ func (e *Env) Execute(ctx context.Context, cmd api.Cmd, id api.CmdID) error {
 		return fmt.Errorf("Program has no command '%v'", name)
 	}
 
-	var buf [1024]byte
-	encodeCommand(cmd, buf[:])
-
 	e.cmd = cmd
 	e.cCtx.cmd_id = (C.uint64_t)(id)
-	res := e.call(ctx, fptr, (unsafe.Pointer)(&buf[0]))
+	res := e.call(ctx, fptr, cmd.ExecData())
 	e.cmd = nil
 
 	return res

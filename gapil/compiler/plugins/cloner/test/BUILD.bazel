@@ -83,9 +83,11 @@ go_library(
         "//core/data/slice:go_default_library",  # keep
         "//core/math/interval:go_default_library",
         "//core/math/u64:go_default_library",  # keep
+        "//core/memory/arena:go_default_library",  # keep
         "//core/os/device:go_default_library",  # keep
         "//gapil/constset:go_default_library",
         "//gapis/api:go_default_library",
+        "//gapis/memory:go_default_library",  # keep
         "//gapis/replay:go_default_library",  # keep
         "//gapis/replay/builder:go_default_library",
         "//gapis/replay/protocol:go_default_library",  # keep

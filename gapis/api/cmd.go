@@ -16,6 +16,7 @@ package api
 
 import (
 	"context"
+	"unsafe"
 
 	"github.com/google/gapid/core/fault"
 	"github.com/google/gapid/gapis/replay/builder"
@@ -25,6 +26,10 @@ import (
 type Cmd interface {
 	// All commands belong to an API
 	APIObject
+
+	// ExecData returns a pointer to the command parameter and return value
+	// data used by the command executor.
+	ExecData() unsafe.Pointer
 
 	// Caller returns the identifier of the command that called this command,
 	// or CmdNoID if the command has no caller.

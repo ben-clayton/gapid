@@ -68,6 +68,7 @@ cc_library(
 go_library(
     name = "go_default_library",
     srcs = [
+        "custom_replay.go",
         "doc.go",
         "helpers.go",
         "test.go",
@@ -78,23 +79,34 @@ go_library(
         ":api_lib",
         "//gapil/runtime/cc",
         "//gapil/runtime/cc/cloner:cc",
+        "//gapil/runtime/cc/replay:cc",
     ],
     cgo = True,  # keep
     clinkopts = [],  # keep
     importpath = "github.com/google/gapid/gapis/api/test",
     visibility = ["//visibility:public"],
     deps = [
+        "//core/data:go_default_library",  # keep
+        "//core/data/binary:go_default_library",  # keep
         "//core/data/compare:go_default_library",
+        "//core/data/id:go_default_library",  # keep
         "//core/data/protoconv:go_default_library",  # keep
+        "//core/data/slice:go_default_library",  # keep
         "//core/event/task:go_default_library",  # keep
         "//core/math/interval:go_default_library",
+        "//core/math/u64:go_default_library",  # keep
         "//core/memory/arena:go_default_library",  # keep
+        "//core/os/device:go_default_library",  # keep
         "//gapil/constset:go_default_library",  # keep
         "//gapis/api:go_default_library",
         "//gapis/api/test/test_pb:go_default_library",  # keep
         "//gapis/memory:go_default_library",
         "//gapis/memory/memory_pb:go_default_library",  # keep
         "//gapis/messages:go_default_library",  # keep
+        "//gapis/replay:go_default_library",  # keep
+        "//gapis/replay/builder:go_default_library",  # keep
+        "//gapis/replay/protocol:go_default_library",  # keep
+        "//gapis/replay/value:go_default_library",  # keep
         "//gapis/service/path:go_default_library",
         "//gapis/stringtable:go_default_library",  # keep
         "@com_github_golang_protobuf//proto:go_default_library",  # keep
@@ -110,6 +122,7 @@ go_test(
         "mutate_test.go",
         "subroutines_test.go",
     ],
+    data = glob(["*.api"]),
     embed = [":go_default_library"],
     deps = [
         "//core/assert:go_default_library",
@@ -125,10 +138,15 @@ go_test(
         "//core/math/u64:go_default_library",  # keep
         "//core/memory/arena:go_default_library",
         "//core/os/device:go_default_library",
+        "//gapil:go_default_library",
+        "//gapil/compiler:go_default_library",
+        "//gapil/compiler/plugins/replay:go_default_library",
         "//gapil/constset:go_default_library",  # keep
+        "//gapil/executor:go_default_library",
         "//gapir/client:go_default_library",
         "//gapis/api:go_default_library",
         "//gapis/api/test/test_pb:go_default_library",  #keep
+        "//gapis/capture:go_default_library",
         "//gapis/database:go_default_library",
         "//gapis/memory:go_default_library",
         "//gapis/memory/memory_pb:go_default_library",  #keep

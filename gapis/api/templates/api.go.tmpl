@@ -560,8 +560,8 @@ import (»
   func New{{$slice_ty}}(a arena.Arena, root, base, size, count uint64, pool ϟmem.PoolID) {{$slice_ty}} {
     return {{$slice_ty}}{
       c: &C.slice{
-        root:  unsafe.Pointer(uintptr(root)),
-        base:  unsafe.Pointer(uintptr(base)),
+        root:  C.uint64_t(root),
+        base:  C.uint64_t(base),
         size:  C.uint64_t(size),
         count: C.uint64_t(count),
         pool:  poolToC(a, pool),
@@ -597,10 +597,10 @@ import (»
   }
 
   // Root returns the original pointer this slice derives from.
-  func (s {{$slice_ty}}) Root() uint64 { return uint64(uintptr(s.c.root)) /* TODO: Translate pointer */ }
+  func (s {{$slice_ty}}) Root() uint64 { return uint64(s.c.root) }
 
   // Base returns the address of first element.
-  func (s {{$slice_ty}}) Base() uint64 { return uint64(uintptr(s.c.base)) /* TODO: Translate pointer */ }
+  func (s {{$slice_ty}}) Base() uint64 { return uint64(s.c.base) }
 
   // Count returns the number of elements in the slice.
   func (s {{$slice_ty}}) Count() uint64 { return uint64(s.c.count) }
@@ -672,8 +672,8 @@ import (»
       return {{$slice_ty}}{
         c: &C.slice{
           pool:  poolToC(a, s.Pool()),
-          root:  unsafe.Pointer(uintptr(s.Root())),
-          base:  unsafe.Pointer(uintptr(s.Base())),
+          root:  C.uint64_t(s.Root()),
+          base:  C.uint64_t(s.Base()),
           size:  C.uint64_t(newSize),
           count: C.uint64_t(newCount),
         },
@@ -868,8 +868,8 @@ import (»
     return {{$slice_ty}}{
       c: &C.slice{
         pool:  s.c.pool, // TODO
-        root:  unsafe.Pointer(uintptr(s.Root())),
-        base:  unsafe.Pointer(uintptr(s.Base() + start * elSize)),
+        root:  C.uint64_t(s.Root()),
+        base:  C.uint64_t(s.Base() + start * elSize),
         size:  C.uint64_t(newCount * elSize),
         count: C.uint64_t(newCount),
       },
@@ -1028,8 +1028,8 @@ import (»
     return {{$slice_ty}}{
       c: &C.slice{
         pool:  nil, // TODO
-        root:  unsafe.Pointer(uintptr(uint64(p))),
-        base:  unsafe.Pointer(uintptr(uint64(p) + start * elSize)),
+        root:  C.uint64_t(p),
+        base:  C.uint64_t(uint64(p) + start * elSize),
         size:  C.uint64_t((count) * elSize),
         count: C.uint64_t(count),
       },
@@ -1295,6 +1295,8 @@ import (»
 
   func (ϟc *{{$name}}) SetThread(v uint64) { ϟc.c.thread_id = C.uint64_t(v) }
 
+	func (ϟc *{{$name}}) ExecData() unsafe.Pointer { return (unsafe.Pointer)(ϟc.c) }
+
   func (ϟc *{{$name}}) Caller() ϟapi.CmdID { return ϟc.caller }
 
   func (ϟc *{{$name}}) SetCaller(id ϟapi.CmdID) { ϟc.caller = id }
@@ -1551,12 +1553,17 @@ import (»
   }
 
 	// CreateCmd constructs and returns a new command with the specified name.
-	func (API) CreateCmd(a arena.Arena, name string) ϟapi.Cmd {
+	func (API) CreateCmd(ϟa arena.Arena, name string) ϟapi.Cmd {
+    cb := CommandBuilder{Arena: ϟa}
     switch name {
       {{range $c := AllCommands $}}
         {{if not (GetAnnotation $c "pfn")}}
           case "{{$c.Name}}":
-            return &{{$c | GoCommandName}}{arena: a}
+            return cb.{{$c | GoCommandName}}(
+              {{range $i, $p := $c.FullParameters}}
+                {{Template "Go.Null" $p.Type}},
+              {{end}}
+            )
         {{end}}
       {{end}}
       default:
