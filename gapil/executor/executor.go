@@ -20,6 +20,9 @@ import (
 
 	"github.com/google/gapid/core/codegen"
 	"github.com/google/gapid/gapil/compiler"
+
+	// Import the cgosymbolizer so that we get Cgo stack traces.
+	_ "github.com/ianlancetaylor/cgosymbolizer"
 )
 
 // Executor is used to create execution environments for a compiled program.

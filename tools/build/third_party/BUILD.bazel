@@ -48,6 +48,36 @@ cc_library(
 )
 
 cc_library(
+    name = "cgosymbolizer-config",
+    hdrs = select({
+        "@gapid//tools/build:linux": glob(["cgosymbolizer/include-linux/**/*"]),
+        "@gapid//tools/build:darwin": glob(["cgosymbolizer/include-darwin/**/*"]),
+        "@gapid//tools/build:windows": glob(["cgosymbolizer/include-windows/**/*"]),
+    }),
+    strip_include_prefix = select({
+        "@gapid//tools/build:linux": "cgosymbolizer/include-linux",
+        "@gapid//tools/build:darwin": "cgosymbolizer/include-darwin",
+        "@gapid//tools/build:windows": "cgosymbolizer/include-windows",
+    }),
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "libbacktrace-config",
+    hdrs = select({
+        "@gapid//tools/build:linux": glob(["libbacktrace/include-linux/**/*"]),
+        "@gapid//tools/build:darwin": glob(["libbacktrace/include-darwin/**/*"]),
+        "@gapid//tools/build:windows": glob(["libbacktrace/include-windows/**/*"]),
+    }),
+    strip_include_prefix = select({
+        "@gapid//tools/build:linux": "libbacktrace/include-linux",
+        "@gapid//tools/build:darwin": "libbacktrace/include-darwin",
+        "@gapid//tools/build:windows": "libbacktrace/include-windows",
+    }),
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
     name = "spirv-tools-generated",
     hdrs = glob(["SPIRV-Tools-Generated/*"]),
     strip_include_prefix = "SPIRV-Tools-Generated",

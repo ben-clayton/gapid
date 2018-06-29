@@ -117,6 +117,24 @@ def gapid_dependencies(android = True, java_client = True, mingw = True, locals 
     )
 
     maybe_repository(github_repository,
+        name = "libbacktrace",
+        locals = locals,
+        organization = "ianlancetaylor",
+        project = "libbacktrace",
+        commit = "5a99ff7fed66b8ea8f09c9805c138524a7035ece",
+        build_file = "@gapid//tools/build/third_party:libbacktrace.BUILD",
+    )
+
+    maybe_repository(github_repository,
+        name = "cgosymbolizer",
+        locals = locals,
+        organization = "ianlancetaylor",
+        project = "cgosymbolizer",
+        commit = "f5072df9c550dc687157e5d7efb50825cdf8f0eb",
+        build_file = "@gapid//tools/build/third_party:cgosymbolizer.BUILD",
+    )
+
+    maybe_repository(github_repository,
         name = "llvm",
         locals = locals,
         organization = "llvm-mirror",
