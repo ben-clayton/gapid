@@ -59,13 +59,52 @@ type Process struct {
 // Start launches an activity on an android device with the GAPII interceptor
 // enabled using the gapid.apk built for the ABI matching the specified action and device.
 // GAPII will attempt to connect back on the returned host port to write the trace.
-func Start(ctx context.Context, p *android.InstalledPackage, a *android.ActivityAction, o Options) (*Process, error) {
+func Start(ctx context.Context, p *android.InstalledPackage, a *android.ActivityAction, o Options) (process *Process, err error) {
 	ctx = log.Enter(ctx, "start")
 	if a != nil {
 		ctx = log.V{"activity": a.Activity}.Bind(ctx)
 	}
 	ctx = log.V{"on": p.Name}.Bind(ctx)
+
 	d := p.Device.(adb.Device)
+
+	// Utility functions
+
+	// Cleanups are things we must do before the app terminates.
+	cleanups := []func(){}
+	onFinish := func(f func()) { cleanups = append(cleanups, f) }
+	cleanup := func() {
+		for _, f := range cleanups {
+			f()
+		}
+		cleanups = nil
+	}
+	app.AddCleanup(ctx, cleanup)
+	defer func() {
+		if err != nil { // StartOrAttach did not succeed. Cleanup now.
+			cleanup()
+		}
+	}()
+
+	// pushSetting changes a device property for the duration of this function.
+	type setting struct{ ns, key, val string }
+	oldSettings := []setting{}
+	pushSetting := func(ns, key, val string) {
+		if old, err := d.SystemSetting(ctx, ns, key); err == nil {
+			oldSettings = append(oldSettings, setting{ns, key, old})
+		}
+		d.SetSystemSetting(ctx, ns, key, val)
+	}
+	defer func() {
+		for _, s := range oldSettings {
+			log.E(ctx, "Restoring setting %v", s.key)
+			if s.val == "null" {
+				d.DeleteSystemSetting(ctx, s.ns, s.key)
+			} else {
+				d.SetSystemSetting(ctx, s.ns, s.key, s.val)
+			}
+		}
+	}()
 
 	abi := p.ABI
 	if abi.SameAs(device.UnknownABI) {
@@ -108,6 +147,22 @@ func Start(ctx context.Context, p *android.InstalledPackage, a *android.Activity
 	if err := d.Forward(ctx, adb.TCPPort(port), adb.NamedAbstractSocket("gapii")); err != nil {
 		return nil, log.Err(ctx, err, "Setting up port forwarding for gapii")
 	}
+	onFinish(func() { d.RemoveForward(ctx, port) })
+
+	// Tracing method to use.
+	// true:  Use JDWP to load GAPII, and inject trampolines into the driver.
+	// false: Use GPU debug layers provided by the OS.
+	useJDWP := true
+
+	if true { // TODO: How can we tell if the device supports debug layers?
+		pushSetting("global", "enable_gpu_debug_layers", "1")
+		pushSetting("global", "gpu_debug_app", p.Name)
+		pushSetting("global", "gpu_debug_layer_app", gapidapk.PackageName(abi))
+		pushSetting("global", "gpu_debug_layers", gapidapk.LibGAPIIName)
+		useJDWP = false
+	}
+
+	log.I(ctx, "Use JDWP: %v", useJDWP)
 
 	// FileDir may fail here. This happens if/when the app is non-debuggable.
 	// Don't set up vulkan tracing here, since the loader will not try and load the layer
@@ -116,15 +171,10 @@ func Start(ctx context.Context, p *android.InstalledPackage, a *android.Activity
 	if o.APIs&VulkanAPI != uint32(0) {
 		m, err = reserveVulkanDevice(ctx, d)
 		if err != nil {
-			d.RemoveForward(ctx, port)
 			return nil, log.Err(ctx, err, "Setting up for tracing Vulkan")
 		}
+		onFinish(func() { releaseVulkanDevice(ctx, d, m) })
 	}
-
-	app.AddCleanup(ctx, func() {
-		d.RemoveForward(ctx, port)
-		releaseVulkanDevice(ctx, d, m)
-	})
 
 	var additionalArgs []android.ActionExtra
 	if o.AdditionalFlags != "" {
@@ -133,8 +183,14 @@ func Start(ctx context.Context, p *android.InstalledPackage, a *android.Activity
 
 	if a != nil {
 		log.I(ctx, "Starting activity in debug mode")
-		if err := d.StartActivityForDebug(ctx, *a, additionalArgs...); err != nil {
-			return nil, log.Err(ctx, err, "Starting activity in debug mode")
+		if useJDWP {
+			if err := d.StartActivityForDebug(ctx, *a, additionalArgs...); err != nil {
+				return nil, log.Err(ctx, err, "Starting activity in debug mode")
+			}
+		} else {
+			if err := d.StartActivity(ctx, *a, additionalArgs...); err != nil {
+				return nil, log.Err(ctx, err, "Starting activity")
+			}
 		}
 	} else {
 		log.I(ctx, "No start activity selected - trying to attach...")
@@ -151,13 +207,16 @@ func Start(ctx context.Context, p *android.InstalledPackage, a *android.Activity
 	}
 	ctx = log.V{"pid": pid}.Bind(ctx)
 
-	process := &Process{
+	process = &Process{
 		Port:    int(port),
 		Device:  d,
 		Options: o,
 	}
-	if err := process.loadAndConnectViaJDWP(ctx, apk, pid, d); err != nil {
-		return nil, err
+
+	if useJDWP {
+		if err := process.loadAndConnectViaJDWP(ctx, apk, pid, d); err != nil {
+			return nil, err
+		}
 	}
 
 	return process, nil

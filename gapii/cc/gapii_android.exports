@@ -1,4 +1,6 @@
 JNI_OnLoad
+GetLayerProcAddress
+InitializeLayer
 gapid_vkGetDeviceProcAddr
 gapid_vkGetInstanceProcAddr
 gapid_vkEnumerateInstanceLayerProperties
