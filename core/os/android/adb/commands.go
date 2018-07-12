@@ -181,6 +181,27 @@ func (b *binding) SetSystemProperty(ctx context.Context, name, value string) err
 	return nil
 }
 
+// SystemSetting returns the system setting in string
+func (b *binding) SystemSetting(ctx context.Context, namespace, key string) (string, error) {
+	res, err := b.Shell("settings", "get", namespace, key).Call(ctx)
+	if err != nil {
+		return "", log.Errf(ctx, err, "settings get returned error: \n%s", err.Error())
+	}
+	return res, nil
+}
+
+// SetSystemSetting sets the system setting with the given string value
+func (b *binding) SetSystemSetting(ctx context.Context, namespace, key, value string) error {
+	res, err := b.Shell("settings", "put", namespace, key, value).Call(ctx)
+	if res != "" {
+		return log.Errf(ctx, nil, "settings put returned error: \n%s", res)
+	}
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // TempFile creates a temporary file on the given Device. It returns the
 // path to the file, and a function that can be called to clean it up.
 func (b *binding) TempFile(ctx context.Context) (string, func(ctx context.Context), error) {
