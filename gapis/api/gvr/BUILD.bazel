@@ -14,7 +14,7 @@
 
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
-load("//tools/build:rules.bzl", "api_library", "apic_compile", "apic_template", "cc_copts")
+load("//tools/build:rules.bzl", "api_library", "apic_binary", "apic_compile", "apic_template", "cc_copts", "embed")
 
 filegroup(
     name = "api_files",
@@ -56,9 +56,21 @@ apic_template(
         "//gapis/api/templates:mutate",
         "//gapis/api/templates:ctypes_h",
         "//gapis/api/templates:constant_sets",
+        "//gapis/api/templates:definition",
         "//gapis/api/templates:convert",
     ],
     visibility = ["//visibility:public"],
+)
+
+apic_binary(
+    name = "api_binary",
+    api = ":api",
+)
+
+embed(
+    name = "embed",
+    srcs = [":api_binary"],
+    package = "gvr",
 )
 
 apic_compile(
@@ -100,6 +112,7 @@ go_library(
         "framebindings.go",
         "gvr.go",
         "importance.go",
+        ":embed",  # keep
         ":generated",  # keep
     ],
     cdeps = [
@@ -128,6 +141,7 @@ go_library(
         "//core/math/u64:go_default_library",  # keep
         "//core/memory/arena:go_default_library",  # keep
         "//core/os/device:go_default_library",  # keep
+        "//gapil/bapi:go_default_library",  # keep
         "//gapil/constset:go_default_library",  # keep
         "//gapis/api:go_default_library",
         "//gapis/api/gles:go_default_library",

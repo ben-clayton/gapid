@@ -23,10 +23,14 @@ import (
 	"github.com/google/gapid/core/image"
 	"github.com/google/gapid/core/memory/arena"
 	"github.com/google/gapid/gapil/constset"
+	"github.com/google/gapid/gapil/semantic"
 )
 
 // API is the common interface to a graphics programming api.
 type API interface {
+	// Definition returns the API's semantic definition.
+	Definition() Definition
+
 	// Name returns the official name of the api.
 	Name() string
 
@@ -55,6 +59,15 @@ type API interface {
 
 	// CreateCmd constructs and returns a new command with the specified name.
 	CreateCmd(a arena.Arena, name string) Cmd
+}
+
+// Definition holds the data from the semantic tree of the API definition.
+type Definition struct {
+	// Semantic is the API's semantic tree.
+	Semantic *semantic.API
+	// Mappings are the API's mappings between the semantic, abstract and
+	// concrete trees.
+	Mappings *semantic.Mappings
 }
 
 // FramebufferAttachmentInfo describes a framebuffer at a given point in the trace

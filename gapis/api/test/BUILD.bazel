@@ -13,7 +13,7 @@
 # limitations under the License.
 
 load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
-load("//tools/build:rules.bzl", "api_library", "apic_compile", "apic_template", "cc_copts")
+load("//tools/build:rules.bzl", "api_library", "apic_binary", "apic_compile", "apic_template", "cc_copts", "embed")
 
 api_library(
     name = "api",
@@ -31,9 +31,21 @@ apic_template(
         "//gapis/api/templates:api",
         "//gapis/api/templates:mutate",
         "//gapis/api/templates:constant_sets",
+        "//gapis/api/templates:definition",
         "//gapis/api/templates:convert",
     ],
     visibility = ["//visibility:public"],
+)
+
+apic_binary(
+    name = "api_binary",
+    api = ":api",
+)
+
+embed(
+    name = "embed",
+    srcs = [":api_binary"],
+    package = "test",
 )
 
 apic_compile(
@@ -72,6 +84,7 @@ go_library(
         "doc.go",
         "helpers.go",
         "test.go",
+        ":embed",  # keep
         ":generated",  # keep
     ],
     cdeps = [
@@ -139,6 +152,7 @@ go_test(
         "//core/memory/arena:go_default_library",
         "//core/os/device:go_default_library",
         "//gapil:go_default_library",
+        "//gapil/bapi:go_default_library",  # keep
         "//gapil/compiler:go_default_library",
         "//gapil/compiler/plugins/replay:go_default_library",
         "//gapil/constset:go_default_library",  # keep
