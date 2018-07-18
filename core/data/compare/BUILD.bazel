@@ -22,6 +22,7 @@ go_library(
         "custom.go",
         "doc.go",
         "handler.go",
+        "hashmap.go",
         "path.go",
     ],
     importpath = "github.com/google/gapid/core/data/compare",

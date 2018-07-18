@@ -172,21 +172,33 @@ func (t Comparator) compareValues(v1, v2 reflect.Value, ptr bool) {
 		if v1.Len() != v2.Len() {
 			t.Handler(t.Path.Length(toValue(v1, ptr), toValue(v2, ptr)).Diff(v1.Len(), v2.Len()))
 		}
+		h1, h2 := newHashmap(v1), newHashmap(v2)
 		// Check reference keys in value map
-		for _, k := range v1.MapKeys() {
-			e1 := v1.MapIndex(k)
-			e2 := v2.MapIndex(k)
-			path := t.Path.Entry(toValue(k, false), toValue(v1, ptr), toValue(v2, ptr))
-			if !e2.IsValid() {
-				t.Handler(path.Missing(toValue(e1, false), Missing))
-			} else {
-				t.With(path).compareValues(e1, e2, false)
+		for _, e := range h1.entries() {
+			path := t.Path.Entry(toValue(e.key, false), toValue(v1, ptr), toValue(v2, ptr))
+			candidates := h2.get(e.key)
+			switch len(candidates) {
+			case 0:
+				t.Handler(path.Missing(toValue(e.val, false), Missing))
+			case 1:
+				// Single key matches, compare value.
+				t.With(path).compareValues(e.val, candidates[0].val, false)
+			default:
+				if !candidates.contains(e.val) {
+					// Multiple keys match, no values match.
+					for i, c := range candidates {
+						path := path.Member(fmt.Sprintf("Ambiguous Key<%d>", i), e.val, c)
+						t.With(path).compareValues(e.val, c.val, false)
+					}
+				}
 			}
 		}
 		// Check for keys in value map that were not in reference
-		for _, k := range v2.MapKeys() {
-			if !v1.MapIndex(k).IsValid() {
-				t.Handler(t.Path.Entry(toValue(k, false), toValue(v1, ptr), toValue(v2, ptr)).Missing(Missing, toValue(v2.MapIndex(k), false)))
+		for _, e := range h2.entries() {
+			path := t.Path.Entry(toValue(e.key, false), toValue(v1, ptr), toValue(v2, ptr))
+			candidates := h1.get(e.key)
+			if len(candidates) == 0 {
+				t.Handler(path.Missing(Missing, toValue(e.val, false)))
 			}
 		}
 	case reflect.Func:

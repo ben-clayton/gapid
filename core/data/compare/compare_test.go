@@ -68,11 +68,15 @@ var (
 	aliasBase            = Alias{1, 0.5}
 	otherBase            = OtherStruct{1, 0.5}
 
-	mapBase            = map[int]string{1: "one", 2: "two"}
-	mapEqual           = map[int]string{1: "one", 2: "two"}
-	mapDifferentKeys   = map[int]string{1: "one", 3: "three"}
-	mapDifferentValues = map[int]string{1: "one", 2: "too"}
-	mapDifferentLength = map[int]string{1: "one"}
+	key1 = &Object{1, []interface{}{"key", "one"}}
+	key2 = &Object{2, []interface{}{"key", "two"}}
+	key3 = &Object{3, []interface{}{"key", "three"}}
+
+	mapBase            = map[*Object]string{key1: "one", key2: "two"}
+	mapEqual           = map[*Object]string{key1: "one", key2: "two"}
+	mapDifferentKeys   = map[*Object]string{key1: "one", key3: "three"}
+	mapDifferentValues = map[*Object]string{key1: "one", key2: "too"}
+	mapDifferentLength = map[*Object]string{key1: "one"}
 	mapUint            = map[uint]string{1: "one", 2: "two"}
 
 	hidden1 = Hide{1}
@@ -140,19 +144,19 @@ var (
 			root.Member("Int", structBase, structDifferentInt).Diff(1, 2),
 		}},
 		{"map.keys !=", mapBase, mapDifferentKeys, []compare.Path{
-			root.Entry(2, mapBase, mapDifferentKeys).Missing("two", compare.Missing),
-			root.Entry(3, mapBase, mapDifferentKeys).Missing(compare.Missing, "three"),
+			root.Entry(key2, mapBase, mapDifferentKeys).Missing("two", compare.Missing),
+			root.Entry(key3, mapBase, mapDifferentKeys).Missing(compare.Missing, "three"),
 		}},
 		{"map.values !=", mapBase, mapDifferentValues, []compare.Path{
-			root.Entry(2, mapBase, mapDifferentValues).Diff("two", "too"),
+			root.Entry(key2, mapBase, mapDifferentValues).Diff("two", "too"),
 		}},
 		{"len(map) 1 != 2", mapDifferentLength, mapBase, []compare.Path{
 			root.Length(mapDifferentLength, mapBase).Diff(1, 2),
-			root.Entry(2, mapDifferentLength, mapBase).Missing(compare.Missing, "two"),
+			root.Entry(key2, mapDifferentLength, mapBase).Missing(compare.Missing, "two"),
 		}},
 		{"len(map) 2 != 1", mapBase, mapDifferentLength, []compare.Path{
 			root.Length(mapBase, mapDifferentLength).Diff(2, 1),
-			root.Entry(2, mapBase, mapDifferentLength).Missing("two", compare.Missing),
+			root.Entry(key2, mapBase, mapDifferentLength).Missing("two", compare.Missing),
 		}},
 		{"nil != int", nil, 1, []compare.Path{
 			root.Nil(nil, 1),
