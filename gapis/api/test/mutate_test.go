@@ -28,6 +28,7 @@ import (
 	"github.com/google/gapid/gapil/compiler"
 	"github.com/google/gapid/gapil/compiler/plugins/replay"
 	"github.com/google/gapid/gapil/executor"
+	"github.com/google/gapid/gapil/semantic"
 	"github.com/google/gapid/gapir/client"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/capture"
@@ -75,7 +76,7 @@ func (test test) check(ctx context.Context, ca, ra *device.MemoryLayout) {
 		},
 	}
 
-	program, err := compiler.Compile(a, processor.Mappings, settings)
+	program, err := compiler.Compile([]*semantic.API{a}, processor.Mappings, settings)
 	if !assert.For(ctx, "Compile").ThatError(err).Succeeded() {
 		return
 	}

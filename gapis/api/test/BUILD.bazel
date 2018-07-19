@@ -158,6 +158,7 @@ go_test(
         "//gapil/compiler/plugins/replay:go_default_library",
         "//gapil/constset:go_default_library",  # keep
         "//gapil/executor:go_default_library",
+        "//gapil/semantic:go_default_library",
         "//gapir/client:go_default_library",
         "//gapis/api:go_default_library",
         "//gapis/api/test/test_pb:go_default_library",  #keep
