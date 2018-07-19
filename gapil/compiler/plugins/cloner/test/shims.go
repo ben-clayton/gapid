@@ -26,6 +26,9 @@ import (
 
 type CustomState struct{}
 
+// Definition is a no-op function so that API conforms to the api.API interface.
+func (API) Definition() api.Definition { return api.Definition{} }
+
 // ConstantSets is a no-op function so that API conforms to the api.API
 // interface.
 func (API) ConstantSets() *constset.Pack { return nil }
