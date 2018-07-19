@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/google/gapid/core/app/analytics"
+	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/api/sync"
 	"github.com/google/gapid/gapis/capture"
@@ -67,13 +68,21 @@ func (r *GlobalStateResolvable) Resolve(ctx context.Context) (interface{}, error
 		return nil, err
 	}
 
+	c, err := capture.Resolve(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	env := executor.NewEnv(ctx, c, executor.Config{})
+
 	err = api.ForeachCmd(ctx, cmds, func(ctx context.Context, id api.CmdID, cmd api.Cmd) error {
-		cmd.Mutate(ctx, id, s, nil)
+		env.Execute(ctx, cmd, id)
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
+
 	return s, nil
 }
 

@@ -16,14 +16,20 @@
 package executor
 
 import (
+	"context"
+	"fmt"
+	"sync"
 	"unsafe"
 
 	"github.com/google/gapid/core/codegen"
 	"github.com/google/gapid/gapil/compiler"
+	"github.com/google/gapid/gapil/semantic"
+	"github.com/google/gapid/gapis/api"
+	"github.com/google/gapid/gapis/capture"
 )
 
 // Executor is used to create execution environments for a compiled program.
-// Use New() to create Executors, do not create directly.
+// Use New() or For() to create Executors, do not create directly.
 type Executor struct {
 	program        *compiler.Program
 	exec           *codegen.Executor
@@ -31,6 +37,51 @@ type Executor struct {
 	destroyContext unsafe.Pointer
 	globalsSize    uint64
 	cmdFunctions   map[string]unsafe.Pointer
+}
+
+var cache sync.Map
+
+type apiExec struct {
+	exec  *Executor
+	ready chan struct{}
+}
+
+// Config is a configuration for an executor.
+type Config struct{}
+
+// NewEnv returns a new environment for an executor with the given config.
+func NewEnv(ctx context.Context, capture *capture.Capture, cfg Config) *Env {
+	key := fmt.Sprintf("%v", cfg)
+	obj, existing := cache.LoadOrStore(key, &apiExec{ready: make(chan struct{})})
+	ae := obj.(*apiExec)
+	if !existing {
+		apis := api.All()
+		sems := make([]*semantic.API, len(apis))
+		mappings := &semantic.Mappings{}
+		for i, api := range apis {
+			def := api.Definition()
+			if def.Semantic == nil {
+				panic(fmt.Errorf("API %v has no semantic definition", api.Name()))
+			}
+			sems[i] = def.Semantic
+			if def.Mappings != nil {
+				mappings.MergeIn(def.Mappings)
+			}
+		}
+		settings := compiler.Settings{
+			EmitContext: true,
+			EmitExec:    true,
+		}
+		prog, err := compiler.Compile(sems, mappings, settings)
+		if err != nil {
+			panic(err)
+		}
+		ae.exec = New(prog, true)
+		close(ae.ready)
+	} else {
+		<-ae.ready
+	}
+	return ae.exec.NewEnv(ctx, capture)
 }
 
 // New returns a new and initialized Executor for the given program.
