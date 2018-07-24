@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"unsafe"
 
 	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/gapis/api"
@@ -27,6 +28,8 @@ import (
 	"github.com/google/gapid/gapis/replay/protocol"
 	"github.com/google/gapid/gapis/service"
 )
+
+import "C"
 
 type externs struct {
 	ctx   context.Context // Allowed because the externs struct is only a parameter proxy for a single call
@@ -463,4 +466,204 @@ func (e externs) vkErrInvalidImageSubresource(img VkImage, subresourceType strin
 	issue.Severity = service.Severity_WarningLevel
 	issue.Error = fmt.Errorf("Accessing invalid image subresource at Image: %v, %v: %v", uint64(img), subresourceType, value)
 	e.onVkError(issue)
+}
+
+//export vulkan_enterSubcontext
+func vulkan_enterSubcontext(ctx unsafe.Pointer) {
+	panic("vulkan_enterSubcontext not implemented")
+}
+
+//export vulkan_fetchBufferMemoryRequirements
+func vulkan_fetchBufferMemoryRequirements(ctx unsafe.Pointer) {
+	panic("vulkan_fetchBufferMemoryRequirements not implemented")
+}
+
+//export vulkan_fetchImageMemoryRequirements
+func vulkan_fetchImageMemoryRequirements(ctx unsafe.Pointer) {
+	panic("vulkan_fetchImageMemoryRequirements not implemented")
+}
+
+//export vulkan_fetchLinearImageSubresourceLayouts
+func vulkan_fetchLinearImageSubresourceLayouts(ctx unsafe.Pointer) {
+	panic("vulkan_fetchLinearImageSubresourceLayouts not implemented")
+}
+
+//export vulkan_fetchPhysicalDeviceMemoryProperties
+func vulkan_fetchPhysicalDeviceMemoryProperties(ctx unsafe.Pointer) {
+	panic("vulkan_fetchPhysicalDeviceMemoryProperties not implemented")
+}
+
+//export vulkan_fetchPhysicalDeviceProperties
+func vulkan_fetchPhysicalDeviceProperties(ctx unsafe.Pointer) {
+	panic("vulkan_fetchPhysicalDeviceProperties not implemented")
+}
+
+//export vulkan_fetchPhysicalDeviceQueueFamilyProperties
+func vulkan_fetchPhysicalDeviceQueueFamilyProperties(ctx unsafe.Pointer) {
+	panic("vulkan_fetchPhysicalDeviceQueueFamilyProperties not implemented")
+}
+
+//export vulkan_hasDynamicProperty
+func vulkan_hasDynamicProperty(ctx unsafe.Pointer) {
+	panic("vulkan_hasDynamicProperty not implemented")
+}
+
+//export vulkan_leaveSubcontext
+func vulkan_leaveSubcontext(ctx unsafe.Pointer) {
+	panic("vulkan_leaveSubcontext not implemented")
+}
+
+//export vulkan_mapMemory
+func vulkan_mapMemory(ctx unsafe.Pointer) {
+	panic("vulkan_mapMemory not implemented")
+}
+
+//export vulkan_nextSubcontext
+func vulkan_nextSubcontext(ctx unsafe.Pointer) {
+	panic("vulkan_nextSubcontext not implemented")
+}
+
+//export vulkan_notifyPendingCommandAdded
+func vulkan_notifyPendingCommandAdded(ctx unsafe.Pointer) {
+	panic("vulkan_notifyPendingCommandAdded not implemented")
+}
+
+//export vulkan_numberOfPNext
+func vulkan_numberOfPNext(ctx unsafe.Pointer) {
+	panic("vulkan_numberOfPNext not implemented")
+}
+
+//export vulkan_onCommandAdded
+func vulkan_onCommandAdded(ctx unsafe.Pointer) {
+	panic("vulkan_onCommandAdded not implemented")
+}
+
+//export vulkan_onDeferSubcommand
+func vulkan_onDeferSubcommand(ctx unsafe.Pointer) {
+	panic("vulkan_onDeferSubcommand not implemented")
+}
+
+//export vulkan_onPostSubcommand
+func vulkan_onPostSubcommand(ctx unsafe.Pointer) {
+	panic("vulkan_onPostSubcommand not implemented")
+}
+
+//export vulkan_onPreProcessCommand
+func vulkan_onPreProcessCommand(ctx unsafe.Pointer) {
+	panic("vulkan_onPreProcessCommand not implemented")
+}
+
+//export vulkan_onPreSubcommand
+func vulkan_onPreSubcommand(ctx unsafe.Pointer) {
+	panic("vulkan_onPreSubcommand not implemented")
+}
+
+//export vulkan_popAndPushMarkerForNextSubpass
+func vulkan_popAndPushMarkerForNextSubpass(ctx unsafe.Pointer) {
+	panic("vulkan_popAndPushMarkerForNextSubpass not implemented")
+}
+
+//export vulkan_popDebugMarker
+func vulkan_popDebugMarker(ctx unsafe.Pointer) {
+	panic("vulkan_popDebugMarker not implemented")
+}
+
+//export vulkan_popRenderPassMarker
+func vulkan_popRenderPassMarker(ctx unsafe.Pointer) {
+	panic("vulkan_popRenderPassMarker not implemented")
+}
+
+//export vulkan_postBindSparse
+func vulkan_postBindSparse(ctx unsafe.Pointer) {
+	panic("vulkan_postBindSparse not implemented")
+}
+
+//export vulkan_pushDebugMarker
+func vulkan_pushDebugMarker(ctx unsafe.Pointer) {
+	panic("vulkan_pushDebugMarker not implemented")
+}
+
+//export vulkan_pushRenderPassMarker
+func vulkan_pushRenderPassMarker(ctx unsafe.Pointer) {
+	panic("vulkan_pushRenderPassMarker not implemented")
+}
+
+//export vulkan_readMappedCoherentMemory
+func vulkan_readMappedCoherentMemory(ctx unsafe.Pointer) {
+	panic("vulkan_readMappedCoherentMemory not implemented")
+}
+
+//export vulkan_resetCmd
+func vulkan_resetCmd(ctx unsafe.Pointer) {
+	panic("vulkan_resetCmd not implemented")
+}
+
+//export vulkan_resetSubcontext
+func vulkan_resetSubcontext(ctx unsafe.Pointer) {
+	panic("vulkan_resetSubcontext not implemented")
+}
+
+//export vulkan_trackMappedCoherentMemory
+func vulkan_trackMappedCoherentMemory(ctx unsafe.Pointer) {
+	panic("vulkan_trackMappedCoherentMemory not implemented")
+}
+
+//export vulkan_unmapMemory
+func vulkan_unmapMemory(ctx unsafe.Pointer) {
+	panic("vulkan_unmapMemory not implemented")
+}
+
+//export vulkan_untrackMappedCoherentMemory
+func vulkan_untrackMappedCoherentMemory(ctx unsafe.Pointer) {
+	panic("vulkan_untrackMappedCoherentMemory not implemented")
+}
+
+//export vulkan_validate
+func vulkan_validate(ctx unsafe.Pointer) {
+	panic("vulkan_validate not implemented")
+}
+
+//export vulkan_vkErrCommandBufferIncomplete
+func vulkan_vkErrCommandBufferIncomplete(ctx unsafe.Pointer) {
+	panic("vulkan_vkErrCommandBufferIncomplete not implemented")
+}
+
+//export vulkan_vkErrExpectNVDedicatedlyAllocatedHandle
+func vulkan_vkErrExpectNVDedicatedlyAllocatedHandle(ctx unsafe.Pointer) {
+	panic("vulkan_vkErrExpectNVDedicatedlyAllocatedHandle not implemented")
+}
+
+//export vulkan_vkErrInvalidDescriptorArrayElement
+func vulkan_vkErrInvalidDescriptorArrayElement(ctx unsafe.Pointer) {
+	panic("vulkan_vkErrInvalidDescriptorArrayElement not implemented")
+}
+
+//export vulkan_vkErrInvalidHandle
+func vulkan_vkErrInvalidHandle(ctx unsafe.Pointer) {
+	panic("vulkan_vkErrInvalidHandle not implemented")
+}
+
+//export vulkan_vkErrInvalidImageLayout
+func vulkan_vkErrInvalidImageLayout(ctx unsafe.Pointer) {
+	panic("vulkan_vkErrInvalidImageLayout not implemented")
+}
+
+//export vulkan_vkErrInvalidImageSubresource
+func vulkan_vkErrInvalidImageSubresource(ctx unsafe.Pointer) {
+	panic("vulkan_vkErrInvalidImageSubresource not implemented")
+}
+
+//export vulkan_vkErrNotNullPointer
+func vulkan_vkErrNotNullPointer(ctx unsafe.Pointer) {
+	panic("vulkan_vkErrNotNullPointer not implemented")
+}
+
+//export vulkan_vkErrNullPointer
+func vulkan_vkErrNullPointer(ctx unsafe.Pointer) {
+	panic("vulkan_vkErrNullPointer not implemented")
+}
+
+//export vulkan_vkErrUnrecognizedExtension
+func vulkan_vkErrUnrecognizedExtension(ctx unsafe.Pointer) {
+	panic("vulkan_vkErrUnrecognizedExtension not implemented")
 }

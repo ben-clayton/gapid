@@ -17,6 +17,7 @@ package gles
 import (
 	"context"
 	"fmt"
+	"unsafe"
 
 	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/core/os/device"
@@ -31,6 +32,8 @@ import (
 	"github.com/google/gapid/gapis/stringtable"
 	"github.com/pkg/errors"
 )
+
+import "C"
 
 type externs struct {
 	ctx   context.Context // Allowed because the externs struct is only a parameter proxy for a single call
@@ -203,4 +206,79 @@ func (e externs) ReadGPUTextureData(texture Textureʳ, level, layer GLint) U8ˢ 
 	data := memory.Resource(dataID, uint64(size))
 	dst.Write(0, data)
 	return NewU8ˢ(e.s.Arena, 0, 0, uint64(size), uint64(size), poolID)
+}
+
+//export gles_GetAndroidNativeBufferExtra
+func gles_GetAndroidNativeBufferExtra(ctx unsafe.Pointer, buffer uint64, out *unsafe.Pointer) {
+	panic("gles_GetAndroidNativeBufferExtra not implemented")
+}
+
+//export gles_GetCompileShaderExtra
+func gles_GetCompileShaderExtra(ctx, c, s, e unsafe.Pointer, out *unsafe.Pointer) {
+	panic("gles_GetCompileShaderExtra not implemented")
+}
+
+//export gles_GetEGLDynamicContextState
+func gles_GetEGLDynamicContextState(ctx unsafe.Pointer, display uint64, surface uint64, context uint64, out *unsafe.Pointer) {
+	panic("gles_GetEGLDynamicContextState not implemented")
+}
+
+//export gles_GetEGLImageData
+func gles_GetEGLImageData(ctx unsafe.Pointer, img uint64, width int32, height int32) {
+	panic("gles_GetEGLImageData not implemented")
+}
+
+//export gles_GetEGLStaticContextState
+func gles_GetEGLStaticContextState(ctx unsafe.Pointer, display uint64, context uint64, out *unsafe.Pointer) {
+	panic("gles_GetEGLStaticContextState not implemented")
+}
+
+//export gles_GetLinkProgramExtra
+func gles_GetLinkProgramExtra(ctx, c, p, binary unsafe.Pointer, out *unsafe.Pointer) {
+	panic("gles_GetLinkProgramExtra not implemented")
+}
+
+//export gles_GetValidateProgramExtra
+func gles_GetValidateProgramExtra(ctx, c, p unsafe.Pointer, out *unsafe.Pointer) {
+	panic("gles_GetValidateProgramExtra not implemented")
+}
+
+//export gles_GetValidateProgramPipelineExtra
+func gles_GetValidateProgramPipelineExtra(ctx, c, p, out *unsafe.Pointer) {
+	panic("gles_GetValidateProgramPipelineExtra not implemented")
+}
+
+//export gles_IndexLimits
+func gles_IndexLimits(ctx, s unsafe.Pointer, sizeofIndex int32, out *unsafe.Pointer) {
+	panic("gles_IndexLimits not implemented")
+}
+
+//export gles_ReadGPUTextureData
+func gles_ReadGPUTextureData(ctx, t unsafe.Pointer, level int32, layer int32, out *unsafe.Pointer) {
+	panic("gles_ReadGPUTextureData not implemented")
+}
+
+//export gles_addTag
+func gles_addTag(ctx unsafe.Pointer, _ uint32, _ uint8) {
+	panic("gles_addTag not implemented")
+}
+
+//export gles_mapMemory
+func gles_mapMemory(ctx, s unsafe.Pointer) {
+	panic("gles_mapMemory not implemented")
+}
+
+//export gles_newMsg
+func gles_newMsg(ctx unsafe.Pointer, _ uint32, _ uint8, out *uint32) {
+	panic("gles_newMsg not implemented")
+}
+
+//export gles_onGlError
+func gles_onGlError(ctx unsafe.Pointer, err GLenum) {
+	panic("gles_onGlError not implemented")
+}
+
+//export gles_unmapMemory
+func gles_unmapMemory(ctx, s unsafe.Pointer) {
+	panic("gles_unmapMemory not implemented")
 }
