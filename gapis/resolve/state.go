@@ -63,11 +63,6 @@ func (r *GlobalStateResolvable) Resolve(ctx context.Context) (interface{}, error
 
 	defer analytics.SendTiming("resolve", "global-state")(analytics.Count(len(cmds)))
 
-	s, err := capture.NewState(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	c, err := capture.Resolve(ctx)
 	if err != nil {
 		return nil, err
@@ -83,7 +78,7 @@ func (r *GlobalStateResolvable) Resolve(ctx context.Context) (interface{}, error
 		return nil, err
 	}
 
-	return s, nil
+	return env.State, nil
 }
 
 // Resolve implements the database.Resolver interface.

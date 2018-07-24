@@ -31,12 +31,13 @@ import (
 // Executor is used to create execution environments for a compiled program.
 // Use New() or For() to create Executors, do not create directly.
 type Executor struct {
-	program        *compiler.Program
-	exec           *codegen.Executor
-	createContext  unsafe.Pointer
-	destroyContext unsafe.Pointer
-	globalsSize    uint64
-	cmdFunctions   map[string]unsafe.Pointer
+	program          *compiler.Program
+	exec             *codegen.Executor
+	createContext    unsafe.Pointer
+	destroyContext   unsafe.Pointer
+	globalsSize      uint64
+	globalsAPIOffset map[api.API]uintptr
+	cmdFunctions     map[string]unsafe.Pointer
 }
 
 var cache sync.Map
@@ -95,13 +96,24 @@ func New(prog *compiler.Program, optimize bool) *Executor {
 		panic("Program has no context functions. Was EmitContext not set to true?")
 	}
 
+	// Gather all the API state offsets from the globals base pointer.
+	apiOffsets := map[api.API]uintptr{}
+	fieldOffsets := e.FieldOffsets(prog.Globals.Type)
+	for _, api := range api.All() {
+		name := api.Definition().Semantic.Name()
+		if idx := prog.Globals.Type.FieldIndex(name); idx >= 0 {
+			apiOffsets[api] = uintptr(fieldOffsets[idx])
+		}
+	}
+
 	exec := &Executor{
-		program:        prog,
-		exec:           e,
-		createContext:  e.FunctionAddress(prog.CreateContext),
-		destroyContext: e.FunctionAddress(prog.DestroyContext),
-		globalsSize:    uint64(e.SizeOf(prog.Globals.Type)),
-		cmdFunctions:   map[string]unsafe.Pointer{},
+		program:          prog,
+		exec:             e,
+		createContext:    e.FunctionAddress(prog.CreateContext),
+		destroyContext:   e.FunctionAddress(prog.DestroyContext),
+		globalsSize:      uint64(e.SizeOf(prog.Globals.Type)),
+		globalsAPIOffset: apiOffsets,
+		cmdFunctions:     map[string]unsafe.Pointer{},
 	}
 
 	for name, info := range prog.Commands {

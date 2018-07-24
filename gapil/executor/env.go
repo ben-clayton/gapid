@@ -109,6 +109,9 @@ type Env struct {
 	// Executor is the parent executor.
 	Executor *Executor
 
+	// State is the global state for the environment.
+	State *api.GlobalState
+
 	id      envID
 	cCtx    *C.context      // The gapil C context.
 	goCtx   context.Context // The go context.
@@ -149,7 +152,7 @@ func GetEnv(c unsafe.Pointer) *Env {
 }
 
 // NewEnv creates a new execution environment for the given capture.
-func (e *Executor) NewEnv(ctx context.Context, capture *capture.Capture) *Env {
+func (e *Executor) NewEnv(ctx context.Context, c *capture.Capture) *Env {
 	var id envID
 	var env *Env
 
@@ -169,16 +172,24 @@ func (e *Executor) NewEnv(ctx context.Context, capture *capture.Capture) *Env {
 
 	// Create the context and initialize the globals.
 	env.Arena = arena.New()
+	env.State = c.NewState(ctx)
 	env.goCtx = ctx
 	env.cCtx = C.create_context((*C.TCreateContext)(e.createContext), (*C.arena)(env.Arena.Pointer))
 	env.cCtx.id = (C.uint32_t)(id)
 	env.goCtx = nil
 
 	// Allocate buffers for all the observed memory ranges.
-	for _, r := range capture.Observed {
+	for _, r := range c.Observed {
 		ptr := env.Arena.Allocate((int)(r.Count), 16)
 		rng := memory.Range{Base: r.First, Size: r.Count}
 		env.buffers.add(rng, ptr)
+	}
+
+	// Prime the state objects.
+	globalsBase := uintptr(unsafe.Pointer(env.cCtx.globals))
+	for api, offset := range e.globalsAPIOffset {
+		addr := globalsBase + offset
+		env.State.APIs[api.ID()] = api.State(env.Arena, unsafe.Pointer(addr))
 	}
 
 	return env

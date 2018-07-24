@@ -1958,6 +1958,8 @@ func (t test) run(ctx context.Context, c *capture.Capture) (succeeded bool) {
 		return false
 	}
 
+	c.Header = &capture.Header{ABI: program.Settings.CaptureABI}
+
 	exec := executor.New(program, false)
 	env := exec.NewEnv(ctx, c)
 	defer env.Dispose()

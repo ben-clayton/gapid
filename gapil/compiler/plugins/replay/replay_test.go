@@ -319,8 +319,6 @@ func (t test) run(ctx context.Context) (succeeded bool) {
 
 	ctx = database.Put(ctx, database.NewInMemory(ctx))
 
-	c := &capture.Capture{}
-
 	processor := gapil.NewProcessor()
 	processor.Loader = gapil.NewDataLoader([]byte(t.src))
 	a, errs := processor.Resolve(t.name + ".api")
@@ -338,6 +336,12 @@ func (t test) run(ctx context.Context) (succeeded bool) {
 	program, err := compiler.Compile([]*semantic.API{a}, processor.Mappings, settings)
 	if !assert.For(ctx, "Compile").ThatError(err).Succeeded() {
 		return false
+	}
+
+	c := &capture.Capture{
+		Header: &capture.Header{
+			ABI: program.Settings.CaptureABI,
+		},
 	}
 
 	exec := executor.New(program, false)

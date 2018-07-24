@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"unsafe"
 
 	"github.com/google/gapid/core/data/id"
 	"github.com/google/gapid/core/image"
@@ -30,6 +31,9 @@ import (
 type API interface {
 	// Definition returns the API's semantic definition.
 	Definition() Definition
+
+	// State returns a Go state object for the native state at p.
+	State(a arena.Arena, p unsafe.Pointer) State
 
 	// Name returns the official name of the api.
 	Name() string

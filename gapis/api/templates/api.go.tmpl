@@ -1542,6 +1542,14 @@ import (»
     return "{{Global "API"}}"
   }
 
+	// State returns a Go state object for the native state at p.
+	func (API) State(a arena.Arena, p unsafe.Pointer) ϟapi.State {
+    return &State{
+      c: (*C.State)(p),
+      a: a,
+    }
+  }
+
   // ID returns the unique identifier of the {{Global "API"}} API.
   func (API) ID() ϟapi.ID {
     return ID
