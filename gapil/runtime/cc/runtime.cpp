@@ -46,41 +46,14 @@ using core::Arena;
 
 namespace {
 
-void* default_pool_data_resolver(context*, pool* pool, uint64_t ptr,
-                                 gapil_data_access, uint64_t* len) {
-  if (pool != nullptr) {
-    auto pool_base =
-        static_cast<uint64_t>(reinterpret_cast<uintptr_t>(pool->buffer));
-    if (ptr > pool->size) {
-      GAPID_FATAL("ptr (0x%" PRIx64
-                  ") is greater than the pool size (0x%" PRIx64 ")",
-                  ptr, pool->size);
-    }
-    if (len != nullptr) {
-      *len = pool->size - ptr;
-    }
-    return reinterpret_cast<void*>(pool_base + ptr);
-  }
-  if (len != nullptr) {
-    *len = (~uint64_t(0)) - ptr;
-  }
-  return reinterpret_cast<void*>(ptr);
-}
-
-static gapil_pool_data_resolver* pool_data_resolver =
-    &default_pool_data_resolver;
-static gapil_database_storer* database_storer = nullptr;
+gapil_runtime_callbacks runtime_callbacks = {0};
 
 }  // anonymous namespace
 
 extern "C" {
 
-void gapil_set_pool_data_resolver(gapil_pool_data_resolver* cb) {
-  pool_data_resolver = cb != nullptr ? cb : &default_pool_data_resolver;
-}
-
-void gapil_set_database_storer(gapil_database_storer* cb) {
-  database_storer = cb;
+void gapil_set_runtime_callbacks(gapil_runtime_callbacks* cbs) {
+  runtime_callbacks = *cbs;
 }
 
 void gapil_logf(uint8_t severity, uint8_t* file, uint32_t line, uint8_t* fmt,
@@ -107,6 +80,7 @@ void gapil_logf(uint8_t severity, uint8_t* file, uint32_t line, uint8_t* fmt,
 void* gapil_alloc(arena_t* a, uint64_t size, uint64_t align) {
   Arena* arena = reinterpret_cast<Arena*>(a);
   void* ptr = arena->allocate(size, align);
+  memset(ptr, 0, size);
   DEBUG_PRINT("gapil_alloc(size: 0x%" PRIx64 ", align: 0x%" PRIx64 ") -> %p",
               size, align, ptr);
   return ptr;
@@ -149,7 +123,7 @@ void gapil_destroy_buffer(arena* a, buffer* buf) {
 
 void gapil_append_buffer(arena* a, buffer* buf, const void* data, uint64_t size,
                          uint64_t alignment) {
-  DEBUG_PRINT("gapil_append_buffer(data: %p, size: " PRId64
+  DEBUG_PRINT("gapil_append_buffer(data: %p, size: %" PRId64
               ", alignment: %" PRId64 ")",
               data, size, alignment);
   if (buf->size + size > buf->capacity) {
@@ -162,45 +136,9 @@ void gapil_append_buffer(arena* a, buffer* buf, const void* data, uint64_t size,
   buf->size = buf->size + size;
 }
 
-pool* gapil_make_pool(context* ctx, uint64_t size) {
-  Arena* arena = reinterpret_cast<Arena*>(ctx->arena);
-
-  void* buffer = arena->allocate(size, 16);
-  memset(buffer, 0, size);
-
-  auto pool = arena->create<pool_t>();
-  pool->arena = ctx->arena;
-  pool->id = (*ctx->next_pool_id)++;
-  pool->size = size;
-  pool->ref_count = 1;
-  pool->buffer = buffer;
-
-  DEBUG_PRINT("gapil_make_pool(size: 0x%" PRIx64 ") -> [pool: %p, buffer: %p]",
-              size, pool, buffer);
-  return pool;
-}
-
-void gapil_free_pool(pool* pool) {
-  DEBUG_PRINT("gapil_free_pool(pool: %p)", pool);
-
-  if (pool == nullptr) {  // Application pool.
-    // TODO: Panic?
-    return;
-  }
-
-  Arena* arena = reinterpret_cast<Arena*>(pool->arena);
-  arena->free(pool->buffer);
-  arena->destroy(pool);
-}
-
 void* gapil_slice_data(context* ctx, slice* sli, gapil_data_access access) {
-  uint64_t bufSize = 0;
-  auto ptr = pool_data_resolver(ctx, sli->pool, sli->base, access, &bufSize);
-  GAPID_ASSERT_MSG(sli->size <= bufSize,
-                   "gapil_slice_data(" SLICE_FMT
-                   ", %d) overflows underlying buffer",
-                   SLICE_ARGS(sli), access);
-
+  auto ptr =
+      gapil_resolve_pool_data(ctx, sli->pool, sli->base, access, sli->size);
   DEBUG_PRINT("gapil_slice_data(" SLICE_FMT ", %d) -> %p", SLICE_ARGS(sli),
               access, ptr);
   return ptr;
@@ -216,15 +154,10 @@ void gapil_copy_slice(context* ctx, slice* dst, slice* src) {
 
   uint64_t size = std::min(dst->size, src->size);
 
-  uint64_t dstBufLen = 0;
   auto dstPtr =
-      pool_data_resolver(ctx, dst->pool, dst->base, GAPIL_WRITE, &dstBufLen);
-  GAPID_ASSERT_MSG(size <= dstBufLen, "gapil_copy_slice overflows dst buffer");
-
-  uint64_t srcBufLen = 0;
+      gapil_resolve_pool_data(ctx, dst->pool, dst->base, GAPIL_WRITE, size);
   auto srcPtr =
-      pool_data_resolver(ctx, src->pool, src->base, GAPIL_READ, &srcBufLen);
-  GAPID_ASSERT_MSG(size <= srcBufLen, "gapil_copy_slice overflows src buffer");
+      gapil_resolve_pool_data(ctx, src->pool, src->base, GAPIL_READ, size);
 
   memcpy(dstPtr, srcPtr, size);
 }
@@ -232,28 +165,27 @@ void gapil_copy_slice(context* ctx, slice* dst, slice* src) {
 void gapil_cstring_to_slice(context* ctx, uint64_t ptr, slice* out) {
   DEBUG_PRINT("gapil_cstring_to_slice(ptr: 0x%" PRIx64 ")", ptr);
 
-  pool* pool = nullptr;  // application pool
+  pool_t* pool = nullptr;  // Application pool
 
-  uint64_t bufSize = 0;
-  auto data = reinterpret_cast<char*>(
-      pool_data_resolver(ctx, pool, ptr, GAPIL_READ, &bufSize));
+  const uint64_t CHUNK_SIZE = 64;
 
   uint64_t len = 0;
-  for (; len < bufSize; len++) {
-    if (data[len] == 0) {
-      len++;  // Include null-terminator in the slice.
-      break;
+  while (true) {
+    auto data = reinterpret_cast<char*>(
+        gapil_resolve_pool_data(ctx, pool, ptr + len, GAPIL_READ, CHUNK_SIZE));
+    for (uint64_t i = 0; i < CHUNK_SIZE; i++, len++) {
+      if (data[i] == 0) {
+        len++;  // Include null-terminator in the slice.
+
+        out->pool = pool;
+        out->root = ptr;
+        out->base = ptr;
+        out->size = len;
+        out->count = len;
+        return;
+      }
     }
   }
-
-  slice s = {0};
-  s.pool = pool;  // application pool
-  s.root = ptr;
-  s.base = ptr;
-  s.size = len;
-  s.count = len;
-  *out = s;
-  return;
 }
 
 string* gapil_make_string(arena* a, uint64_t length, void* data) {
@@ -302,8 +234,10 @@ void gapil_string_to_slice(context* ctx, string* str, slice* out) {
   DEBUG_PRINT("gapil_string_to_slice(str: '%s')", str->data);
 
   auto pool = gapil_make_pool(ctx, str->length);
-
-  memcpy(pool->buffer, str->data, str->length);
+  auto buf = reinterpret_cast<uint8_t*>(
+      gapil_resolve_pool_data(ctx, pool, 0, GAPIL_WRITE, str->length + 1));
+  memcpy(buf, str->data, str->length);
+  str->data[str->length] = 0;  // Null-terminate
 
   out->pool = pool;
   out->base = 0;
@@ -345,10 +279,67 @@ int32_t gapil_string_compare(string* a, string* b) {
                  std::max(a->length, b->length));
 }
 
+void gapil_apply_reads(context* ctx) {
+  DEBUG_PRINT("gapil_apply_reads(ctx: %p)", ctx);
+  GAPID_ASSERT(runtime_callbacks.apply_reads != nullptr);
+  runtime_callbacks.apply_reads(ctx);
+}
+
+void gapil_apply_writes(context* ctx) {
+  DEBUG_PRINT("gapil_apply_writes(ctx: %p)", ctx);
+  GAPID_ASSERT(runtime_callbacks.apply_writes != nullptr);
+  runtime_callbacks.apply_writes(ctx);
+}
+
+void* gapil_resolve_pool_data(context* ctx, pool* pool, uint64_t ptr,
+                              gapil_data_access access, uint64_t size) {
+  DEBUG_PRINT("gapil_resolve_pool_data(ctx: %p, pool: %p, ptr: 0x%" PRIx64
+              ", access: %d, size: 0x%" PRIx64 ")",
+              ctx, pool, ptr, access, size);
+  GAPID_ASSERT(runtime_callbacks.resolve_pool_data != nullptr);
+  return runtime_callbacks.resolve_pool_data(ctx, pool, ptr, access, size);
+}
+
 void gapil_store_in_database(context* ctx, void* ptr, uint64_t size,
                              uint8_t* id_out) {
-  GAPID_ASSERT_MSG(database_storer != nullptr, "No database storer set");
-  database_storer(ctx, ptr, size, id_out);
+  DEBUG_PRINT("gapil_store_in_database(ctx: %p, ptr: %p, size: 0x%" PRIx64
+              ", id_out:  %p)",
+              ctx, ptr, size, id_out);
+  GAPID_ASSERT(runtime_callbacks.store_in_database != nullptr);
+  runtime_callbacks.store_in_database(ctx, ptr, size, id_out);
+}
+
+pool* gapil_make_pool(context* ctx, uint64_t size) {
+  DEBUG_PRINT("gapil_make_pool(ctx: %p, size: %" PRIu64 ")", ctx, size);
+  GAPID_ASSERT(runtime_callbacks.make_pool != nullptr);
+  return runtime_callbacks.make_pool(ctx, size);
+}
+
+void gapil_pool_reference(pool* pool) {
+  DEBUG_PRINT("gapil_pool_reference(pool: %p)", pool);
+  GAPID_ASSERT(runtime_callbacks.pool_reference != nullptr);
+  if (pool == nullptr) {
+    GAPID_FATAL("Attempting to reference application pool")
+  }
+  runtime_callbacks.pool_reference(pool);
+}
+
+void gapil_pool_release(pool* pool) {
+  DEBUG_PRINT("gapil_pool_release(pool: %p)", pool);
+  GAPID_ASSERT(runtime_callbacks.pool_release != nullptr);
+  if (pool == nullptr) {
+    GAPID_FATAL("Attempting to release application pool")
+  }
+  runtime_callbacks.pool_release(pool);
+}
+
+uint64_t gapil_pool_id(pool* pool) {
+  DEBUG_PRINT("gapil_pool_id(pool: %p)", pool);
+  GAPID_ASSERT(runtime_callbacks.pool_id != nullptr);
+  if (pool == nullptr) {
+    return 0;
+  }
+  return runtime_callbacks.pool_id(pool);
 }
 
 }  // extern "C"

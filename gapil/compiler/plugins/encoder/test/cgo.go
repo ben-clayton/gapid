@@ -78,6 +78,11 @@ func gapil_slice_encoded(ctx *C.context, slicePtr *C.slice) {
 	e.callbacks = append(e.callbacks, cbSliceEncoded{Size: int(slicePtr.size)})
 }
 
+//export gapil_get_pool_id
+func gapil_get_pool_id(pool *C.pool) C.uint64_t {
+	return 0
+}
+
 //export gapil_encode_backref
 func gapil_encode_backref(ctx *C.context, object unsafe.Pointer) C.int64_t {
 	e := encoders[ctx]

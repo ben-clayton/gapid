@@ -22,6 +22,7 @@ import (
 	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/core/os/device"
 	"github.com/google/gapid/core/os/device/bind"
+	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/capture"
 	"github.com/google/gapid/gapis/database"
@@ -208,6 +209,17 @@ func (e externs) ReadGPUTextureData(texture Textureʳ, level, layer GLint) U8ˢ 
 	return NewU8ˢ(e.s.Arena, 0, 0, uint64(size), uint64(size), poolID)
 }
 
+func externsFromNative(ctx unsafe.Pointer) *externs {
+	env := executor.GetEnv(ctx)
+	return &externs{
+		ctx:   env.Context(),
+		cmd:   env.Cmd(),
+		cmdID: env.CmdID(),
+		s:     env.State,
+		b:     nil,
+	}
+}
+
 //export gles_GetAndroidNativeBufferExtra
 func gles_GetAndroidNativeBufferExtra(ctx unsafe.Pointer, buffer uint64, out *unsafe.Pointer) {
 	panic("gles_GetAndroidNativeBufferExtra not implemented")
@@ -219,8 +231,9 @@ func gles_GetCompileShaderExtra(ctx, c, s, e unsafe.Pointer, out *unsafe.Pointer
 }
 
 //export gles_GetEGLDynamicContextState
-func gles_GetEGLDynamicContextState(ctx unsafe.Pointer, display uint64, surface uint64, context uint64, out *unsafe.Pointer) {
-	panic("gles_GetEGLDynamicContextState not implemented")
+func gles_GetEGLDynamicContextState(ctx unsafe.Pointer, display EGLDisplay, surface EGLSurface, context EGLContext, out *unsafe.Pointer) {
+	e := externsFromNative(ctx)
+	*out = (unsafe.Pointer)(e.GetEGLDynamicContextState(display, surface, context).c)
 }
 
 //export gles_GetEGLImageData
@@ -229,8 +242,9 @@ func gles_GetEGLImageData(ctx unsafe.Pointer, img uint64, width int32, height in
 }
 
 //export gles_GetEGLStaticContextState
-func gles_GetEGLStaticContextState(ctx unsafe.Pointer, display uint64, context uint64, out *unsafe.Pointer) {
-	panic("gles_GetEGLStaticContextState not implemented")
+func gles_GetEGLStaticContextState(ctx unsafe.Pointer, display EGLDisplay, context EGLContext, out *unsafe.Pointer) {
+	e := externsFromNative(ctx)
+	*out = (unsafe.Pointer)(e.GetEGLStaticContextState(display, context).c)
 }
 
 //export gles_GetLinkProgramExtra

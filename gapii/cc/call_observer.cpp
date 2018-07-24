@@ -48,7 +48,6 @@ CallObserver::CallObserver(SpyBase* spy, CallObserver* parent, uint8_t api)
   // context_t initialization.
   this->context_t::id = 0;
   this->context_t::location = 0;
-  this->context_t::next_pool_id = &spy->next_pool_id();
   this->context_t::globals = nullptr;
   this->context_t::arena = reinterpret_cast<arena_t*>(spy->arena());
   mShouldTrace = mSpy->should_trace(mApi);
@@ -147,6 +146,10 @@ gapil::String CallObserver::string(const char* str) {
 gapil::String CallObserver::string(const gapil::Slice<char>& slice) {
   read(slice);
   return gapil::String(mSpy->arena(), slice.begin(), slice.end());
+}
+
+uint32_t CallObserver::allocate_pool_id() const {
+  return mSpy->allocate_pool_id();
 }
 
 }  // namespace gapii

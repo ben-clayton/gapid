@@ -554,13 +554,13 @@ func (e *encoder) encodeValue(s *compiler.S, ptr, buf *codegen.Value, ty semanti
 				e.writeVarint(s, buf, size)
 			})
 
-			s.If(s.NotEqual(count, s.Zero(size.Type())), func(s *compiler.S) {
+			s.If(s.NotEqual(count, s.Zero(count.Type())), func(s *compiler.S) {
 				e.writeWireAndTag(s, buf, proto.WireVarint, serialization.SliceCount)
 				e.writeVarint(s, buf, count)
 			})
 
 			s.If(s.Not(pool.IsNull()), func(s *compiler.S) {
-				id := pool.Index(0, compiler.PoolID).Load()
+				id := e.PoolID(s, pool)
 				e.writeWireAndTag(s, buf, proto.WireVarint, serialization.SlicePool)
 				e.writeVarint(s, buf, id)
 			})

@@ -20,6 +20,7 @@
 #include "abort_exception.h"
 #include "call_observer.h"
 #include "pack_encoder.h"
+#include "pool.h"
 
 #include "core/cc/assert.h"
 #include "core/cc/id.h"
@@ -76,8 +77,8 @@ class SpyBase {
   // returns the spy's memory arena.
   inline core::Arena* arena() { return &mArena; }
 
-  // returns a handle to the identifier of the next pool to be allocated.
-  inline uint32_t& next_pool_id() { return mNextPoolId; }
+  // allocate_pool_id returns the next unallocated pool identifier.
+  inline uint32_t allocate_pool_id();
 
   // Returns the transimission encoder.
   // TODO(qining): To support multithreaded uses, mutex is required to manage
@@ -284,6 +285,9 @@ inline gapil::Slice<T> SpyBase::slice(const gapil::Slice<T>& src, uint64_t s,
                                       uint64_t e) const {
   return src(s, e);
 }
+
+// returns a handle to the identifier of the next pool to be allocated.
+inline uint32_t SpyBase::allocate_pool_id() { return mNextPoolId++; }
 
 }  // namespace gapii
 

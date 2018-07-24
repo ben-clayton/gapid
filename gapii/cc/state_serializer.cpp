@@ -44,7 +44,7 @@ pool_t* StateSerializer::createPool(
   auto arena = mSpy->arena();
   auto pool = arena->create<pool_t>();
   pool->arena = reinterpret_cast<arena_t*>(arena);
-  pool->id = (*mObserver->next_pool_id)++;
+  pool->id = mObserver->allocate_pool_id();
   pool->size = pool_size;
   pool->ref_count = 1;
   pool->buffer = nullptr;

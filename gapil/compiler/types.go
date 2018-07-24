@@ -67,7 +67,7 @@ func (c *C) declareTypes() {
 	c.T.CtxPtr = c.T.Pointer(c.T.Ctx)
 	c.T.Globals = c.T.DeclareStruct("globals")
 	c.T.GlobalsPtr = c.T.Pointer(c.T.Globals)
-	c.T.Pool = c.T.TypeOf(C.pool{})
+	c.T.Pool = c.T.DeclareStruct("pool")
 	c.T.PoolPtr = c.T.Pointer(c.T.Pool)
 	c.T.Sli = c.T.TypeOf(C.slice{})
 	c.T.Str = c.T.TypeOf(C.string{}).(*codegen.Struct)
@@ -123,10 +123,6 @@ func (c *C) declareTypes() {
 			c.T.CmdParams[f] = c.T.Struct(f.Name()+"Params", fields...)
 		}
 	}
-
-	c.declareMangling()
-
-	c.declareRefRels()
 }
 
 func (c *C) declareMangling() {

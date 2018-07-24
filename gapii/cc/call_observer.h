@@ -178,6 +178,9 @@ class CallObserver : public context_t {
   // The list of pending memory observations is cleared on returning.
   void observePending();
 
+  // allocate_pool_id returns the next unallocated pool identifier.
+  uint32_t allocate_pool_id() const;
+
  private:
   // shouldObserve returns true if the given slice is located in application
   // pool and we are supposed to observe application pool.

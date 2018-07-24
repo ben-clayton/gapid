@@ -31,6 +31,14 @@ import (
 
 // #include "gapil/runtime/cc/runtime.h"
 //
+// #include <string.h>
+//
+// typedef struct pool_t {
+//   uint64_t ref_count;
+//   uint64_t pool_id;
+//   uint64_t env_id;
+// } pool;
+//
 // typedef context* (TCreateContext) (arena*);
 // typedef void     (TDestroyContext) (context*);
 // typedef uint32_t (TFunc) (void* ctx);
@@ -40,65 +48,33 @@ import (
 // static uint32_t call(context* ctx, TFunc* func) { return func(ctx); }
 //
 // // Implemented below.
-// extern void* pool_data_resolver(context*, pool*, uint64_t ptr, gapil_data_access, uint64_t* len);
-// extern void  database_storer(context* ctx, void* ptr, uint64_t size, uint8_t* id_out);
+// extern void apply_reads(context*);
+// extern void apply_writes(context*);
+// extern void* resolve_pool_data(context*, pool*, uint64_t, gapil_data_access, uint64_t);
+// extern void store_in_database(context*, void*, uint64_t, uint8_t*);
+// extern pool* make_pool(context*, uint64_t);
+// extern void pool_reference(pool*);
+// extern void pool_release(pool*);
+// extern uint64_t pool_id(pool*);
 //
 // static void set_callbacks() {
-//   gapil_set_pool_data_resolver(&pool_data_resolver);
-//   gapil_set_database_storer(&database_storer);
+//   gapil_runtime_callbacks callbacks = {
+//     .apply_reads       = &apply_reads,
+//     .apply_writes      = &apply_writes,
+//     .resolve_pool_data = &resolve_pool_data,
+//     .store_in_database = &store_in_database,
+//     .make_pool         = &make_pool,
+//     .pool_reference    = &pool_reference,
+//     .pool_release      = &pool_release,
+//     .pool_id           = &pool_id,
+//   };
+//   gapil_set_runtime_callbacks(&callbacks);
 // }
 import "C"
 
 func init() {
 	// Setup the gapil runtime environment.
 	C.set_callbacks()
-}
-
-// buffer is an allocation used to hold remapped memory.
-type buffer struct {
-	rng   memory.Range
-	alloc unsafe.Pointer
-}
-
-// buffers is a list of buffers.
-type buffers []buffer
-
-// add adds a new buffer spanning the storage memory range rng that maps to the
-// allocated buffer at alloc the into the list.
-func (l *buffers) add(rng memory.Range, alloc unsafe.Pointer) {
-	*l = append(*l, buffer{rng, alloc})
-}
-
-// lookup returns the buffer that overlaps the storage memory pointer ptr, or
-// nil if there is no buffer for the given pointer.
-func (l buffers) lookup(ptr uint64) *buffer {
-	for i, b := range l {
-		if b.rng.Contains(ptr) {
-			return &l[i]
-		}
-	}
-	return nil
-}
-
-// find returns the buffer that overlaps the storage memory pointer ptr.
-// If there is no buffer for the given pointer, find panics.
-func (l buffers) find(ptr uint64) buffer {
-	if b := l.lookup(ptr); b != nil {
-		return *b
-	}
-	panic(fmt.Errorf("%v is not allocated", ptr))
-}
-
-// remap returns the base address allocated buffer for the storage memory range
-// rng. If there is no allocated memory range for rng (or the range overflows
-// the buffer) then remap panics.
-func (l buffers) remap(rng memory.Range) unsafe.Pointer {
-	b := l.find(rng.Base)
-	if rng.Base+rng.Size > b.rng.Base+b.rng.Size {
-		panic(fmt.Errorf("%v overflows allocation %v", rng, b.rng))
-	}
-	offset := (uintptr)(rng.Base - b.rng.Base)
-	return (unsafe.Pointer)((uintptr)(b.alloc) + offset)
 }
 
 // Env is the go execution environment.
@@ -112,17 +88,20 @@ type Env struct {
 	// State is the global state for the environment.
 	State *api.GlobalState
 
-	id      envID
-	cCtx    *C.context      // The gapil C context.
-	goCtx   context.Context // The go context.
-	cmd     api.Cmd         // The currently executing command.
-	buffers buffers
+	// Arena to use for buffers
+	bufferArena arena.Arena
+
+	id    envID
+	cCtx  *C.context      // The gapil C context.
+	goCtx context.Context // The go context.
+	cmd   api.Cmd         // The currently executing command.
 }
 
 // Dispose releases the memory used by the environment.
 // Call after the env is no longer needed to avoid leaking memory.
 func (e *Env) Dispose() {
 	C.destroy_context((*C.TDestroyContext)(e.Executor.destroyContext), e.cCtx)
+	e.bufferArena.Dispose()
 	e.Arena.Dispose()
 }
 
@@ -136,7 +115,11 @@ var (
 
 // env returns the environment for the given context c.
 func env(c *C.context) *Env {
-	id := envID(c.id)
+	return envFromID(envID(c.id))
+}
+
+// envFromID returns the environment for the given envID.
+func envFromID(id envID) *Env {
 	envMutex.RLock()
 	out, ok := envs[id]
 	envMutex.RUnlock()
@@ -177,13 +160,7 @@ func (e *Executor) NewEnv(ctx context.Context, c *capture.Capture) *Env {
 	env.cCtx = C.create_context((*C.TCreateContext)(e.createContext), (*C.arena)(env.Arena.Pointer))
 	env.cCtx.id = (C.uint32_t)(id)
 	env.goCtx = nil
-
-	// Allocate buffers for all the observed memory ranges.
-	for _, r := range c.Observed {
-		ptr := env.Arena.Allocate((int)(r.Count), 16)
-		rng := memory.Range{Base: r.First, Size: r.Count}
-		env.buffers.add(rng, ptr)
-	}
+	env.bufferArena = arena.New()
 
 	// Prime the state objects.
 	globalsBase := uintptr(unsafe.Pointer(env.cCtx.globals))
@@ -221,15 +198,19 @@ func (e *Env) Context() context.Context {
 	return e.goCtx
 }
 
+// Cmd returns the currently executing command.
+func (e *Env) Cmd() api.Cmd {
+	return e.cmd
+}
+
+// CmdID returns the currently executing command identifer.
+func (e *Env) CmdID() api.CmdID {
+	return api.CmdID(e.cCtx.cmd_id)
+}
+
 // Globals returns the memory of the global state.
 func (e *Env) Globals() []byte {
 	return slice.Bytes((unsafe.Pointer)(e.cCtx.globals), e.Executor.globalsSize)
-}
-
-// GetBytes returns the bytes that are in the given memory range.
-func (e *Env) GetBytes(rng memory.Range) []byte {
-	basePtr := e.buffers.remap(rng)
-	return slice.Bytes(basePtr, rng.Size)
 }
 
 func (e *Env) call(ctx context.Context, fptr, args unsafe.Pointer) error {
@@ -241,63 +222,58 @@ func (e *Env) call(ctx context.Context, fptr, args unsafe.Pointer) error {
 	return err.Err()
 }
 
-func (e *Env) applyObservations(l []api.CmdObservation) {
-	for _, o := range l {
-		obj, err := database.Resolve(e.goCtx, o.ID)
-		if err != nil {
+//export apply_reads
+func apply_reads(c *C.context) {
+	e := env(c)
+	if extras := e.cmd.Extras(); extras != nil {
+		if o := extras.Observations(); o != nil {
+			o.ApplyReads(e.State.Memory.ApplicationPool())
+		}
+	}
+}
+
+//export apply_writes
+func apply_writes(c *C.context) {
+	e := env(c)
+	if extras := e.cmd.Extras(); extras != nil {
+		if o := extras.Observations(); o != nil {
+			o.ApplyWrites(e.State.Memory.ApplicationPool())
+		}
+	}
+}
+
+//export resolve_pool_data
+func resolve_pool_data(c *C.context, pool *C.pool, ptr C.uint64_t, access C.gapil_data_access, size C.uint64_t) unsafe.Pointer {
+	env := GetEnv((unsafe.Pointer)(c))
+	ctx := env.goCtx
+	id := memory.ApplicationPool
+	if pool != nil {
+		id = memory.PoolID(pool.pool_id)
+	}
+	p := env.State.Memory.MustGet(id)
+	switch access {
+	case C.GAPIL_READ:
+		buf := env.bufferArena.Allocate(int(size), 1) // TODO: Free these!
+		C.memset(buf, 0, C.size_t(size))
+		rng := memory.Range{Base: uint64(ptr), Size: uint64(size)}
+		sli := p.Slice(rng)
+		if err := sli.Get(ctx, 0, slice.Bytes(buf, uint64(size))); err != nil {
 			panic(err)
 		}
-		data := obj.([]byte)
-		ptr := e.buffers.remap(o.Range)
-		dst := slice.Bytes(ptr, o.Range.Size)
-		copy(dst, data)
+		return buf
+	case C.GAPIL_WRITE:
+		buf := env.bufferArena.Allocate(int(size), 1) // TODO: Free these!
+		C.memset(buf, 0, C.size_t(size))
+		blob := memory.Blob(slice.Bytes(buf, uint64(size)))
+		p.Write(uint64(ptr), blob)
+		return buf
+	default:
+		panic(fmt.Errorf("Unexpected access: %v", access))
 	}
 }
 
-//export gapil_apply_reads
-func gapil_apply_reads(c *C.context) {
-	e := env(c)
-	if extras := e.cmd.Extras(); extras != nil {
-		if observations := extras.Observations(); observations != nil {
-			e.applyObservations(observations.Reads)
-		}
-	}
-}
-
-//export gapil_apply_writes
-func gapil_apply_writes(c *C.context) {
-	e := env(c)
-	if extras := e.cmd.Extras(); extras != nil {
-		if observations := extras.Observations(); observations != nil {
-			e.applyObservations(observations.Writes)
-		}
-	}
-}
-
-//export pool_data_resolver
-func pool_data_resolver(c *C.context, pool *C.pool, ptr C.uint64_t, access C.gapil_data_access, len *C.uint64_t) unsafe.Pointer {
-	if pool != nil {
-		if ptr > pool.size {
-			panic(fmt.Errorf("%v overflows pool buffer %v", ptr, pool.size))
-		}
-		if len != nil {
-			*len = pool.size - ptr
-		}
-		return unsafe.Pointer(uintptr(pool.buffer) + uintptr(ptr))
-	}
-
-	// Application pool
-	e := env(c)
-	b := e.buffers.find(uint64(ptr))
-	offset := uint64(ptr) - b.rng.Base
-	if len != nil {
-		*len = (C.uint64_t)(b.rng.Size - offset)
-	}
-	return (unsafe.Pointer)(uintptr(b.alloc) + uintptr(offset))
-}
-
-//export database_storer
-func database_storer(c *C.context, ptr unsafe.Pointer, size C.uint64_t, idOut *C.uint8_t) {
+//export store_in_database
+func store_in_database(c *C.context, ptr unsafe.Pointer, size C.uint64_t, idOut *C.uint8_t) {
 	env := GetEnv((unsafe.Pointer)(c))
 	ctx := env.Context()
 	sli := slice.Bytes(ptr, uint64(size))
@@ -307,4 +283,40 @@ func database_storer(c *C.context, ptr unsafe.Pointer, size C.uint64_t, idOut *C
 	}
 	out := slice.Bytes((unsafe.Pointer)(idOut), 20)
 	copy(out, id[:])
+}
+
+//export make_pool
+func make_pool(c *C.context, size C.uint64_t) *C.pool {
+	env := GetEnv((unsafe.Pointer)(c))
+	id, _ := env.State.Memory.New()
+	pool := (*C.pool)(env.Arena.Allocate(int(unsafe.Sizeof(C.pool{})), int(unsafe.Alignof(C.pool{}))))
+	pool.ref_count = 1
+	pool.pool_id = C.uint64_t(id)
+	pool.env_id = C.uint64_t(env.id)
+	return pool
+}
+
+//export pool_reference
+func pool_reference(pool *C.pool) {
+	if pool.ref_count == 0 {
+		panic("Attempting to reference pool with no references")
+	}
+	pool.ref_count++
+}
+
+//export pool_release
+func pool_release(pool *C.pool) {
+	if pool.ref_count == 0 {
+		panic("Attempting to release pool with no references")
+	}
+	pool.ref_count--
+	if pool.ref_count == 0 {
+		env := envFromID(envID(pool.env_id))
+		env.Arena.Free(unsafe.Pointer(pool))
+	}
+}
+
+//export pool_id
+func pool_id(pool *C.pool) C.uint64_t {
+	return pool.pool_id
 }

@@ -206,19 +206,20 @@ func (c *C) buildRefRels() {
 	r := c.refRels.impls
 
 	sli := r[slicePrototype]
-	sli.build(c,
-		func(s *S, sli *codegen.Value) *codegen.Value {
-			poolPtr := sli.Extract(SlicePool)
-			return s.Equal(poolPtr, s.Zero(poolPtr.Type()))
-		},
-		func(s *S, sli *codegen.Value) *codegen.Value {
-			poolPtr := sli.Extract(SlicePool)
-			return poolPtr.Index(0, PoolRefCount)
-		},
-		func(s *S, sli *codegen.Value) {
-			poolPtr := sli.Extract(SlicePool)
-			s.Call(c.callbacks.freePool, poolPtr)
+	c.Build(sli.reference, func(s *S) {
+		sli := s.Parameter(0)
+		pool := sli.Extract(SlicePool)
+		s.If(s.Not(pool.IsNull()), func(s *S) {
+			s.Call(c.callbacks.poolReference, pool)
 		})
+	})
+	c.Build(sli.release, func(s *S) {
+		sli := s.Parameter(0)
+		pool := sli.Extract(SlicePool)
+		s.If(s.Not(pool.IsNull()), func(s *S) {
+			s.Call(c.callbacks.poolRelease, pool)
+		})
+	})
 
 	str := r[semantic.StringType]
 	str.build(c,

@@ -121,10 +121,16 @@ import (»
   }
 ¶
   func poolToC(a arena.Arena, id ϟmem.PoolID) *C.pool {
-    pool := (*C.pool)(a.Allocate(int(unsafe.Sizeof(C.pool{})), int(unsafe.Alignof(C.pool{}))))
-    pool.id = C.uint32_t(id)
-    pool.ref_count = 0x3fffffff // TEMP
-    return pool
+    // TODO
+    return (*C.pool)(unsafe.Pointer(uintptr(id)))
+  }
+¶
+  func poolFromC(p *C.pool) ϟmem.PoolID {
+    if p == nil {
+      return ϟmem.ApplicationPool
+    }
+    // TODO
+    return ϟmem.PoolID(uintptr(unsafe.Pointer(p)))
   }
 {{end}}
 
@@ -610,10 +616,7 @@ import (»
 
   // Pool returns the the pool identifier.
   func (s {{$slice_ty}}) Pool() ϟmem.PoolID {
-    if s.c.pool == nil {
-      return ϟmem.ApplicationPool
-    }
-    return ϟmem.PoolID(s.c.pool.id)
+    return poolFromC(s.c.pool)
   }
 
   // ElementType returns the reflect.Type of the elements in the slice.

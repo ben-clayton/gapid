@@ -1970,7 +1970,7 @@ func (t test) run(ctx context.Context, c *capture.Capture) (succeeded bool) {
 
 	defer func() {
 		if !succeeded {
-			fmt.Println(program.Dump())
+			// fmt.Println(program.Dump())
 		}
 	}()
 
@@ -2006,7 +2006,11 @@ func (t test) run(ctx context.Context, c *capture.Capture) (succeeded bool) {
 
 	for k, v := range t.expected.buffers {
 		rng := memory.Range{k, uint64(len(v))}
-		storedBytes := env.GetBytes(rng)
+		storedBytes := make([]byte, len(v))
+		err := env.State.Memory.ApplicationPool().Slice(rng).Get(ctx, 0, storedBytes)
+		if !assert.For(ctx, "Slice(%v).Get", rng).ThatError(err).Succeeded() {
+			return false
+		}
 
 		if !assert.For(ctx, "Buffers").ThatSlice(storedBytes).Equals(v) {
 			return false
@@ -2014,10 +2018,8 @@ func (t test) run(ctx context.Context, c *capture.Capture) (succeeded bool) {
 	}
 
 	stats := env.Arena.Stats()
-	numContextAllocs := 3               // gapil_create_context: context, next_pool_id, globals
-	numMemBlocks := c.Observed.Length() // observation allocations
-	numOtherAllocs := numMemBlocks + numContextAllocs
-	if !assert.For(ctx, "Allocations").That(stats.NumAllocations - numOtherAllocs).Equals(t.expected.numAllocs) {
+	numContextAllocs := 2 // gapil_create_context: context, globals
+	if !assert.For(ctx, "Allocations").That(stats.NumAllocations - numContextAllocs).Equals(t.expected.numAllocs) {
 		log.I(ctx, "Allocations: %v\n", stats)
 		return false
 	}

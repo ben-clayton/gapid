@@ -83,23 +83,27 @@ type C struct {
 	expressionStack []semantic.Expression
 	isFence         bool // If true, a fence should be emitted for the given statement
 	callbacks       struct {
-		alloc          *codegen.Function
-		realloc        *codegen.Function
-		free           *codegen.Function
-		applyReads     *codegen.Function
-		applyWrites    *codegen.Function
-		freePool       *codegen.Function
-		sliceData      *codegen.Function
-		copySlice      *codegen.Function
-		makePool       *codegen.Function
-		cstringToSlice *codegen.Function
-		sliceToString  *codegen.Function
-		makeString     *codegen.Function
-		freeString     *codegen.Function
-		stringToSlice  *codegen.Function
-		stringConcat   *codegen.Function
-		stringCompare  *codegen.Function
-		logf           *codegen.Function
+		alloc           *codegen.Function
+		applyReads      *codegen.Function
+		applyWrites     *codegen.Function
+		copySlice       *codegen.Function
+		cstringToSlice  *codegen.Function
+		free            *codegen.Function
+		freeString      *codegen.Function
+		logf            *codegen.Function
+		makePool        *codegen.Function
+		makeString      *codegen.Function
+		poolID          *codegen.Function
+		poolReference   *codegen.Function
+		poolRelease     *codegen.Function
+		realloc         *codegen.Function
+		resolvePoolData *codegen.Function
+		sliceData       *codegen.Function
+		sliceToString   *codegen.Function
+		storeInDatabase *codegen.Function
+		stringCompare   *codegen.Function
+		stringConcat    *codegen.Function
+		stringToSlice   *codegen.Function
 	}
 }
 
@@ -210,26 +214,32 @@ func (c *C) compile() {
 	defer c.augmentPanics()
 
 	c.declareTypes()
+	c.declareMangling()
 	c.declareBufferFuncs()
 	c.declareContextType()
+	c.declareRefRels()
 
 	c.callbacks.alloc = c.M.ParseFunctionSignature(C.GoString(C.gapil_alloc_sig))
-	c.callbacks.realloc = c.M.ParseFunctionSignature(C.GoString(C.gapil_realloc_sig))
-	c.callbacks.free = c.M.ParseFunctionSignature(C.GoString(C.gapil_free_sig))
 	c.callbacks.applyReads = c.M.ParseFunctionSignature(C.GoString(C.gapil_apply_reads_sig))
 	c.callbacks.applyWrites = c.M.ParseFunctionSignature(C.GoString(C.gapil_apply_writes_sig))
-	c.callbacks.freePool = c.M.ParseFunctionSignature(C.GoString(C.gapil_free_pool_sig))
-	c.callbacks.sliceData = c.M.ParseFunctionSignature(C.GoString(C.gapil_slice_data_sig))
 	c.callbacks.copySlice = c.M.ParseFunctionSignature(C.GoString(C.gapil_copy_slice_sig))
-	c.callbacks.makePool = c.M.ParseFunctionSignature(C.GoString(C.gapil_make_pool_sig))
 	c.callbacks.cstringToSlice = c.M.ParseFunctionSignature(C.GoString(C.gapil_cstring_to_slice_sig))
-	c.callbacks.sliceToString = c.M.ParseFunctionSignature(C.GoString(C.gapil_slice_to_string_sig))
-	c.callbacks.makeString = c.M.ParseFunctionSignature(C.GoString(C.gapil_make_string_sig))
+	c.callbacks.free = c.M.ParseFunctionSignature(C.GoString(C.gapil_free_sig))
 	c.callbacks.freeString = c.M.ParseFunctionSignature(C.GoString(C.gapil_free_string_sig))
-	c.callbacks.stringToSlice = c.M.ParseFunctionSignature(C.GoString(C.gapil_string_to_slice_sig))
-	c.callbacks.stringConcat = c.M.ParseFunctionSignature(C.GoString(C.gapil_string_concat_sig))
-	c.callbacks.stringCompare = c.M.ParseFunctionSignature(C.GoString(C.gapil_string_compare_sig))
 	c.callbacks.logf = c.M.ParseFunctionSignature(C.GoString(C.gapil_logf_sig))
+	c.callbacks.makePool = c.M.ParseFunctionSignature(C.GoString(C.gapil_make_pool_sig))
+	c.callbacks.makeString = c.M.ParseFunctionSignature(C.GoString(C.gapil_make_string_sig))
+	c.callbacks.poolID = c.M.ParseFunctionSignature(C.GoString(C.gapil_pool_id_sig))
+	c.callbacks.poolReference = c.M.ParseFunctionSignature(C.GoString(C.gapil_pool_reference_sig))
+	c.callbacks.poolRelease = c.M.ParseFunctionSignature(C.GoString(C.gapil_pool_release_sig))
+	c.callbacks.realloc = c.M.ParseFunctionSignature(C.GoString(C.gapil_realloc_sig))
+	c.callbacks.resolvePoolData = c.M.ParseFunctionSignature(C.GoString(C.gapil_resolve_pool_data_sig))
+	c.callbacks.sliceData = c.M.ParseFunctionSignature(C.GoString(C.gapil_slice_data_sig))
+	c.callbacks.sliceToString = c.M.ParseFunctionSignature(C.GoString(C.gapil_slice_to_string_sig))
+	c.callbacks.storeInDatabase = c.M.ParseFunctionSignature(C.GoString(C.gapil_store_in_database_sig))
+	c.callbacks.stringCompare = c.M.ParseFunctionSignature(C.GoString(C.gapil_string_compare_sig))
+	c.callbacks.stringConcat = c.M.ParseFunctionSignature(C.GoString(C.gapil_string_concat_sig))
+	c.callbacks.stringToSlice = c.M.ParseFunctionSignature(C.GoString(C.gapil_string_to_slice_sig))
 
 	c.emptyString = c.M.Global("gapil_empty_string",
 		c.M.ConstStruct(
@@ -283,6 +293,11 @@ func (c *C) Build(f *codegen.Function, do func(*S)) {
 
 		s.enter(do)
 	}))
+}
+
+// PoolID returns the identifier of the pool
+func (c *C) PoolID(s *S, pool *codegen.Value) *codegen.Value {
+	return s.Call(c.callbacks.poolID, pool)
 }
 
 // MakeSlice creates a new slice of the given size in bytes.
