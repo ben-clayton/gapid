@@ -40,7 +40,7 @@ import (
 	"github.com/google/gapid/test/integration/gles/snippets"
 )
 
-const replayTimeout = time.Second * 5
+const replayTimeout = time.Second * 30
 
 var (
 	triangleVertices = []float32{
