@@ -17,6 +17,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "context.go",
         "env.go",
         "executor.go",
     ],
@@ -29,6 +30,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//core/codegen:go_default_library",
+        "//core/context/keys:go_default_library",
         "//core/data/slice:go_default_library",
         "//core/memory/arena:go_default_library",
         "//gapil/compiler:go_default_library",

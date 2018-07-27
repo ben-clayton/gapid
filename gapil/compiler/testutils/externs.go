@@ -35,12 +35,12 @@ var (
 
 //export test_extern_a
 func test_extern_a(ctx unsafe.Pointer, i uint64, f float32, b bool, out *uint64) {
-	env := executor.GetEnv(ctx)
+	env := executor.EnvFromNative(ctx)
 	*out = ExternA(env, i, f, b)
 }
 
 //export test_extern_b
 func test_extern_b(ctx unsafe.Pointer, s *C.string, out *bool) {
-	env := executor.GetEnv(ctx)
+	env := executor.EnvFromNative(ctx)
 	*out = ExternB(env, C.GoString((*C.char)((unsafe.Pointer)(&s.data[0]))))
 }

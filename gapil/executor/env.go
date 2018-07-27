@@ -129,8 +129,8 @@ func envFromID(id envID) *Env {
 	return out
 }
 
-// GetEnv returns the environment for the given context c.
-func GetEnv(c unsafe.Pointer) *Env {
+// EnvFromNative returns the environment for the given context c.
+func EnvFromNative(c unsafe.Pointer) *Env {
 	return env((*C.context)(c))
 }
 
@@ -244,7 +244,7 @@ func apply_writes(c *C.context) {
 
 //export resolve_pool_data
 func resolve_pool_data(c *C.context, pool *C.pool, ptr C.uint64_t, access C.gapil_data_access, size C.uint64_t) unsafe.Pointer {
-	env := GetEnv((unsafe.Pointer)(c))
+	env := EnvFromNative((unsafe.Pointer)(c))
 	ctx := env.goCtx
 	id := memory.ApplicationPool
 	if pool != nil {
@@ -274,7 +274,7 @@ func resolve_pool_data(c *C.context, pool *C.pool, ptr C.uint64_t, access C.gapi
 
 //export store_in_database
 func store_in_database(c *C.context, ptr unsafe.Pointer, size C.uint64_t, idOut *C.uint8_t) {
-	env := GetEnv((unsafe.Pointer)(c))
+	env := EnvFromNative((unsafe.Pointer)(c))
 	ctx := env.Context()
 	sli := slice.Bytes(ptr, uint64(size))
 	id, err := database.Store(ctx, sli)
@@ -287,7 +287,7 @@ func store_in_database(c *C.context, ptr unsafe.Pointer, size C.uint64_t, idOut 
 
 //export make_pool
 func make_pool(c *C.context, size C.uint64_t) *C.pool {
-	env := GetEnv((unsafe.Pointer)(c))
+	env := EnvFromNative((unsafe.Pointer)(c))
 	id, _ := env.State.Memory.New()
 	pool := (*C.pool)(env.Arena.Allocate(int(unsafe.Sizeof(C.pool{})), int(unsafe.Alignof(C.pool{}))))
 	pool.ref_count = 1

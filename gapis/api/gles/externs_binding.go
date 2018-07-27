@@ -24,7 +24,7 @@ import (
 )
 
 func externsFromNative(ctx *C.context) *externs {
-	env := executor.GetEnv(unsafe.Pointer(ctx))
+	env := executor.EnvFromNative(unsafe.Pointer(ctx))
 	return &externs{
 		ctx:   env.Context(),
 		cmd:   env.Cmd(),
