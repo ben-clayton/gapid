@@ -1970,7 +1970,7 @@ func (t test) run(ctx context.Context, c *capture.Capture) (succeeded bool) {
 
 	defer func() {
 		if !succeeded {
-			// fmt.Println(program.Dump())
+			fmt.Println(program.Dump())
 		}
 	}()
 
