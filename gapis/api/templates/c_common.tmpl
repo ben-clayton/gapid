@@ -147,7 +147,7 @@
   {{else if IsString      $}}string
   {{else if IsStaticArray $}}{{Template "C.Mangle" $.ValueType}}__{{$.Size}}__A
   {{else if IsReference   $}}Ref_{{Template "C.Mangle" $.To}}
-  {{else if IsPointer     $}}uint
+  {{else if IsPointer     $}}ulong
   {{else}}{{Error "C.Mangle passed unsupported type (%T): %s" $ $.Name}}
   {{end}}
 {{end}}

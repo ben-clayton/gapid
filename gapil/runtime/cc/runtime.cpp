@@ -247,7 +247,7 @@ void gapil_copy_slice(context* ctx, slice* dst, slice* src) {
   memcpy(dstPtr, srcPtr, size);
 }
 
-void gapil_cstring_to_slice(context* ctx, uintptr_t ptr, slice* out) {
+void gapil_cstring_to_slice(context* ctx, uint64_t ptr, slice* out) {
   DEBUG_PRINT("gapil_cstring_to_slice(ptr: 0x%" PRIx64 ")", ptr);
 
   pool* pool = nullptr;  // application pool
