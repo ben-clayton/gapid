@@ -48,10 +48,11 @@ func gles_GetCompileShaderExtra(
 	out **C.CompileShaderExtra__R) {
 
 	e := externsFromNative(ctx)
-	c := Contextʳ{context}
-	s := Shaderʳ{shader}
-	b := BinaryExtraʳ{extra}
-	*out = e.GetCompileShaderExtra(c, s, b).c
+	*out = e.GetCompileShaderExtra(
+		Contextʳ{context},
+		Shaderʳ{shader},
+		BinaryExtraʳ{extra},
+	).c
 }
 
 //export gles_GetEGLDynamicContextState
@@ -67,8 +68,9 @@ func gles_GetEGLDynamicContextState(
 }
 
 //export gles_GetEGLImageData
-func gles_GetEGLImageData(ctx *C.context, img uint64, width int32, height int32) {
-	panic("gles_GetEGLImageData not implemented")
+func gles_GetEGLImageData(ctx *C.context, img EGLImageKHR, width, height GLsizei) {
+	e := externsFromNative(ctx)
+	e.GetEGLImageData(img, width, height)
 }
 
 //export gles_GetEGLStaticContextState
@@ -83,27 +85,42 @@ func gles_GetEGLStaticContextState(
 }
 
 //export gles_GetLinkProgramExtra
-func gles_GetLinkProgramExtra(ctx, c, p, binary unsafe.Pointer, out *unsafe.Pointer) {
-	panic("gles_GetLinkProgramExtra not implemented")
+func gles_GetLinkProgramExtra(
+	ctx *C.context,
+	context *C.Context__R,
+	program *C.Program__R,
+	extra *C.BinaryExtra__R,
+	out **C.LinkProgramExtra__R) {
+
+	e := externsFromNative(ctx)
+	*out = e.GetLinkProgramExtra(
+		Contextʳ{context},
+		Programʳ{program},
+		BinaryExtraʳ{extra},
+	).c
 }
 
 //export gles_GetValidateProgramExtra
-func gles_GetValidateProgramExtra(ctx, c, p unsafe.Pointer, out *unsafe.Pointer) {
+func gles_GetValidateProgramExtra(ctx *C.context, c, p unsafe.Pointer, out *unsafe.Pointer) {
 	panic("gles_GetValidateProgramExtra not implemented")
 }
 
 //export gles_GetValidateProgramPipelineExtra
-func gles_GetValidateProgramPipelineExtra(ctx, c, p, out *unsafe.Pointer) {
+func gles_GetValidateProgramPipelineExtra(ctx *C.context, c, p, out *unsafe.Pointer) {
 	panic("gles_GetValidateProgramPipelineExtra not implemented")
 }
 
 //export gles_IndexLimits
-func gles_IndexLimits(ctx, s unsafe.Pointer, sizeofIndex int32, out *unsafe.Pointer) {
-	panic("gles_IndexLimits not implemented")
+func gles_IndexLimits(ctx *C.context, s *C.slice, indexSize int32, out *C.u32Limits) {
+	e := externsFromNative(ctx)
+	*out = *e.IndexLimits(
+		U8ˢ{s},
+		indexSize,
+	).c
 }
 
 //export gles_ReadGPUTextureData
-func gles_ReadGPUTextureData(ctx, t unsafe.Pointer, level int32, layer int32, out *unsafe.Pointer) {
+func gles_ReadGPUTextureData(ctx *C.context, t unsafe.Pointer, level int32, layer int32, out *unsafe.Pointer) {
 	panic("gles_ReadGPUTextureData not implemented")
 }
 
@@ -113,7 +130,7 @@ func gles_addTag(ctx *C.context, _ uint32, _ uint8) {
 }
 
 //export gles_mapMemory
-func gles_mapMemory(ctx, s unsafe.Pointer) {
+func gles_mapMemory(ctx *C.context, s unsafe.Pointer) {
 	panic("gles_mapMemory not implemented")
 }
 
@@ -128,6 +145,6 @@ func gles_onGlError(ctx *C.context, err GLenum) {
 }
 
 //export gles_unmapMemory
-func gles_unmapMemory(ctx, s unsafe.Pointer) {
+func gles_unmapMemory(ctx *C.context, s unsafe.Pointer) {
 	panic("gles_unmapMemory not implemented")
 }
