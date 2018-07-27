@@ -320,8 +320,7 @@ DECL_GAPIL_CB(string*, gapil_make_string, arena*, uint64_t length, void* data);
 
 // outputs a slice spanning the bytes of the null-terminated string starting at
 // ptr. The slice includes the null-terminator byte.
-DECL_GAPIL_CB(void, gapil_cstring_to_slice, context*, uintptr_t ptr,
-              slice* out);
+DECL_GAPIL_CB(void, gapil_cstring_to_slice, context*, uint64_t ptr, slice* out);
 
 // frees a string allocated with gapil_make_string, gapil_string_concat or
 // gapil_slice_to_string.

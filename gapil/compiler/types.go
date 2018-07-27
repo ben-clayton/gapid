@@ -311,7 +311,7 @@ func (t *Types) Target(ty semantic.Type) codegen.Type {
 	case *semantic.Slice:
 		return t.Sli
 	case *semantic.Pointer:
-		return t.Uintptr
+		return t.Uint64
 	case *semantic.Class, *semantic.Reference, *semantic.Map:
 		if out, ok := t.target[ty]; ok {
 			return out
