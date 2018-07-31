@@ -95,14 +95,6 @@ message ResourceMetaResolvable {
   path.Command after = 2;
 }
 
-message GlobalStateResolvable {
-  path.GlobalState path = 1;
-}
-
-message StateResolvable {
-  path.State path = 1;
-}
-
 message SynchronizationResolvable {
   path.Capture capture = 1;
 }

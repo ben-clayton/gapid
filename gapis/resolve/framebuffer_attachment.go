@@ -39,22 +39,23 @@ func FramebufferAttachment(
 	attachment api.FramebufferAttachment,
 	settings *service.RenderSettings,
 	hints *service.UsageHints,
-) (*path.ImageInfo, error) {
+) (*path.ImageInfo, context.Context, error) {
+
 	if replaySettings.Device == nil {
 		devices, err := devices.ForReplay(ctx, after.Capture)
 		if err != nil {
-			return nil, err
+			return nil, ctx, err
 		}
 		if len(devices) == 0 {
-			return nil, fmt.Errorf("No compatible replay devices found")
+			return nil, ctx, fmt.Errorf("No compatible replay devices found")
 		}
 		replaySettings.Device = devices[0]
 	}
 
 	// Check the command is valid. If we don't do it here, we'll likely get an
 	// error deep in the bowels of the framebuffer data resolve.
-	if _, err := Cmd(ctx, after); err != nil {
-		return nil, err
+	if _, ctx, err := Cmd(ctx, after); err != nil {
+		return nil, ctx, err
 	}
 
 	id, err := database.Store(ctx, &FramebufferAttachmentResolvable{
@@ -66,9 +67,9 @@ func FramebufferAttachment(
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
-	return path.NewImageInfo(id), nil
+	return path.NewImageInfo(id), ctx, nil
 }
 
 // Resolve implements the database.Resolver interface.

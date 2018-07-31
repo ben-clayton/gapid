@@ -29,18 +29,18 @@ import (
 )
 
 // Commands resolves and returns the command list from the path p.
-func Commands(ctx context.Context, p *path.Commands) (*service.Commands, error) {
+func Commands(ctx context.Context, p *path.Commands) (*service.Commands, context.Context, error) {
 	c, err := capture.ResolveFromPath(ctx, p.Capture)
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 	cmdIdxFrom, cmdIdxTo := p.From[0], p.To[0]
 	if len(p.From) > 1 || len(p.To) > 1 {
-		return nil, fmt.Errorf("Subcommands currently not supported for Commands") // TODO: Subcommands
+		return nil, ctx, fmt.Errorf("Subcommands currently not supported for Commands") // TODO: Subcommands
 	}
 	count := uint64(len(c.Commands))
 	if count == 0 {
-		return nil, fmt.Errorf("No commands in capture")
+		return nil, ctx, fmt.Errorf("No commands in capture")
 	}
 	cmdIdxFrom = u64.Min(cmdIdxFrom, count-1)
 	cmdIdxTo = u64.Min(cmdIdxTo, count-1)
@@ -52,43 +52,43 @@ func Commands(ctx context.Context, p *path.Commands) (*service.Commands, error) 
 	for i := uint64(0); i < count; i++ {
 		paths[i] = p.Capture.Command(i)
 	}
-	return &service.Commands{List: paths}, nil
+	return &service.Commands{List: paths}, ctx, nil
 }
 
 // Cmds resolves and returns the command list from the path p.
-func Cmds(ctx context.Context, p *path.Capture) ([]api.Cmd, error) {
+func Cmds(ctx context.Context, p *path.Capture) ([]api.Cmd, context.Context, error) {
 	c, err := capture.ResolveFromPath(ctx, p)
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
-	return c.Commands, nil
+	return c.Commands, ctx, nil
 }
 
 // NCmds resolves and returns the command list from the path p, ensuring
 // that the number of commands is at least N.
-func NCmds(ctx context.Context, p *path.Capture, n uint64) ([]api.Cmd, error) {
-	list, err := Cmds(ctx, p)
+func NCmds(ctx context.Context, p *path.Capture, n uint64) ([]api.Cmd, context.Context, error) {
+	list, ctx, err := Cmds(ctx, p)
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 	if count := uint64(len(list)); n > count {
-		return nil, errPathOOB(ctx, n-1, "Index", 0, count-1, p.Command(n-1))
+		return nil, ctx, errPathOOB(ctx, n-1, "Index", 0, count-1, p.Command(n-1))
 	}
-	return list, nil
+	return list, ctx, nil
 }
 
 // Cmd resolves and returns the command from the path p.
-func Cmd(ctx context.Context, p *path.Command) (api.Cmd, error) {
+func Cmd(ctx context.Context, p *path.Command) (api.Cmd, context.Context, error) {
 	cmdIdx := p.Indices[0]
 	if len(p.Indices) > 1 {
 		snc, err := SyncData(ctx, p.Capture)
 		if err != nil {
-			return nil, err
+			return nil, ctx, err
 		}
 
 		sg, ok := snc.SubcommandReferences[api.CmdID(cmdIdx)]
 		if !ok {
-			return nil, log.Errf(ctx, nil, "Could not find any subcommands on %v", cmdIdx)
+			return nil, ctx, log.Errf(ctx, nil, "Could not find any subcommands on %v", cmdIdx)
 		}
 
 		idx := append(api.SubCmdIdx{}, p.Indices[1:]...)
@@ -100,7 +100,7 @@ func Cmd(ctx context.Context, p *path.Command) (api.Cmd, error) {
 				if cmdIdx == uint64(api.CmdNoID) {
 					capture, err := capture.ResolveFromPath(ctx, p.Capture)
 					if err != nil {
-						return nil, err
+						return nil, ctx, err
 					}
 
 					for _, api := range capture.APIs {
@@ -108,10 +108,10 @@ func Cmd(ctx context.Context, p *path.Command) (api.Cmd, error) {
 							a, err := snc.RecoverMidExecutionCommand(ctx, p.Capture, v.MidExecutionCommandData)
 							if err != nil {
 								if _, ok := err.(sync.NoMECSubcommandsError); !ok {
-									return nil, err
+									return nil, ctx, err
 								}
 							} else {
-								return a, nil
+								return a, ctx, nil
 							}
 						}
 					}
@@ -121,54 +121,54 @@ func Cmd(ctx context.Context, p *path.Command) (api.Cmd, error) {
 			}
 		}
 		if !found {
-			return nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage(ctx, "Not a valid subcommand")}
+			return nil, ctx, &service.ErrDataUnavailable{Reason: messages.ErrMessage(ctx, "Not a valid subcommand")}
 		}
 	}
-	cmds, err := NCmds(ctx, p.Capture, cmdIdx+1)
+	cmds, ctx, err := NCmds(ctx, p.Capture, cmdIdx+1)
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
-	return cmds[cmdIdx], nil
+	return cmds[cmdIdx], ctx, nil
 }
 
 // Parameter resolves and returns the parameter from the path p.
-func Parameter(ctx context.Context, p *path.Parameter) (interface{}, error) {
-	obj, err := ResolveInternal(ctx, p.Parent())
+func Parameter(ctx context.Context, p *path.Parameter) (interface{}, context.Context, error) {
+	obj, ctx, err := ResolveInternal(ctx, p.Parent())
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 	cmd := obj.(api.Cmd)
 	param, err := api.GetParameter(cmd, p.Name)
 	switch err {
 	case nil:
-		return param, nil
+		return param, ctx, nil
 	case api.ErrParameterNotFound:
-		return nil, &service.ErrInvalidPath{
+		return nil, ctx, &service.ErrInvalidPath{
 			Reason: messages.ErrParameterDoesNotExist(ctx, cmd.CmdName(), p.Name),
 			Path:   p.Path(),
 		}
 	default:
-		return nil, err
+		return nil, ctx, err
 	}
 }
 
 // Result resolves and returns the command's result from the path p.
-func Result(ctx context.Context, p *path.Result) (interface{}, error) {
-	obj, err := ResolveInternal(ctx, p.Parent())
+func Result(ctx context.Context, p *path.Result) (interface{}, context.Context, error) {
+	obj, ctx, err := ResolveInternal(ctx, p.Parent())
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 	cmd := obj.(api.Cmd)
 	param, err := api.GetResult(cmd)
 	switch err {
 	case nil:
-		return param, nil
+		return param, ctx, nil
 	case api.ErrResultNotFound:
-		return nil, &service.ErrInvalidPath{
+		return nil, ctx, &service.ErrInvalidPath{
 			Reason: messages.ErrResultDoesNotExist(ctx, cmd.CmdName()),
 			Path:   p.Path(),
 		}
 	default:
-		return nil, err
+		return nil, ctx, err
 	}
 }

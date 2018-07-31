@@ -26,17 +26,17 @@ import (
 
 // FramebufferObservation returns the framebuffer observation for the given
 // command.
-func FramebufferObservation(ctx context.Context, p *path.FramebufferObservation) (*image.Info, error) {
+func FramebufferObservation(ctx context.Context, p *path.FramebufferObservation) (*image.Info, context.Context, error) {
 	obj, err := database.Build(ctx, &FramebufferObservationResolvable{Path: p})
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
-	return obj.(*image.Info), nil
+	return obj.(*image.Info), ctx, nil
 }
 
 // Resolve implements the database.Resolver interface.
 func (r *FramebufferObservationResolvable) Resolve(ctx context.Context) (interface{}, error) {
-	cmd, err := Cmd(ctx, r.Path.Command)
+	cmd, ctx, err := Cmd(ctx, r.Path.Command)
 	if err != nil {
 		return nil, err
 	}

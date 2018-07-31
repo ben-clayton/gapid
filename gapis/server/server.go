@@ -265,7 +265,8 @@ func (s *server) GetFramebufferAttachment(
 	if err := after.Validate(); err != nil {
 		return nil, log.Errf(ctx, err, "Invalid path: %v", after)
 	}
-	return resolve.FramebufferAttachment(ctx, replaySettings, after, attachment, settings, hints)
+	img, _, err := resolve.FramebufferAttachment(ctx, replaySettings, after, attachment, settings, hints)
+	return img, err
 }
 
 func (s *server) Get(ctx context.Context, p *path.Any) (interface{}, error) {
@@ -293,7 +294,8 @@ func (s *server) Follow(ctx context.Context, p *path.Any) (*path.Any, error) {
 	if err := p.Validate(); err != nil {
 		return nil, log.Errf(ctx, err, "Invalid path: %v", p)
 	}
-	return resolve.Follow(ctx, p)
+	p, _, err := resolve.Follow(ctx, p)
+	return p, err
 }
 
 func (s *server) GetLogStream(ctx context.Context, handler log.Handler) error {

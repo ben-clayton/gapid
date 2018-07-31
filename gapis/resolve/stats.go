@@ -25,15 +25,15 @@ import (
 )
 
 // Stats resolves and returns the stats list from the path p.
-func Stats(ctx context.Context, p *path.Stats) (*service.Stats, error) {
+func Stats(ctx context.Context, p *path.Stats) (*service.Stats, context.Context, error) {
 	stats := &service.Stats{}
 	if p.DrawCall {
 		err := drawCallStats(ctx, p.Capture, stats)
 		if err != nil {
-			return nil, err
+			return nil, ctx, err
 		}
 	}
-	return stats, nil
+	return stats, ctx, nil
 }
 
 func drawCallStats(ctx context.Context, capt *path.Capture, stats *service.Stats) error {
@@ -41,7 +41,7 @@ func drawCallStats(ctx context.Context, capt *path.Capture, stats *service.Stats
 	if err != nil {
 		return err
 	}
-	cmds, err := Cmds(ctx, capt)
+	cmds, ctx, err := Cmds(ctx, capt)
 	if err != nil {
 		return err
 	}
@@ -53,7 +53,7 @@ func drawCallStats(ctx context.Context, capt *path.Capture, stats *service.Stats
 	flags := make([]api.CmdFlags, len(cmds))
 
 	// Get the present calls
-	events, err := Events(ctx, &path.Events{
+	events, ctx, err := Events(ctx, &path.Events{
 		Capture:     capt,
 		LastInFrame: true,
 	})
@@ -76,7 +76,7 @@ func drawCallStats(ctx context.Context, capt *path.Capture, stats *service.Stats
 		ptObj := d.SyncNodes[pt]
 		if cmdIdx, ok := ptObj.(sync.CmdNode); ok {
 			idx := cmdIdx.Idx
-			cmd, err := Cmd(ctx, &path.Command{
+			cmd, ctx, err := Cmd(ctx, &path.Command{
 				Capture: capt,
 				Indices: []uint64(idx),
 			})

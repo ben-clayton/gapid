@@ -30,12 +30,12 @@ import (
 )
 
 // Report resolves the report for the given path.
-func Report(ctx context.Context, p *path.Report) (*service.Report, error) {
+func Report(ctx context.Context, p *path.Report) (*service.Report, context.Context, error) {
 	obj, err := database.Build(ctx, &ReportResolvable{Path: p})
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
-	return obj.(*service.Report), nil
+	return obj.(*service.Report), ctx, nil
 }
 
 func (r *ReportResolvable) newReportItem(s log.Severity, c uint64, m *stringtable.Msg) *service.ReportItemRaw {

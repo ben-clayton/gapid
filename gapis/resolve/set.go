@@ -76,7 +76,7 @@ func change(ctx context.Context, a arena.Arena, p path.Node, val interface{}) (p
 		// If we change resource data, subcommands do not affect this, so change
 		// the main comand.
 
-		oldCmds, err := NCmds(ctx, p.After.Capture, cmdIdx+1)
+		oldCmds, ctx, err := NCmds(ctx, p.After.Capture, cmdIdx+1)
 		if err != nil {
 			return nil, err
 		}
@@ -123,7 +123,7 @@ func change(ctx context.Context, a arena.Arena, p path.Node, val interface{}) (p
 		// If we change resource data, subcommands do not affect this, so change
 		// the main command.
 
-		oldCmds, err := NCmds(ctx, p.After.Capture, cmdIdx+1)
+		oldCmds, ctx, err := NCmds(ctx, p.After.Capture, cmdIdx+1)
 		if err != nil {
 			return nil, err
 		}
@@ -169,7 +169,7 @@ func change(ctx context.Context, a arena.Arena, p path.Node, val interface{}) (p
 		}
 
 		// Resolve the command list
-		oldCmds, err := NCmds(ctx, p.Capture, cmdIdx+1)
+		oldCmds, ctx, err := NCmds(ctx, p.Capture, cmdIdx+1)
 		if err != nil {
 			return nil, err
 		}
@@ -217,7 +217,7 @@ func change(ctx context.Context, a arena.Arena, p path.Node, val interface{}) (p
 		return nil, fmt.Errorf("State can not currently be mutated")
 
 	case *path.Field, *path.Parameter, *path.ArrayIndex, *path.MapIndex:
-		oldObj, err := ResolveInternal(ctx, p.Parent())
+		oldObj, ctx, err := ResolveInternal(ctx, p.Parent())
 		if err != nil {
 			return nil, err
 		}

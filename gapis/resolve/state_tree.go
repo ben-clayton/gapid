@@ -32,14 +32,14 @@ import (
 )
 
 // StateTree resolves the specified state tree path.
-func StateTree(ctx context.Context, c *path.StateTree) (*service.StateTree, error) {
+func StateTree(ctx context.Context, c *path.StateTree) (*service.StateTree, context.Context, error) {
 	id, err := database.Store(ctx, &StateTreeResolvable{Path: c.State, ArrayGroupSize: c.ArrayGroupSize})
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 	return &service.StateTree{
 		Root: &path.StateTreeNode{Tree: path.NewID(id)},
-	}, nil
+	}, ctx, nil
 }
 
 type stateTree struct {
@@ -93,29 +93,30 @@ func deref(v reflect.Value) reflect.Value {
 }
 
 // StateTreeNode resolves the specified command tree node path.
-func StateTreeNode(ctx context.Context, p *path.StateTreeNode) (*service.StateTreeNode, error) {
+func StateTreeNode(ctx context.Context, p *path.StateTreeNode) (*service.StateTreeNode, context.Context, error) {
 	boxed, err := database.Resolve(ctx, p.Tree.ID())
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
-	return stateTreeNode(ctx, boxed.(*stateTree), p)
+	n, err := stateTreeNode(ctx, boxed.(*stateTree), p)
+	return n, ctx, err
 }
 
 // StateTreeNodeForPath returns the path to the StateTreeNode representing the
 // path p.
-func StateTreeNodeForPath(ctx context.Context, p *path.StateTreeNodeForPath) (*path.StateTreeNode, error) {
+func StateTreeNodeForPath(ctx context.Context, p *path.StateTreeNodeForPath) (*path.StateTreeNode, context.Context, error) {
 	boxed, err := database.Resolve(ctx, p.Tree.ID())
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 	indices, err := stateTreeNodePath(ctx, boxed.(*stateTree), p.Member.Node())
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 	return &path.StateTreeNode{
 		Tree:    p.Tree,
 		Indices: indices,
-	}, nil
+	}, ctx, nil
 }
 
 func stateTreeNode(ctx context.Context, tree *stateTree, p *path.StateTreeNode) (*service.StateTreeNode, error) {
@@ -367,12 +368,12 @@ func stateValuePreview(ctx context.Context, v reflect.Value) (*box.Value, bool) 
 // Resolve builds and returns a *StateTree for the path.StateTreeNode.
 // Resolve implements the database.Resolver interface.
 func (r *StateTreeResolvable) Resolve(ctx context.Context) (interface{}, error) {
-	globalState, err := GlobalState(ctx, r.Path.After.GlobalStateAfter())
+	globalState, ctx, err := GlobalState(ctx, r.Path.After.GlobalStateAfter())
 	if err != nil {
 		return nil, err
 	}
 
-	rootObj, rootPath, apiID, err := state(ctx, r.Path)
+	rootObj, ctx, rootPath, apiID, err := state(ctx, r.Path)
 	if err != nil {
 		return nil, err
 	}

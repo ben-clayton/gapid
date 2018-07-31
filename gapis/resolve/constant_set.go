@@ -24,17 +24,17 @@ import (
 )
 
 // ConstantSet resolves and returns the constant set from the path p.
-func ConstantSet(ctx context.Context, p *path.ConstantSet) (*service.ConstantSet, error) {
+func ConstantSet(ctx context.Context, p *path.ConstantSet) (*service.ConstantSet, context.Context, error) {
 	apiID := api.ID(p.API.ID.ID())
 	api := api.Find(apiID)
 	if api == nil {
-		return nil, fmt.Errorf("Unknown API: %v", apiID)
+		return nil, ctx, fmt.Errorf("Unknown API: %v", apiID)
 	}
 
 	cs := api.ConstantSets()
 
 	if count := uint32(len(cs.Sets)); p.Index >= count {
-		return nil, errPathOOB(ctx, uint64(p.Index), "Index", 0, uint64(count)-1, p)
+		return nil, ctx, errPathOOB(ctx, uint64(p.Index), "Index", 0, uint64(count)-1, p)
 	}
 
 	set := cs.Sets[p.Index]
@@ -51,5 +51,5 @@ func ConstantSet(ctx context.Context, p *path.ConstantSet) (*service.ConstantSet
 		}
 	}
 
-	return out, nil
+	return out, ctx, nil
 }

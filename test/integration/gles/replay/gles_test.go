@@ -228,7 +228,7 @@ func TestMultiContextCapture(t *testing.T) {
 	c := mergeCaptures(ctx, t1, t2, t3)
 	maybeExportCapture(ctx, c)
 
-	contexts, err := resolve.Contexts(ctx, c.Contexts())
+	contexts, ctx, err := resolve.Contexts(ctx, c.Contexts())
 	assert.For(ctx, "err").ThatError(err).Succeeded()
 	assert.For(ctx, "len").That(len(contexts)).Equals(3)
 }

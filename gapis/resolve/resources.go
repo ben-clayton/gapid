@@ -29,12 +29,12 @@ import (
 )
 
 // Resources resolves all the resources used by the specified capture.
-func Resources(ctx context.Context, c *path.Capture) (*service.Resources, error) {
+func Resources(ctx context.Context, c *path.Capture) (*service.Resources, context.Context, error) {
 	obj, err := database.Build(ctx, &ResourcesResolvable{Capture: c})
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
-	return obj.(*service.Resources), nil
+	return obj.(*service.Resources), ctx, nil
 }
 
 // Resolve implements the database.Resolver interface.

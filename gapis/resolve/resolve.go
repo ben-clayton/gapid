@@ -35,29 +35,29 @@ import (
 )
 
 // Capture resolves and returns the capture from the path p.
-func Capture(ctx context.Context, p *path.Capture) (*service.Capture, error) {
+func Capture(ctx context.Context, p *path.Capture) (*service.Capture, context.Context, error) {
 	c, err := capture.ResolveFromPath(ctx, p)
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
-	return c.Service(ctx, p), nil
+	return c.Service(ctx, p), ctx, nil
 }
 
 // Device resolves and returns the device from the path p.
-func Device(ctx context.Context, p *path.Device) (*device.Instance, error) {
+func Device(ctx context.Context, p *path.Device) (*device.Instance, context.Context, error) {
 	device := bind.GetRegistry(ctx).Device(p.ID.ID())
 	if device == nil {
-		return nil, &service.ErrDataUnavailable{Reason: messages.ErrUnknownDevice(ctx)}
+		return nil, ctx, &service.ErrDataUnavailable{Reason: messages.ErrUnknownDevice(ctx)}
 	}
-	return device.Instance(), nil
+	return device.Instance(), ctx, nil
 }
 
 // DeviceTraceConfiguration resolves and returns the trace config for a device.
-func DeviceTraceConfiguration(ctx context.Context, p *path.DeviceTraceConfiguration) (*service.DeviceTraceConfiguration, error) {
+func DeviceTraceConfiguration(ctx context.Context, p *path.DeviceTraceConfiguration) (*service.DeviceTraceConfiguration, context.Context, error) {
 	c, err := trace.TraceConfiguration(ctx, p.Device)
 
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 
 	config := &service.DeviceTraceConfiguration{
@@ -77,46 +77,46 @@ func DeviceTraceConfiguration(ctx context.Context, p *path.DeviceTraceConfigurat
 			MidExecutionCaptureSupport: opt.MidExecutionCaptureSupport,
 		}
 	}
-	return config, nil
+	return config, ctx, nil
 }
 
 // ImageInfo resolves and returns the ImageInfo from the path p.
-func ImageInfo(ctx context.Context, p *path.ImageInfo) (*image.Info, error) {
+func ImageInfo(ctx context.Context, p *path.ImageInfo) (*image.Info, context.Context, error) {
 	obj, err := database.Resolve(ctx, p.ID.ID())
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 	ii, ok := obj.(*image.Info)
 	if !ok {
-		return nil, fmt.Errorf("Path %s gave %T, expected *image.Info", p, obj)
+		return nil, ctx, fmt.Errorf("Path %s gave %T, expected *image.Info", p, obj)
 	}
-	return ii, err
+	return ii, ctx, err
 }
 
 // Blob resolves and returns the byte slice from the path p.
-func Blob(ctx context.Context, p *path.Blob) ([]byte, error) {
+func Blob(ctx context.Context, p *path.Blob) ([]byte, context.Context, error) {
 	obj, err := database.Resolve(ctx, p.ID.ID())
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 	bytes, ok := obj.([]byte)
 	if !ok {
-		return nil, fmt.Errorf("Path %s gave %T, expected []byte", p, obj)
+		return nil, ctx, fmt.Errorf("Path %s gave %T, expected []byte", p, obj)
 	}
-	return bytes, nil
+	return bytes, ctx, nil
 }
 
 // Field resolves and returns the field from the path p.
-func Field(ctx context.Context, p *path.Field) (interface{}, error) {
-	obj, err := ResolveInternal(ctx, p.Parent())
+func Field(ctx context.Context, p *path.Field) (interface{}, context.Context, error) {
+	obj, ctx, err := ResolveInternal(ctx, p.Parent())
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 	v, err := field(ctx, reflect.ValueOf(obj), p.Name, p)
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
-	return v.Interface(), nil
+	return v.Interface(), ctx, nil
 }
 
 func field(ctx context.Context, s reflect.Value, name string, p path.Node) (reflect.Value, error) {
@@ -156,10 +156,10 @@ func field(ctx context.Context, s reflect.Value, name string, p path.Node) (refl
 }
 
 // ArrayIndex resolves and returns the array or slice element from the path p.
-func ArrayIndex(ctx context.Context, p *path.ArrayIndex) (interface{}, error) {
-	obj, err := ResolveInternal(ctx, p.Parent())
+func ArrayIndex(ctx context.Context, p *path.ArrayIndex) (interface{}, context.Context, error) {
+	obj, ctx, err := ResolveInternal(ctx, p.Parent())
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 
 	a := reflect.ValueOf(obj)
@@ -167,20 +167,20 @@ func ArrayIndex(ctx context.Context, p *path.ArrayIndex) (interface{}, error) {
 	case box.IsMemorySlice(a.Type()):
 		slice := box.AsMemorySlice(a)
 		if count := slice.Count(); p.Index >= count {
-			return nil, errPathOOB(ctx, p.Index, "Index", 0, count-1, p)
+			return nil, ctx, errPathOOB(ctx, p.Index, "Index", 0, count-1, p)
 		}
-		return slice.ISlice(p.Index, p.Index+1), nil
+		return slice.ISlice(p.Index, p.Index+1), ctx, nil
 
 	default:
 		switch a.Kind() {
 		case reflect.Array, reflect.Slice, reflect.String:
 			if count := uint64(a.Len()); p.Index >= count {
-				return nil, errPathOOB(ctx, p.Index, "Index", 0, count-1, p)
+				return nil, ctx, errPathOOB(ctx, p.Index, "Index", 0, count-1, p)
 			}
-			return a.Index(int(p.Index)).Interface(), nil
+			return a.Index(int(p.Index)).Interface(), ctx, nil
 
 		default:
-			return nil, &service.ErrInvalidPath{
+			return nil, ctx, &service.ErrInvalidPath{
 				Reason: messages.ErrTypeNotArrayIndexable(ctx, typename(a.Type())),
 				Path:   p.Path(),
 			}
@@ -189,30 +189,30 @@ func ArrayIndex(ctx context.Context, p *path.ArrayIndex) (interface{}, error) {
 }
 
 // Slice resolves and returns the subslice from the path p.
-func Slice(ctx context.Context, p *path.Slice) (interface{}, error) {
-	obj, err := ResolveInternal(ctx, p.Parent())
+func Slice(ctx context.Context, p *path.Slice) (interface{}, context.Context, error) {
+	obj, ctx, err := ResolveInternal(ctx, p.Parent())
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 	a := reflect.ValueOf(obj)
 	switch {
 	case box.IsMemorySlice(a.Type()):
 		slice := box.AsMemorySlice(a)
 		if count := slice.Count(); p.Start >= count || p.End > count {
-			return nil, errPathSliceOOB(ctx, p.Start, p.End, count, p)
+			return nil, ctx, errPathSliceOOB(ctx, p.Start, p.End, count, p)
 		}
-		return slice.ISlice(p.Start, p.End), nil
+		return slice.ISlice(p.Start, p.End), ctx, nil
 
 	default:
 		switch a.Kind() {
 		case reflect.Array, reflect.Slice, reflect.String:
 			if int(p.Start) >= a.Len() || int(p.End) > a.Len() {
-				return nil, errPathSliceOOB(ctx, p.Start, p.End, uint64(a.Len()), p)
+				return nil, ctx, errPathSliceOOB(ctx, p.Start, p.End, uint64(a.Len()), p)
 			}
-			return a.Slice(int(p.Start), int(p.End)).Interface(), nil
+			return a.Slice(int(p.Start), int(p.End)).Interface(), ctx, nil
 
 		default:
-			return nil, &service.ErrInvalidPath{
+			return nil, ctx, &service.ErrInvalidPath{
 				Reason: messages.ErrTypeNotSliceable(ctx, typename(a.Type())),
 				Path:   p.Path(),
 			}
@@ -221,15 +221,15 @@ func Slice(ctx context.Context, p *path.Slice) (interface{}, error) {
 }
 
 // MapIndex resolves and returns the map value from the path p.
-func MapIndex(ctx context.Context, p *path.MapIndex) (interface{}, error) {
-	obj, err := ResolveInternal(ctx, p.Parent())
+func MapIndex(ctx context.Context, p *path.MapIndex) (interface{}, context.Context, error) {
+	obj, ctx, err := ResolveInternal(ctx, p.Parent())
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 
 	d := dictionary.From(obj)
 	if d == nil {
-		return nil, &service.ErrInvalidPath{
+		return nil, ctx, &service.ErrInvalidPath{
 			Reason: messages.ErrTypeNotMapIndexable(ctx, typename(reflect.TypeOf(obj))),
 			Path:   p.Path(),
 		}
@@ -237,7 +237,7 @@ func MapIndex(ctx context.Context, p *path.MapIndex) (interface{}, error) {
 
 	key, ok := convert(reflect.ValueOf(p.KeyValue(ctx)), d.KeyTy())
 	if !ok {
-		return nil, &service.ErrInvalidPath{
+		return nil, ctx, &service.ErrInvalidPath{
 			Reason: messages.ErrIncorrectMapKeyType(ctx,
 				typename(reflect.TypeOf(p.KeyValue(ctx))), // got
 				typename(d.KeyTy())),                      // expected
@@ -247,35 +247,35 @@ func MapIndex(ctx context.Context, p *path.MapIndex) (interface{}, error) {
 
 	val, ok := d.Lookup(ctx, key.Interface())
 	if !ok {
-		return nil, &service.ErrInvalidPath{
+		return nil, ctx, &service.ErrInvalidPath{
 			Reason: messages.ErrMapKeyDoesNotExist(ctx, key.Interface()),
 			Path:   p.Path(),
 		}
 	}
-	return val, nil
+	return val, ctx, nil
 }
 
 // memoryLayout resolves the memory layout for the capture of the given path.
-func memoryLayout(ctx context.Context, p path.Node) (*device.MemoryLayout, error) {
+func memoryLayout(ctx context.Context, p path.Node) (*device.MemoryLayout, context.Context, error) {
 	cp := path.FindCapture(p)
 	if cp == nil {
-		return nil, errPathNoCapture(ctx, p)
+		return nil, ctx, errPathNoCapture(ctx, p)
 	}
 
 	c, err := capture.ResolveFromPath(ctx, cp)
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 
-	return c.Header.ABI.MemoryLayout, nil
+	return c.Header.ABI.MemoryLayout, ctx, nil
 }
 
 // ResolveService resolves and returns the object, value or memory at the path p,
 // converting the final result to the service representation.
-func ResolveService(ctx context.Context, p path.Node) (interface{}, error) {
-	v, err := ResolveInternal(ctx, p)
+func ResolveService(ctx context.Context, p path.Node) (interface{}, context.Context, error) {
+	v, ctx, err := ResolveInternal(ctx, p)
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 	return internalToService(ctx, v)
 }
@@ -283,7 +283,7 @@ func ResolveService(ctx context.Context, p path.Node) (interface{}, error) {
 // ResolveInternal resolves and returns the object, value or memory at the path
 // p without converting the potentially internal result to a service
 // representation.
-func ResolveInternal(ctx context.Context, p path.Node) (interface{}, error) {
+func ResolveInternal(ctx context.Context, p path.Node) (interface{}, context.Context, error) {
 	switch p := p.(type) {
 	case *path.ArrayIndex:
 		return ArrayIndex(ctx, p)
@@ -356,7 +356,7 @@ func ResolveInternal(ctx context.Context, p path.Node) (interface{}, error) {
 	case *path.Stats:
 		return Stats(ctx, p)
 	default:
-		return nil, fmt.Errorf("Unknown path type %T", p)
+		return nil, ctx, fmt.Errorf("Unknown path type %T", p)
 	}
 }
 

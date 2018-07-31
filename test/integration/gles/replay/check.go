@@ -76,7 +76,7 @@ func checkReport(ctx context.Context, c *path.Capture, d *device.Instance, cmds 
 		defer done.Done()
 	}
 
-	report, err := resolve.Report(ctx, c.Report(path.NewDevice(d.ID.ID()), nil))
+	report, ctx, err := resolve.Report(ctx, c.Report(path.NewDevice(d.ID.ID()), nil))
 	assert.For(ctx, "err").ThatError(err).Succeeded()
 
 	got := []string{}
@@ -120,14 +120,14 @@ func checkTextureBuffer(ctx context.Context, c *path.Capture, d *device.Instance
 
 	cmdPath := c.Command(uint64(after))
 
-	cmd, err := resolve.Cmd(ctx, cmdPath)
+	cmd, ctx, err := resolve.Cmd(ctx, cmdPath)
 	if !assert.For(ctx, "resolve cmd").ThatError(err).Succeeded() {
 		return
 	}
 
 	thread := cmd.Thread()
 
-	globalState, err := resolve.GlobalState(ctx, cmdPath.GlobalStateAfter())
+	globalState, ctx, err := resolve.GlobalState(ctx, cmdPath.GlobalStateAfter())
 	if !assert.For(ctx, "resolve global state").ThatError(err).Succeeded() {
 		return
 	}

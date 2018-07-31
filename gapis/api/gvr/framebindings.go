@@ -27,7 +27,7 @@ import (
 
 func getFramebuffer(ctx context.Context, id api.CmdID) (gles.FramebufferId, error) {
 	c := capture.Get(ctx)
-	cmds, err := resolve.Cmds(ctx, c)
+	cmds, ctx, err := resolve.Cmds(ctx, c)
 	if err != nil {
 		return 0, err
 	}
@@ -58,7 +58,7 @@ func getFrameBindings(ctx context.Context, c *path.Capture) (*frameBindings, err
 func (r *FrameBindingsResolvable) Resolve(ctx context.Context) (interface{}, error) {
 	ctx = capture.Put(ctx, r.Capture)
 
-	cmds, err := resolve.Cmds(ctx, r.Capture)
+	cmds, ctx, err := resolve.Cmds(ctx, r.Capture)
 	if err != nil {
 		return nil, err
 	}

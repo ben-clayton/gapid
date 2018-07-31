@@ -45,7 +45,7 @@ func (s *State) Root(ctx context.Context, p *path.State) (path.Node, error) {
 	if p.Context == nil || !p.Context.IsValid() {
 		return p, nil
 	}
-	c, err := resolve.Context(ctx, p.After.Capture.Context(p.Context.ID()))
+	c, ctx, err := resolve.Context(ctx, p.After.Capture.Context(p.Context.ID()))
 	if err != nil {
 		return nil, err
 	}

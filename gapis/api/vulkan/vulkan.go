@@ -154,7 +154,7 @@ func (API) ResolveSynchronization(ctx context.Context, d *sync.Data, c *path.Cap
 	if err != nil {
 		return err
 	}
-	cmds, err := resolve.Cmds(ctx, c)
+	cmds, ctx, err := resolve.Cmds(ctx, c)
 	if err != nil {
 		return err
 	}
@@ -387,7 +387,7 @@ func dependencySync(ctx context.Context, d *sync.Data, c *path.Capture) error {
 	if err != nil {
 		return err
 	}
-	cmds, err := resolve.Cmds(ctx, c)
+	cmds, ctx, err := resolve.Cmds(ctx, c)
 	if err != nil {
 		return err
 	}

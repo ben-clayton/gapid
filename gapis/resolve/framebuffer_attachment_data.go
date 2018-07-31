@@ -35,7 +35,7 @@ func (r *FramebufferAttachmentBytesResolvable) Resolve(ctx context.Context) (int
 		Capture: c,
 	}
 
-	after, err := Cmd(ctx, r.After)
+	after, ctx, err := Cmd(ctx, r.After)
 	if err != nil {
 		return nil, err
 	}

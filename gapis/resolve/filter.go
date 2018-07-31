@@ -47,7 +47,7 @@ func buildFilter(ctx context.Context, p *path.Capture, f *path.CommandFilter, sd
 		},
 	}
 	if f := f.GetContext(); f.IsValid() {
-		c, err := Context(ctx, p.Context(f.ID()))
+		c, ctx, err := Context(ctx, p.Context(f.ID()))
 		if err != nil {
 			return nil, err
 		}

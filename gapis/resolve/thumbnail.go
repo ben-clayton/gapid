@@ -27,7 +27,7 @@ import (
 )
 
 // Thumbnail resolves and returns the thumbnail from the path p.
-func Thumbnail(ctx context.Context, p *path.Thumbnail) (*image.Info, error) {
+func Thumbnail(ctx context.Context, p *path.Thumbnail) (*image.Info, context.Context, error) {
 	switch parent := p.Parent().(type) {
 	case *path.Command:
 		return CommandThumbnail(ctx, p.DesiredMaxWidth, p.DesiredMaxHeight, p.DesiredFormat, p.DisableOptimization, parent)
@@ -36,13 +36,13 @@ func Thumbnail(ctx context.Context, p *path.Thumbnail) (*image.Info, error) {
 	case *path.ResourceData:
 		return ResourceDataThumbnail(ctx, p.DesiredMaxWidth, p.DesiredMaxHeight, p.DesiredFormat, parent)
 	default:
-		return nil, fmt.Errorf("Unexpected Thumbnail parent %T", parent)
+		return nil, ctx, fmt.Errorf("Unexpected Thumbnail parent %T", parent)
 	}
 }
 
 // CommandThumbnail resolves and returns the thumbnail for the framebuffer at p.
-func CommandThumbnail(ctx context.Context, w, h uint32, f *image.Format, noOpt bool, p *path.Command) (*image.Info, error) {
-	imageInfoPath, err := FramebufferAttachment(ctx,
+func CommandThumbnail(ctx context.Context, w, h uint32, f *image.Format, noOpt bool, p *path.Command) (*image.Info, context.Context, error) {
+	imageInfoPath, ctx, err := FramebufferAttachment(ctx,
 		&service.ReplaySettings{DisableReplayOptimization: noOpt},
 		p,
 		api.FramebufferAttachment_Color0,
@@ -56,7 +56,7 @@ func CommandThumbnail(ctx context.Context, w, h uint32, f *image.Format, noOpt b
 		},
 	)
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 
 	var boxedImageInfo interface{}
@@ -66,17 +66,17 @@ func CommandThumbnail(ctx context.Context, w, h uint32, f *image.Format, noOpt b
 		boxedImageInfo, err = Get(ctx, imageInfoPath.Path())
 	}
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 
-	return boxedImageInfo.(*image.Info), nil
+	return boxedImageInfo.(*image.Info), ctx, nil
 }
 
 // CommandTreeNodeThumbnail resolves and returns the thumbnail for the framebuffer at p.
-func CommandTreeNodeThumbnail(ctx context.Context, w, h uint32, f *image.Format, noOpt bool, p *path.CommandTreeNode) (*image.Info, error) {
+func CommandTreeNodeThumbnail(ctx context.Context, w, h uint32, f *image.Format, noOpt bool, p *path.CommandTreeNode) (*image.Info, context.Context, error) {
 	boxedCmdTree, err := database.Resolve(ctx, p.Tree.ID())
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 
 	cmdTree := boxedCmdTree.(*commandTree)
@@ -99,24 +99,24 @@ func CommandTreeNodeThumbnail(ctx context.Context, w, h uint32, f *image.Format,
 }
 
 // ResourceDataThumbnail resolves and returns the thumbnail for the resource at p.
-func ResourceDataThumbnail(ctx context.Context, w, h uint32, f *image.Format, p *path.ResourceData) (*image.Info, error) {
-	obj, err := ResolveInternal(ctx, p)
+func ResourceDataThumbnail(ctx context.Context, w, h uint32, f *image.Format, p *path.ResourceData) (*image.Info, context.Context, error) {
+	obj, ctx, err := ResolveInternal(ctx, p)
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 
 	t, ok := obj.(image.Thumbnailer)
 	if !ok {
-		return nil, fmt.Errorf("Type %T does not support thumbnailing", obj)
+		return nil, ctx, fmt.Errorf("Type %T does not support thumbnailing", obj)
 	}
 
 	img, err := t.Thumbnail(ctx, w, h, 1)
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 
 	if img == nil || img.Format == nil || img.Bytes == nil {
-		return nil, &service.ErrDataUnavailable{Reason: messages.ErrNoTextureData(ctx, "")}
+		return nil, ctx, &service.ErrDataUnavailable{Reason: messages.ErrNoTextureData(ctx, "")}
 	}
 
 	if f != nil {
@@ -124,7 +124,7 @@ func ResourceDataThumbnail(ctx context.Context, w, h uint32, f *image.Format, p 
 		if img.Format.Key() != f.Key() {
 			img, err = img.Convert(ctx, f)
 			if err != nil {
-				return nil, err
+				return nil, ctx, err
 			}
 		}
 	}
@@ -155,8 +155,9 @@ func ResourceDataThumbnail(ctx context.Context, w, h uint32, f *image.Format, p 
 
 	if targetWidth == img.Width && targetHeight == img.Height {
 		// Image is already at requested target size.
-		return img, err
+		return img, ctx, err
 	}
 
-	return img.Resize(ctx, targetWidth, targetHeight, 1)
+	img, err = img.Resize(ctx, targetWidth, targetHeight, 1)
+	return img, ctx, err
 }

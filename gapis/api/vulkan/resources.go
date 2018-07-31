@@ -768,7 +768,7 @@ func (shader ShaderModuleObjectʳ) SetResourceData(
 	cmdIdx := at.Indices[0]
 
 	// Dirty. TODO: Make separate type for getting info for a single resource.
-	resources, err := resolve.Resources(ctx, at.Capture)
+	resources, ctx, err := resolve.Resources(ctx, at.Capture)
 	if err != nil {
 		return err
 	}

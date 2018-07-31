@@ -62,7 +62,7 @@ func (r *SynchronizationResolvable) Resolve(ctx context.Context) (interface{}, e
 }
 
 func addCallerGroups(ctx context.Context, d *sync.Data, c *path.Capture) error {
-	cmds, err := Cmds(ctx, c)
+	cmds, ctx, err := Cmds(ctx, c)
 	if err != nil {
 		return err
 	}

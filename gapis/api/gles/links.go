@@ -25,13 +25,13 @@ import (
 // context, and the context at p.
 func objects(ctx context.Context, p path.Node) (*path.Field, Contextʳ, error) {
 	if cmdPath := path.FindCommand(p); cmdPath != nil {
-		cmd, err := resolve.Cmd(ctx, cmdPath)
+		cmd, ctx, err := resolve.Cmd(ctx, cmdPath)
 		if err != nil {
 			return nil, NilContextʳ, err
 		}
 		thread := cmd.Thread()
 
-		stateObj, err := resolve.State(ctx, cmdPath.StateAfter())
+		stateObj, ctx, err := resolve.State(ctx, cmdPath.StateAfter())
 		if err != nil {
 			return nil, NilContextʳ, err
 		}
@@ -140,7 +140,7 @@ func (o UniformIndex) Link(ctx context.Context, p path.Node) (path.Node, error) 
 		return nil, err
 	}
 
-	cmd, err := resolve.Cmd(ctx, path.FindCommand(p))
+	cmd, ctx, err := resolve.Cmd(ctx, path.FindCommand(p))
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +176,7 @@ func (o UniformLocation) Link(ctx context.Context, p path.Node) (path.Node, erro
 		return nil, err
 	}
 
-	cmd, err := resolve.Cmd(ctx, path.FindCommand(p))
+	cmd, ctx, err := resolve.Cmd(ctx, path.FindCommand(p))
 	if err != nil {
 		return nil, err
 	}

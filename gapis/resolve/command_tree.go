@@ -39,14 +39,14 @@ type CmdGroupData struct {
 }
 
 // CommandTree resolves the specified command tree path.
-func CommandTree(ctx context.Context, c *path.CommandTree) (*service.CommandTree, error) {
+func CommandTree(ctx context.Context, c *path.CommandTree) (*service.CommandTree, context.Context, error) {
 	id, err := database.Store(ctx, &CommandTreeResolvable{Path: c})
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 	return &service.CommandTree{
 		Root: &path.CommandTreeNode{Tree: path.NewID(id)},
-	}, nil
+	}, ctx, nil
 }
 
 type commandTree struct {
@@ -91,10 +91,10 @@ func (t *commandTree) indices(id api.CmdID) []uint64 {
 }
 
 // CommandTreeNode resolves the specified command tree node path.
-func CommandTreeNode(ctx context.Context, c *path.CommandTreeNode) (*service.CommandTreeNode, error) {
+func CommandTreeNode(ctx context.Context, c *path.CommandTreeNode) (*service.CommandTreeNode, context.Context, error) {
 	boxed, err := database.Resolve(ctx, c.Tree.ID())
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 
 	cmdTree := boxed.(*commandTree)
@@ -106,7 +106,7 @@ func CommandTreeNode(ctx context.Context, c *path.CommandTreeNode) (*service.Com
 			Representation: cmdTree.path.Capture.Command(item[0], item[1:]...),
 			NumChildren:    0, // TODO: Subcommands
 			Commands:       cmdTree.path.Capture.SubCommandRange(item, item),
-		}, nil
+		}, ctx, nil
 	case api.CmdIDGroup:
 		representation := cmdTree.path.Capture.Command(uint64(item.Range.Last()))
 		if data, ok := item.UserData.(*CmdGroupData); ok {
@@ -121,7 +121,7 @@ func CommandTreeNode(ctx context.Context, c *path.CommandTreeNode) (*service.Com
 				Commands:       cmdTree.path.Capture.CommandRange(uint64(item.Range.First()), uint64(item.Range.Last())),
 				Group:          item.Name,
 				NumCommands:    item.DeepCount(func(g api.CmdIDGroup) bool { return true /* TODO: Subcommands */ }),
-			}, nil
+			}, ctx, nil
 		}
 		// Is a CmdIDGroup under SubCmdRoot, contains only Subcommands
 		startID := append(absID, uint64(item.Range.First()))
@@ -133,7 +133,7 @@ func CommandTreeNode(ctx context.Context, c *path.CommandTreeNode) (*service.Com
 			Commands:       cmdTree.path.Capture.SubCommandRange(startID, endID),
 			Group:          item.Name,
 			NumCommands:    item.DeepCount(func(g api.CmdIDGroup) bool { return true /* TODO: Subcommands */ }),
-		}, nil
+		}, ctx, nil
 
 	case api.SubCmdRoot:
 		count := uint64(1)
@@ -148,7 +148,7 @@ func CommandTreeNode(ctx context.Context, c *path.CommandTreeNode) (*service.Com
 			Commands:       cmdTree.path.Capture.SubCommandRange(item.Id, item.Id),
 			Group:          g,
 			NumCommands:    count,
-		}, nil
+		}, ctx, nil
 	default:
 		panic(fmt.Errorf("Unexpected type: %T, cmdTree.index(c.Indices): (%v, %v), indices: %v",
 			item, rawItem, absID, c.Indices))
@@ -157,23 +157,23 @@ func CommandTreeNode(ctx context.Context, c *path.CommandTreeNode) (*service.Com
 
 // CommandTreeNodeForCommand returns the path to the CommandTreeNode that
 // represents the specified command.
-func CommandTreeNodeForCommand(ctx context.Context, p *path.CommandTreeNodeForCommand) (*path.CommandTreeNode, error) {
+func CommandTreeNodeForCommand(ctx context.Context, p *path.CommandTreeNodeForCommand) (*path.CommandTreeNode, context.Context, error) {
 	boxed, err := database.Resolve(ctx, p.Tree.ID())
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 
 	cmdTree := boxed.(*commandTree)
 
 	cmdIdx := p.Command.Indices[0]
 	if len(p.Command.Indices) > 1 {
-		return nil, fmt.Errorf("Subcommands currently not supported for Command Tree") // TODO: Subcommands
+		return nil, ctx, fmt.Errorf("Subcommands currently not supported for Command Tree") // TODO: Subcommands
 	}
 
 	return &path.CommandTreeNode{
 		Tree:    p.Tree,
 		Indices: cmdTree.indices(api.CmdID(cmdIdx)),
-	}, nil
+	}, ctx, nil
 }
 
 // Resolve builds and returns a *commandTree for the path.CommandTreeNode.
@@ -276,7 +276,7 @@ func (r *CommandTreeResolvable) Resolve(ctx context.Context) (interface{}, error
 	}
 
 	if p.GroupByDrawCall || p.GroupByFrame {
-		events, err := Events(ctx, &path.Events{
+		events, ctx, err := Events(ctx, &path.Events{
 			Capture:            p.Capture,
 			Filter:             p.Filter,
 			DrawCalls:          true,

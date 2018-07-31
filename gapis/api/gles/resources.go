@@ -315,7 +315,7 @@ func (s Shaderʳ) SetResourceData(
 
 	// Dirty. TODO: Make separate type for getting info for a single resource.
 	capturePath := at.Capture
-	resources, err := resolve.Resources(ctx, capturePath)
+	resources, ctx, err := resolve.Resources(ctx, capturePath)
 	if err != nil {
 		return err
 	}

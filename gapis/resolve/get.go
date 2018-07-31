@@ -17,7 +17,6 @@ package resolve
 import (
 	"context"
 
-	"github.com/google/gapid/gapis/capture"
 	"github.com/google/gapid/gapis/database"
 	"github.com/google/gapid/gapis/service/path"
 )
@@ -29,8 +28,6 @@ func Get(ctx context.Context, p *path.Any) (interface{}, error) {
 
 // Resolve implements the database.Resolver interface.
 func (r *GetResolvable) Resolve(ctx context.Context) (interface{}, error) {
-	if c := path.FindCapture(r.Path.Node()); c != nil {
-		ctx = capture.Put(ctx, c)
-	}
-	return ResolveService(ctx, r.Path.Node())
+	val, _, err := ResolveService(ctx, r.Path.Node())
+	return val, err
 }

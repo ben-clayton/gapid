@@ -25,23 +25,25 @@ import (
 )
 
 // As resolves and returns the object at p transformed to the requested type.
-func As(ctx context.Context, p *path.As) (interface{}, error) {
-	o, err := ResolveInternal(ctx, p.Parent())
+func As(ctx context.Context, p *path.As) (interface{}, context.Context, error) {
+	o, ctx, err := ResolveInternal(ctx, p.Parent())
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 	switch to := p.To.(type) {
 	case *path.As_ImageFormat:
 		switch o := o.(type) {
 		case image.Convertable:
-			return o.ConvertTo(ctx, to.ImageFormat)
+			v, e := o.ConvertTo(ctx, to.ImageFormat)
+			return v, ctx, e
 		}
 	case *path.As_VertexBufferFormat:
 		f := to.VertexBufferFormat
 		switch o := o.(type) {
 		case *api.Mesh:
-			return o.ConvertTo(ctx, f)
+			v, e := o.ConvertTo(ctx, f)
+			return v, ctx, e
 		}
 	}
-	return nil, &service.ErrDataUnavailable{Reason: messages.ErrUnsupportedConversion(ctx)}
+	return nil, ctx, &service.ErrDataUnavailable{Reason: messages.ErrUnsupportedConversion(ctx)}
 }

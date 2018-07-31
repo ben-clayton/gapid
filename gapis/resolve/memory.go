@@ -29,39 +29,39 @@ import (
 )
 
 // Memory resolves and returns the memory from the path p.
-func Memory(ctx context.Context, p *path.Memory) (*service.Memory, error) {
+func Memory(ctx context.Context, p *path.Memory) (*service.Memory, context.Context, error) {
 	ctx = capture.Put(ctx, path.FindCapture(p))
 
 	cmdIdx := p.After.Indices[0]
 	fullCmdIdx := p.After.Indices
 
-	allCmds, err := Cmds(ctx, path.FindCapture(p))
+	allCmds, ctx, err := Cmds(ctx, path.FindCapture(p))
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 
 	sd, err := SyncData(ctx, path.FindCapture(p))
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 
 	cmds, err := sync.MutationCmdsFor(ctx, path.FindCapture(p), sd, allCmds, api.CmdID(cmdIdx), fullCmdIdx[1:], true)
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 
 	defer analytics.SendTiming("resolve", "memory")(analytics.Count(len(cmds)))
 
 	s, err := capture.NewState(ctx)
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 	err = api.ForeachCmd(ctx, cmds[:len(cmds)-1], func(ctx context.Context, id api.CmdID, cmd api.Cmd) error {
 		cmd.Mutate(ctx, id, s, nil)
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 
 	r := memory.Range{Base: p.Address, Size: p.Size}
@@ -87,7 +87,7 @@ func Memory(ctx context.Context, p *path.Memory) (*service.Memory, error) {
 	// Check whether the requested pool was ever created.
 	pool, err := s.Memory.Get(memory.PoolID(p.Pool))
 	if err != nil {
-		return nil, &service.ErrDataUnavailable{Reason: messages.ErrInvalidMemoryPool(ctx, p.Pool)}
+		return nil, ctx, &service.ErrDataUnavailable{Reason: messages.ErrInvalidMemoryPool(ctx, p.Pool)}
 	}
 
 	slice := pool.Slice(r)
@@ -100,7 +100,7 @@ func Memory(ctx context.Context, p *path.Memory) (*service.Memory, error) {
 	if !p.ExcludeData && slice.Size() > 0 {
 		data = make([]byte, slice.Size())
 		if err := slice.Get(ctx, 0, data); err != nil {
-			return nil, err
+			return nil, ctx, err
 		}
 	}
 
@@ -109,5 +109,5 @@ func Memory(ctx context.Context, p *path.Memory) (*service.Memory, error) {
 		Reads:    service.NewMemoryRanges(reads),
 		Writes:   service.NewMemoryRanges(writes),
 		Observed: service.NewMemoryRanges(observed),
-	}, nil
+	}, ctx, nil
 }

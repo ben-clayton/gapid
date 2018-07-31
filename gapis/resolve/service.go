@@ -25,24 +25,25 @@ import (
 	"github.com/google/gapid/gapis/service/path"
 )
 
-func internalToService(ctx context.Context, v interface{}) (interface{}, error) {
+func internalToService(ctx context.Context, v interface{}) (interface{}, context.Context, error) {
 	switch v := v.(type) {
 	case api.Cmd:
-		return api.CmdToService(ctx, v)
+		val, err := api.CmdToService(ctx, v)
+		return val, ctx, err
 	case []*api.ContextInfo:
 		out := &service.Contexts{List: make([]*path.Context, len(v))}
 		for i, c := range v {
 			out.List[i] = c.Path
 		}
-		return out, nil
+		return out, ctx, nil
 	case *api.ContextInfo:
 		return &service.Context{
 			Name:     v.Name,
 			API:      path.NewAPI(id.ID(v.API)),
 			Priority: uint32(v.Priority),
-		}, nil
+		}, ctx, nil
 	default:
-		return v, nil
+		return v, ctx, nil
 	}
 }
 

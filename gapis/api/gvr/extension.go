@@ -76,7 +76,7 @@ func isReprojectionContext(ctx context.Context, p *path.Context) bool {
 	if p == nil {
 		return false
 	}
-	c, err := resolve.Context(ctx, p)
+	c, ctx, err := resolve.Context(ctx, p)
 	if c == nil || err != nil {
 		return false
 	}
@@ -88,7 +88,7 @@ func getRenderContextID(ctx context.Context, p *path.Contexts) *api.ContextID {
 	if p == nil {
 		return nil
 	}
-	ctxs, err := resolve.Contexts(ctx, p)
+	ctxs, ctx, err := resolve.Contexts(ctx, p)
 	if err != nil {
 		return nil
 	}

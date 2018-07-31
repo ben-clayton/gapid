@@ -31,17 +31,17 @@ import (
 )
 
 // Contexts resolves the list of contexts belonging to a capture.
-func Contexts(ctx context.Context, p *path.Contexts) ([]*api.ContextInfo, error) {
+func Contexts(ctx context.Context, p *path.Contexts) ([]*api.ContextInfo, context.Context, error) {
 	obj, err := database.Build(ctx, &ContextListResolvable{Capture: p.Capture})
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
-	return obj.([]*api.ContextInfo), nil
+	return obj.([]*api.ContextInfo), ctx, nil
 }
 
 // ContextsByID resolves the list of contexts belonging to a capture.
 func ContextsByID(ctx context.Context, p *path.Contexts) (map[api.ContextID]*api.ContextInfo, error) {
-	ctxs, err := Contexts(ctx, p)
+	ctxs, ctx, err := Contexts(ctx, p)
 	if err != nil {
 		return nil, err
 	}
@@ -53,18 +53,18 @@ func ContextsByID(ctx context.Context, p *path.Contexts) (map[api.ContextID]*api
 }
 
 // Context resolves the single context.
-func Context(ctx context.Context, p *path.Context) (*api.ContextInfo, error) {
-	contexts, err := Contexts(ctx, p.Capture.Contexts())
+func Context(ctx context.Context, p *path.Context) (*api.ContextInfo, context.Context, error) {
+	contexts, ctx, err := Contexts(ctx, p.Capture.Contexts())
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 	id := api.ContextID(p.ID.ID())
 	for _, c := range contexts {
 		if c.ID == id {
-			return c, nil
+			return c, ctx, nil
 		}
 	}
-	return nil, &service.ErrInvalidPath{
+	return nil, ctx, &service.ErrInvalidPath{
 		Reason: messages.ErrContextDoesNotExist(ctx, p.ID),
 		Path:   p.Path(),
 	}

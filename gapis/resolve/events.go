@@ -25,20 +25,20 @@ import (
 )
 
 // Events resolves and returns the event list from the path p.
-func Events(ctx context.Context, p *path.Events) (*service.Events, error) {
+func Events(ctx context.Context, p *path.Events) (*service.Events, context.Context, error) {
 	c, err := capture.ResolveFromPath(ctx, p.Capture)
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 
 	sd, err := SyncData(ctx, p.Capture)
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 
 	filter, err := buildFilter(ctx, p.Capture, p.Filter, sd)
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 
 	// Add any extension event filters
@@ -201,5 +201,5 @@ func Events(ctx context.Context, p *path.Events) (*service.Events, error) {
 		return nil
 	})
 
-	return &service.Events{List: events}, nil
+	return &service.Events{List: events}, ctx, nil
 }
