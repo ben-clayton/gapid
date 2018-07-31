@@ -601,10 +601,10 @@ func (qei *queueExecutionState) beginRenderPass(ctx context.Context,
 	attStoreSubpass := map[uint32]uint32{}
 	attStoreAttInfo := map[uint32]*subpassAttachmentInfo{}
 	recordAttachment := func(ai, si uint32) *subpassAttachmentInfo {
-		viewObj := fb.ImageAttachments().Get(ai)
+		viewObj := fb.ImageAttachments().Get(ctx, ai)
 		imgObj := viewObj.Image()
 		imgLayout, imgData := vb.getImageLayoutAndData(ctx, bh, imgObj.VulkanHandle())
-		attDesc := rp.AttachmentDescriptions().Get(ai)
+		attDesc := rp.AttachmentDescriptions().Get(ctx, ai)
 		fullImageData := false
 		switch viewObj.Type() {
 		case VkImageViewType_VK_IMAGE_VIEW_TYPE_2D,
@@ -638,7 +638,7 @@ func (qei *queueExecutionState) beginRenderPass(ctx context.Context,
 	}()
 
 	for _, subpass := range rp.SubpassDescriptions().Keys() {
-		desc := rp.SubpassDescriptions().Get(subpass)
+		desc := rp.SubpassDescriptions().Get(ctx, subpass)
 		qei.subpasses = append(qei.subpasses, subpassInfo{})
 		if subpass != uint32(len(qei.subpasses)-1) {
 			log.E(ctx, "FootprintBuilder: Cannot get subpass info, subpass: %v, length of info: %v",
@@ -691,10 +691,10 @@ func (qei *queueExecutionState) beginRenderPass(ctx context.Context,
 		if !desc.DepthStencilAttachment().IsNil() {
 			dsAi := desc.DepthStencilAttachment().Attachment()
 			if dsAi != vkAttachmentUnused {
-				viewObj := fb.ImageAttachments().Get(dsAi)
+				viewObj := fb.ImageAttachments().Get(ctx, dsAi)
 				imgObj := viewObj.Image()
 				imgLayout, imgData := vb.getImageLayoutAndData(ctx, bh, imgObj.VulkanHandle())
-				attDesc := rp.AttachmentDescriptions().Get(dsAi)
+				attDesc := rp.AttachmentDescriptions().Get(ctx, dsAi)
 				fullImageData := false
 				switch viewObj.Type() {
 				case VkImageViewType_VK_IMAGE_VIEW_TYPE_2D,
@@ -1058,7 +1058,7 @@ func (ds *descriptorSet) writeDescriptors(ctx context.Context,
 			if write.DescriptorType() != VkDescriptorType_VK_DESCRIPTOR_TYPE_SAMPLER &&
 				read(ctx, bh, vkHandle(imageInfo.ImageView())) {
 				vkView := imageInfo.ImageView()
-				vkImg = GetState(s).ImageViews().Get(vkView).Image().VulkanHandle()
+				vkImg = GetState(s).ImageViews().Get(ctx, vkView).Image().VulkanHandle()
 			}
 			if (write.DescriptorType() == VkDescriptorType_VK_DESCRIPTOR_TYPE_SAMPLER ||
 				write.DescriptorType() == VkDescriptorType_VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) &&
@@ -1092,8 +1092,8 @@ func (ds *descriptorSet) writeDescriptors(ctx context.Context,
 		for _, vkBufView := range write.PTexelBufferView().Slice(0, count, l).MustRead(ctx, cmd, s, nil) {
 			updateDstForOverflow()
 			read(ctx, bh, vkHandle(vkBufView))
-			bufView := GetState(s).BufferViews().Get(vkBufView)
-			vkBuf := GetState(s).BufferViews().Get(vkBufView).Buffer().VulkanHandle()
+			bufView := GetState(s).BufferViews().Get(ctx, vkBufView)
+			vkBuf := GetState(s).BufferViews().Get(ctx, vkBufView).Buffer().VulkanHandle()
 			ds.setDescriptor(ctx, bh, dstBinding, dstElm, write.DescriptorType(),
 				VkImage(0), vkNullHandle, vkBuf, bufView.Offset(), bufView.Range())
 			dstElm++
@@ -1306,7 +1306,7 @@ func (vb *FootprintBuilder) visitBlocksInVkSparseImageMemoryBind(ctx context.Con
 	cmd api.Cmd, id api.CmdID, s *api.GlobalState, bh *dependencygraph.Behavior,
 	vkImg VkImage, bind VkSparseImageMemoryBind, cb func(aspects VkImageAspectFlags,
 		layer, level uint32, blockIndex, memOffset uint64)) {
-	imgObj := GetState(s).Images().Get(vkImg)
+	imgObj := GetState(s).Images().Get(ctx, vkImg)
 
 	aspect := bind.Subresource().AspectMask()
 	layer := bind.Subresource().ArrayLayer()
@@ -1338,7 +1338,7 @@ func (vb *FootprintBuilder) addSparseImageMemBinding(ctx context.Context,
 	cmd api.Cmd, id api.CmdID,
 	s *api.GlobalState, bh *dependencygraph.Behavior, vkImg VkImage,
 	bind VkSparseImageMemoryBind) {
-	blockSize := GetState(s).Images().Get(vkImg).MemoryRequirements().Alignment()
+	blockSize := GetState(s).Images().Get(ctx, vkImg).MemoryRequirements().Alignment()
 	vb.visitBlocksInVkSparseImageMemoryBind(ctx, cmd, id, s, bh, vkImg, bind,
 		func(aspects VkImageAspectFlags, layer, level uint32, blockIndex, memoryOffset uint64) {
 			if _, ok := vb.images[vkImg].sparseData[aspects]; !ok {
@@ -1657,7 +1657,7 @@ func (vb *FootprintBuilder) BuildFootprint(ctx context.Context,
 		lastBoundQueue := GetState(s).LastBoundQueue()
 		if !lastBoundQueue.IsNil() {
 			if GetState(s).LastDrawInfos().Contains(lastBoundQueue.VulkanHandle()) {
-				lastDrawInfo := GetState(s).LastDrawInfos().Get(lastBoundQueue.VulkanHandle())
+				lastDrawInfo := GetState(s).LastDrawInfos().Get(ctx, lastBoundQueue.VulkanHandle())
 				if !lastDrawInfo.Framebuffer().IsNil() {
 					for _, view := range lastDrawInfo.Framebuffer().ImageAttachments().All() {
 						if view.IsNil() || view.Image().IsNil() {
@@ -1685,7 +1685,7 @@ func (vb *FootprintBuilder) BuildFootprint(ctx context.Context,
 		bh.Alive = true
 	case *VkMapMemory:
 		modify(ctx, bh, vkHandle(cmd.Memory()))
-		memObj := GetState(s).DeviceMemories().Get(cmd.Memory())
+		memObj := GetState(s).DeviceMemories().Get(ctx, cmd.Memory())
 		isCoherent, _ := subIsMemoryCoherent(ctx, cmd, id, nil, s, GetState(s),
 			cmd.Thread(), nil, memObj)
 		if isCoherent {
@@ -1704,7 +1704,7 @@ func (vb *FootprintBuilder) BuildFootprint(ctx context.Context,
 		count := uint64(cmd.MemoryRangeCount())
 		for _, rng := range cmd.PMemoryRanges().Slice(0, count, l).MustRead(ctx, cmd, s, nil) {
 			read(ctx, bh, vkHandle(rng.Memory()))
-			mem := GetState(s).DeviceMemories().Get(rng.Memory())
+			mem := GetState(s).DeviceMemories().Get(ctx, rng.Memory())
 			if mem.IsNil() {
 				continue
 			}
@@ -1768,7 +1768,7 @@ func (vb *FootprintBuilder) BuildFootprint(ctx context.Context,
 		read(ctx, bh, vkHandle(cmd.Memory()))
 		offset := uint64(cmd.MemoryOffset())
 		inferredSize, err := subInferImageSize(ctx, cmd, id, nil, s, nil, cmd.Thread(),
-			nil, GetState(s).Images().Get(cmd.Image()))
+			nil, GetState(s).Images().Get(ctx, cmd.Image()))
 		if err != nil {
 			log.E(ctx, "FootprintBuilder: Cannot get inferred size of image: %v", cmd.Image())
 			log.E(ctx, "FootprintBuilder: Command %v %v: %v", id, cmd, err)
@@ -1805,7 +1805,7 @@ func (vb *FootprintBuilder) BuildFootprint(ctx context.Context,
 		read(ctx, bh, vkHandle(cmd.Buffer()))
 		read(ctx, bh, vkHandle(cmd.Memory()))
 		offset := uint64(cmd.MemoryOffset())
-		size := uint64(GetState(s).Buffers().Get(cmd.Buffer()).Info().Size())
+		size := uint64(GetState(s).Buffers().Get(ctx, cmd.Buffer()).Info().Size())
 		vb.addBufferMemBinding(ctx, bh, cmd.Buffer(), cmd.Memory(), 0, size, offset)
 	case *VkCreateBufferView:
 		write(ctx, bh, vkHandle(cmd.PView().MustRead(ctx, cmd, s, nil)))
@@ -1862,7 +1862,7 @@ func (vb *FootprintBuilder) BuildFootprint(ctx context.Context,
 		read(ctx, bh, vkHandle(cmd.Swapchain()))
 		// The value of this imgId should have been written by the driver.
 		imgID := cmd.PImageIndex().MustRead(ctx, cmd, s, nil)
-		vkImg := GetState(s).Swapchains().Get(cmd.Swapchain()).SwapchainImages().Get(imgID).VulkanHandle()
+		vkImg := GetState(s).Swapchains().Get(ctx, cmd.Swapchain()).SwapchainImages().Get(ctx, imgID).VulkanHandle()
 		if read(ctx, bh, vkHandle(vkImg)) {
 			imgLayout, imgData := vb.getImageLayoutAndData(ctx, bh, vkImg)
 			write(ctx, bh, imgLayout)
@@ -1885,7 +1885,7 @@ func (vb *FootprintBuilder) BuildFootprint(ctx context.Context,
 		for swi, vkSw := range info.PSwapchains().Slice(0, swCount, l).MustRead(ctx, cmd, s, nil) {
 			read(ctx, bh, vkHandle(vkSw))
 			imgID := imgIds.Index(uint64(swi)).MustRead(ctx, cmd, s, nil)[0]
-			vkImg := GetState(s).Swapchains().Get(vkSw).SwapchainImages().Get(imgID).VulkanHandle()
+			vkImg := GetState(s).Swapchains().Get(ctx, vkSw).SwapchainImages().Get(ctx, imgID).VulkanHandle()
 			imgLayout, imgData := vb.getImageLayoutAndData(ctx, bh, vkImg)
 			read(ctx, bh, imgLayout)
 			read(ctx, bh, imgData...)
@@ -1959,7 +1959,7 @@ func (vb *FootprintBuilder) BuildFootprint(ctx context.Context,
 		for i, vkSet := range cmd.PDescriptorSets().Slice(0, setCount, l).MustRead(ctx, cmd, s, nil) {
 			vkLayout := vkLayouts.Index(uint64(i)).MustRead(ctx, cmd, s, nil)[0]
 			read(ctx, bh, vkHandle(vkLayout))
-			layoutObj := GetState(s).DescriptorSetLayouts().Get(vkLayout)
+			layoutObj := GetState(s).DescriptorSetLayouts().Get(ctx, vkLayout)
 			write(ctx, bh, vkHandle(vkSet))
 			vb.descriptorSets[vkSet] = newDescriptorSet()
 			for bi, bindingInfo := range layoutObj.Bindings().All() {
@@ -2133,7 +2133,7 @@ func (vb *FootprintBuilder) BuildFootprint(ctx context.Context,
 		// TODO: check dst image coverage correctly
 		for _, region := range cmd.PRegions().Slice(0, count, l).MustRead(ctx, cmd, s, nil) {
 			overwritten = overwritten || subresourceLayersFullyCoverImage(
-				GetState(s).Images().Get(cmd.DstImage()),
+				GetState(s).Images().Get(ctx, cmd.DstImage()),
 				region.DstSubresource(), region.DstOffset(), region.Extent())
 		}
 		if overwritten {
@@ -2172,7 +2172,7 @@ func (vb *FootprintBuilder) BuildFootprint(ctx context.Context,
 		count := uint64(cmd.RegionCount())
 		for _, region := range cmd.PRegions().Slice(0, count, l).MustRead(ctx, cmd, s, nil) {
 			overwritten = overwritten || subresourceLayersFullyCoverImage(
-				GetState(s).Images().Get(cmd.DstImage()),
+				GetState(s).Images().Get(ctx, cmd.DstImage()),
 				region.ImageSubresource(), region.ImageOffset(), region.ImageExtent())
 		}
 		if overwritten {
@@ -2190,7 +2190,7 @@ func (vb *FootprintBuilder) BuildFootprint(ctx context.Context,
 		count := uint64(cmd.RegionCount())
 		for _, region := range cmd.PRegions().Slice(0, count, l).MustRead(ctx, cmd, s, nil) {
 			overwritten = overwritten || blitFullyCoverImage(
-				GetState(s).Images().Get(cmd.DstImage()),
+				GetState(s).Images().Get(ctx, cmd.DstImage()),
 				region.DstSubresource(),
 				region.DstOffsets().Get(0), region.DstOffsets().Get(1))
 		}
@@ -2209,7 +2209,7 @@ func (vb *FootprintBuilder) BuildFootprint(ctx context.Context,
 		count := uint64(cmd.RegionCount())
 		for _, region := range cmd.PRegions().Slice(0, count, l).MustRead(ctx, cmd, s, nil) {
 			overwritten = overwritten || subresourceLayersFullyCoverImage(
-				GetState(s).Images().Get(cmd.DstImage()),
+				GetState(s).Images().Get(ctx, cmd.DstImage()),
 				region.DstSubresource(), region.DstOffset(), region.Extent())
 		}
 		if overwritten {
@@ -2235,7 +2235,7 @@ func (vb *FootprintBuilder) BuildFootprint(ctx context.Context,
 		count := uint64(cmd.RangeCount())
 		overwritten := false
 		for _, rng := range cmd.PRanges().Slice(0, count, l).MustRead(ctx, cmd, s, nil) {
-			if subresourceRangeFullyCoverImage(GetState(s).Images().Get(cmd.Image()), rng) {
+			if subresourceRangeFullyCoverImage(GetState(s).Images().Get(ctx, cmd.Image()), rng) {
 				overwritten = true
 			}
 		}
@@ -2252,7 +2252,7 @@ func (vb *FootprintBuilder) BuildFootprint(ctx context.Context,
 		count := uint64(cmd.RangeCount())
 		overwritten := false
 		for _, rng := range cmd.PRanges().Slice(0, count, l).MustRead(ctx, cmd, s, nil) {
-			if subresourceRangeFullyCoverImage(GetState(s).Images().Get(cmd.Image()), rng) {
+			if subresourceRangeFullyCoverImage(GetState(s).Images().Get(ctx, cmd.Image()), rng) {
 				overwritten = true
 			}
 		}
@@ -2271,8 +2271,8 @@ func (vb *FootprintBuilder) BuildFootprint(ctx context.Context,
 		vkFb := cmd.PRenderPassBegin().MustRead(ctx, cmd, s, nil).Framebuffer()
 		read(ctx, bh, vkHandle(vkFb))
 		write(ctx, bh, vb.commandBuffers[cmd.CommandBuffer()].renderPassBegin)
-		rp := GetState(s).RenderPasses().Get(vkRp)
-		fb := GetState(s).Framebuffers().Get(vkFb)
+		rp := GetState(s).RenderPasses().Get(ctx, vkRp)
+		fb := GetState(s).Framebuffers().Get(ctx, vkFb)
 		read(ctx, bh, vkHandle(fb.RenderPass().VulkanHandle()))
 		for _, ia := range fb.ImageAttachments().All() {
 			if read(ctx, bh, vkHandle(ia.VulkanHandle())) {

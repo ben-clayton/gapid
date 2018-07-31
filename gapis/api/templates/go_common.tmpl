@@ -270,7 +270,7 @@
   {{AssertType $.Type "Type"}}
   {{AssertType $.Name "string"}}
 
-  {{if (GetAnnotation $.Type "replay_custom_value")}}{{$.Name}}.value(ϟb, ϟc, ϟg)
+  {{if (GetAnnotation $.Type "replay_custom_value")}}{{$.Name}}.value(ϟctx, ϟb, ϟc, ϟg)
   {{else if IsBool        $.Type}}value.Bool({{$.Name}})
   {{else if IsS8          $.Type}}value.S8({{$.Name}})
   {{else if IsU8          $.Type}}value.U8({{$.Name}})
@@ -286,11 +286,11 @@
   {{else if IsInt         $.Type}}value.S64({{$.Name}})
   {{else if IsUint        $.Type}}value.U64({{$.Name}})
   {{else if IsString      $.Type}}ϟb.String({{$.Name}})
-  {{else if IsPointer     $.Type}}{{$.Name}}.value(ϟb, ϟc, ϟg)
+  {{else if IsPointer     $.Type}}{{$.Name}}.value(ϟctx, ϟb, ϟc, ϟg)
   {{else if IsEnum        $.Type}}{{Template "Go.Replay.Value" "Type" $.Type.NumberType "Name" $.Name}}
-  {{else if IsStaticArray $.Type}}{{$.Name}}.value(ϟb, ϟc, ϟg)
-  {{else if IsPseudonym   $.Type}}{{$.Name}}.value(ϟb, ϟc, ϟg)
-  {{else if IsClass       $.Type}}{{$.Name}}.value(ϟb, ϟc, ϟg)
+  {{else if IsStaticArray $.Type}}{{$.Name}}.value(ϟctx, ϟb, ϟc, ϟg)
+  {{else if IsPseudonym   $.Type}}{{$.Name}}.value(ϟctx, ϟb, ϟc, ϟg)
+  {{else if IsClass       $.Type}}{{$.Name}}.value(ϟctx, ϟb, ϟc, ϟg)
   {{else                        }}{{Error "macro Go.Replay.Value '%v' called with unsupported type: %s" $.Name $.Type.Name}}
   {{end}}
 {{end}}
@@ -510,7 +510,7 @@
   {{else if IsNumericValue     $}}{{Template "Go.Type" $}}({{$}})
   {{else if IsUnaryOp          $}}{{$.Operator}}({{Template "Go.Read" $.Expression}})
   {{else if IsStringValue      $}}{{printf "%q" $}}
-  {{else if IsMessageValue     $}}messages.{{$.AST.Name.Value | SplitOn "_" | Lower | Title}}({{ForEach $.Arguments "Go.Read" | JoinWith ", "}})
+  {{else if IsMessageValue     $}}messages.{{$.AST.Name.Value | SplitOn "_" | Lower | Title}}(ϟctx, {{ForEach $.Arguments "Go.Read" | JoinWith ", "}})
   {{else if IsEnumEntry        $}}{{$.Owner.Name}}_{{$.Name}}
   {{else if IsLocal            $}}{{$.Name}}
   {{else if IsBitTest          $}}(({{Template "Go.Read" $.Bits}}) & ({{Template "Go.Read" $.Bitfield}}) != 0)
@@ -523,7 +523,7 @@
   {{else if IsGlobal           $}}{{Template "Go.Global" $}}
   {{else if IsParameter        $}}{{Template "Go.Parameter" $}}
   {{else if IsArrayIndex       $}}{{Template "Go.Read" $.Array}}.Get(int({{Template "Go.Read" $.Index}}))
-  {{else if IsMapIndex         $}}{{Template "Go.Read" $.Map}}.Get({{Template "Go.Read" $.Index}})
+  {{else if IsMapIndex         $}}{{Template "Go.Read" $.Map}}.Get(ϟctx, {{Template "Go.Read" $.Index}})
   {{else if IsMapContains      $}}{{Template "Go.Read" $.Map}}.Contains({{Template "Go.Read" $.Key}})
   {{else if IsLength           $}}{{Template "Go.Type" $.Type}}({{Template "Go.ReadLength" "Type" (TypeOf $.Object) "Value" $.Object}})
   {{else if IsNull             $}}{{Template "Go.Null" $.Type}}

@@ -81,7 +81,7 @@ func (test test) check(ctx context.Context, ca, ra *device.MemoryLayout) {
 		return
 	}
 
-	exec := executor.New(program, false)
+	exec := executor.NewExecutor(program, false)
 	env := exec.NewEnv(ctx, c)
 	defer env.Dispose()
 

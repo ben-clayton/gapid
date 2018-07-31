@@ -15,6 +15,7 @@
 package box
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -28,8 +29,8 @@ import (
 
 // NewValue attempts to box and return v into a Value.
 // If v cannot be boxed into a Value then nil is returned.
-func NewValue(v interface{}) *Value {
-	return newBoxer().val(reflect.ValueOf(v))
+func NewValue(ctx context.Context, v interface{}) *Value {
+	return newBoxer().val(ctx, reflect.ValueOf(v))
 }
 
 // NewType returns the Type of value v
@@ -38,8 +39,8 @@ func NewType(t reflect.Type) *Type {
 }
 
 // Get returns the boxed value.
-func (v *Value) Get() interface{} {
-	return newUnboxer().val(v).Interface()
+func (v *Value) Get(ctx context.Context) interface{} {
+	return newUnboxer().val(ctx, v).Interface()
 }
 
 // Get returns the type as a reflect.Type.
@@ -48,14 +49,14 @@ func (t *Type) Get() reflect.Type {
 }
 
 // AssignTo assigns the boxed value to the value at pointer p.
-func (v *Value) AssignTo(p interface{}) error {
+func (v *Value) AssignTo(ctx context.Context, p interface{}) error {
 	unboxer := newUnboxer()
 	defer func() {
 		if r := recover(); r != nil {
 			panic(fmt.Errorf("%v\nValue: %v", r, v))
 		}
 	}()
-	s := unboxer.val(v).Interface()
+	s := unboxer.val(ctx, v).Interface()
 	return deep.Copy(p, s)
 }
 
@@ -97,7 +98,7 @@ func newBoxer() *boxer {
 	return &boxer{map[reflect.Value]uint32{}, map[reflect.Type]uint32{}}
 }
 
-func (b *boxer) val(v reflect.Value) *Value {
+func (b *boxer) val(ctx context.Context, v reflect.Value) *Value {
 	if b := pod.NewValue(v.Interface()); b != nil {
 		return &Value{Val: &Value_Pod{b}}
 	}
@@ -129,7 +130,7 @@ func (b *boxer) val(v reflect.Value) *Value {
 		if v.IsNil() {
 			return &Value{Val: &Value_Reference{&Reference{Val: &Reference_Null{}}}}
 		}
-		return b.val(v.Elem())
+		return b.val(ctx, v.Elem())
 	}
 
 	id, ok := b.values[v]
@@ -143,14 +144,14 @@ func (b *boxer) val(v reflect.Value) *Value {
 		entries := []*MapEntry{}
 		mapTy := b.ty(reflect.MapOf(d.KeyTy(), d.ValTy()))
 		for _, k := range d.Keys() {
-			v := d.Get(k)
+			v := d.Get(ctx, k)
 			entries = append(entries, &MapEntry{
-				Key:   b.val(reflect.ValueOf(k)),
-				Value: b.val(reflect.ValueOf(v)),
+				Key:   b.val(ctx, reflect.ValueOf(k)),
+				Value: b.val(ctx, reflect.ValueOf(v)),
 			})
 		}
 		m := &Map{Type: mapTy, Entries: entries}
-		m.Sort()
+		m.Sort(ctx)
 		return &Value{ValueId: id, Val: &Value_Map{m}}
 	}
 
@@ -160,7 +161,7 @@ func (b *boxer) val(v reflect.Value) *Value {
 			ptrTy := b.ty(v.Type().Elem())
 			return &Value{ValueId: id, Val: &Value_Reference{&Reference{Val: &Reference_Null{ptrTy}}}}
 		}
-		ptrVal := b.val(v.Elem())
+		ptrVal := b.val(ctx, v.Elem())
 		return &Value{ValueId: id, Val: &Value_Reference{&Reference{Val: &Reference_Value{ptrVal}}}}
 
 	case reflect.Struct:
@@ -174,7 +175,7 @@ func (b *boxer) val(v reflect.Value) *Value {
 			if f.Tag.Get("nobox") == "true" {
 				continue // Explictly disabled.
 			}
-			fields = append(fields, b.val(v.FieldByName(f.Name)))
+			fields = append(fields, b.val(ctx, v.FieldByName(f.Name)))
 		}
 		return &Value{ValueId: id, Val: &Value_Struct{&Struct{Type: structTy, Fields: fields}}}
 
@@ -182,7 +183,7 @@ func (b *boxer) val(v reflect.Value) *Value {
 		arrTy := b.ty(v.Type())
 		entries := []*Value{}
 		for i, c := 0, v.Len(); i < c; i++ {
-			entries = append(entries, b.val(v.Index(i)))
+			entries = append(entries, b.val(ctx, v.Index(i)))
 		}
 		return &Value{ValueId: id, Val: &Value_Array{&Array{Type: arrTy, Entries: entries}}}
 	}
@@ -264,7 +265,7 @@ func newUnboxer() *unboxer {
 	}
 }
 
-func (b *unboxer) val(v *Value) (out reflect.Value) {
+func (b *unboxer) val(ctx context.Context, v *Value) (out reflect.Value) {
 	switch v := v.Val.(type) {
 	case *Value_Pod:
 		if v := v.Pod.Get(); v != nil {
@@ -304,7 +305,7 @@ func (b *unboxer) val(v *Value) (out reflect.Value) {
 			}
 			return reflect.New(reflect.PtrTo(b.ty(p.Null))).Elem()
 		case *Reference_Value:
-			val := b.val(p.Value)
+			val := b.val(ctx, p.Value)
 			clone := reflect.New(val.Type()).Elem()
 			clone.Set(val)
 			return clone.Addr()
@@ -316,7 +317,7 @@ func (b *unboxer) val(v *Value) (out reflect.Value) {
 		}
 		mapVal := reflect.MakeMap(mapTy)
 		for _, e := range v.Map.Entries {
-			k, v := b.val(e.Key), b.val(e.Value)
+			k, v := b.val(ctx, e.Key), b.val(ctx, e.Value)
 			mapVal.SetMapIndex(k, v)
 		}
 		return mapVal
@@ -324,7 +325,7 @@ func (b *unboxer) val(v *Value) (out reflect.Value) {
 		arrTy := b.ty(v.Array.Type)
 		arrVal := slice.New(arrTy, len(v.Array.Entries), len(v.Array.Entries))
 		for i, e := range v.Array.Entries {
-			v := b.val(e)
+			v := b.val(ctx, e)
 			arrVal.Index(i).Set(v)
 		}
 		return arrVal
@@ -333,7 +334,7 @@ func (b *unboxer) val(v *Value) (out reflect.Value) {
 		structVal := reflect.New(structTy).Elem()
 		for i, c := 0, structTy.NumField(); i < c; i++ {
 			f := structVal.FieldByName(structTy.Field(i).Name)
-			if v := b.val(v.Struct.Fields[i]); v != noValue {
+			if v := b.val(ctx, v.Struct.Fields[i]); v != noValue {
 				f.Set(v)
 			}
 		}
@@ -404,10 +405,10 @@ func (b *unboxer) ty(t *Type) (out reflect.Type) {
 }
 
 // Sort sorts the entries in the map using the keys lexicographic order.
-func (m *Map) Sort() {
+func (m *Map) Sort(ctx context.Context) {
 	keys := make([]string, len(m.Entries))
 	for i, e := range m.Entries {
-		keys[i] = fmt.Sprint(e.Key.Get())
+		keys[i] = fmt.Sprint(e.Key.Get(ctx))
 	}
 	sort.Sort(mapSorter{keys, m.Entries})
 }

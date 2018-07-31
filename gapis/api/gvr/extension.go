@@ -225,7 +225,7 @@ func eventFilter(ctx context.Context, p *path.Events) extensions.EventFilter {
 	return func(id api.CmdID, cmd api.Cmd, s *api.GlobalState) bool {
 		_, isSwapBuffers := cmd.(*gles.EglSwapBuffers)
 		if isSwapBuffers {
-			if context := gles.GetContext(s, cmd.Thread()); !context.IsNil() {
+			if context := gles.GetContext(ctx, s, cmd.Thread()); !context.IsNil() {
 				ctxID := context.ID()
 				if ctxID == *renderCtxID {
 					// Strip out eglSwapBuffers from the render context.

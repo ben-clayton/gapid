@@ -18,46 +18,52 @@
 
 #include <gtest/gtest.h>
 
-extern "C" {
+namespace {
 
-typedef struct pool_t {
+struct Pool {
   uint64_t ref_count;
   uint64_t id;
   uint64_t size;
   uint8_t* buffer;
   arena_t* arena;
-} pool;
+};
 
-uint64_t allocate_pool_id() {
-  static uint64_t next_pool_id = 1;
-  return next_pool_id++;
-}
+std::unordered_map<uint64_t, Pool*> gPools;
 
-void* resolve_pool_data(context* ctx, pool* pool, uint64_t ptr,
+}  // anonymous namespace
+
+extern "C" {
+
+void* resolve_pool_data(context* ctx, uint64_t pool_id, uint64_t ptr,
                         gapil_data_access access, uint64_t size) {
-  return (pool == nullptr)
+  return (pool_id == GAPIL_APPLICATION_POOL)
              ? reinterpret_cast<void*>(static_cast<uintptr_t>(ptr))
-             : &pool->buffer[ptr];
+             : &gPools[pool_id]->buffer[ptr];
 }
 
-pool_t* make_pool(context* ctx, uint64_t size) {
+uint64_t make_pool(context* ctx, uint64_t size) {
   auto arena = reinterpret_cast<core::Arena*>(ctx->arena);
-  auto pool = arena->create<pool_t>();
+  auto pool = arena->create<Pool>();
+  static uint64_t next_pool_id = 1;
+  auto id = next_pool_id++;
   pool->ref_count = 1;
-  pool->id = allocate_pool_id();
+  pool->id = id;
   pool->size = size;
   pool->buffer = reinterpret_cast<uint8_t*>(arena->allocate(size, 16));
   pool->arena = ctx->arena;
-  return pool;
+  gPools[id] = pool;
+  return id;
 }
 
-void pool_reference(pool_t* pool) {
+void pool_reference(context* ctx, uint64_t pool_id) {
+  auto pool = gPools[pool_id];
   GAPID_ASSERT_MSG(pool->ref_count > 0,
                    "Attempting to reference pool with no references");
   pool->ref_count++;
 }
 
-void pool_release(pool_t* pool) {
+void pool_release(context* ctx, uint64_t pool_id) {
+  auto pool = gPools[pool_id];
   GAPID_ASSERT_MSG(pool->ref_count > 0,
                    "Attempting to reference pool with no references");
   pool->ref_count--;
@@ -68,15 +74,12 @@ void pool_release(pool_t* pool) {
   }
 }
 
-uint64_t pool_id(pool_t* pool) { return pool->id; }
-
 void register_runtime_callbacks() {
   gapil_runtime_callbacks cb = {0};
   cb.resolve_pool_data = &resolve_pool_data;
   cb.make_pool = &make_pool;
   cb.pool_reference = &pool_reference;
   cb.pool_release = &pool_release;
-  cb.pool_id = &pool_id;
   gapil_set_runtime_callbacks(&cb);
 }
 

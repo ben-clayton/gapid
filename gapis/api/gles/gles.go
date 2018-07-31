@@ -30,12 +30,12 @@ import (
 
 type CustomState struct{}
 
-func GetContext(s *api.GlobalState, thread uint64) Contextʳ {
-	return GetState(s).GetContext(thread)
+func GetContext(ctx context.Context, s *api.GlobalState, thread uint64) Contextʳ {
+	return GetState(s).GetContext(ctx, thread)
 }
 
-func (s *State) GetContext(thread uint64) Contextʳ {
-	return s.Contexts().Get(thread)
+func (s *State) GetContext(ctx context.Context, thread uint64) Contextʳ {
+	return s.Contexts().Get(ctx, thread)
 }
 
 // Root returns the path to the root of the state to display. It can vary based
@@ -51,7 +51,7 @@ func (s *State) Root(ctx context.Context, p *path.State) (path.Node, error) {
 	}
 	for thread, context := range s.Contexts().All() {
 		if c.ID == context.ID() {
-			return s.contextRoot(p.After, thread), nil
+			return s.contextRoot(ctx, p.After, thread), nil
 		}
 	}
 	return nil, nil
@@ -60,14 +60,14 @@ func (s *State) Root(ctx context.Context, p *path.State) (path.Node, error) {
 func (s *State) SetupInitialState(ctx context.Context, g *api.GlobalState) {
 	a := s.Arena()
 	contexts := NewU64ːContextʳᵐ(a)
-	contexts.Add(0, NilContextʳ)
+	contexts.Add(ctx, 0, NilContextʳ)
 	s.SetContexts(contexts)
 	s.SetGLXContexts(NewGLXContextːContextʳᵐ(a))
 	s.SetWGLContexts(NewHGLRCːContextʳᵐ(a))
 	s.SetCGLContexts(NewCGLContextObjːContextʳᵐ(a))
 	for _, c := range s.EGLContexts().All() {
 		if t := c.Other().BoundOnThread(); t != 0 {
-			s.Contexts().Add(t, c) // Current thread bindings.
+			s.Contexts().Add(ctx, t, c) // Current thread bindings.
 		}
 		if id := c.Identifier(); id >= s.NextContextID() {
 			s.SetNextContextID(id + 1)
@@ -77,20 +77,20 @@ func (s *State) SetupInitialState(ctx context.Context, g *api.GlobalState) {
 
 func (s *State) InitializeCustomState() {}
 
-func (s *State) contextRoot(p *path.Command, thread uint64) *path.MapIndex {
-	return path.NewField("Contexts", resolve.APIStateAfter(p, ID)).MapIndex(thread)
+func (s *State) contextRoot(ctx context.Context, p *path.Command, thread uint64) *path.MapIndex {
+	return path.NewField("Contexts", resolve.APIStateAfter(ctx, p, ID)).MapIndex(ctx, thread)
 }
 
-func (s *State) objectsRoot(p *path.Command, thread uint64) *path.Field {
-	return s.contextRoot(p, thread).Field("Objects")
+func (s *State) objectsRoot(ctx context.Context, p *path.Command, thread uint64) *path.Field {
+	return s.contextRoot(ctx, p, thread).Field("Objects")
 }
 
 func (c *State) preMutate(ctx context.Context, s *api.GlobalState, cmd api.Cmd) error {
-	c.SetCurrentContext(c.GetContext(cmd.Thread()))
+	c.SetCurrentContext(c.GetContext(ctx, cmd.Thread()))
 	// TODO: Find better way to separate GL and EGL commands.
 	if c.CurrentContext().IsNil() && strings.HasPrefix(cmd.CmdName(), "gl") {
 		if f := s.NewMessage; f != nil {
-			f(log.Error, messages.ErrNoContextBound(cmd.Thread()))
+			f(log.Error, messages.ErrNoContextBound(ctx, cmd.Thread()))
 		}
 		return &api.ErrCmdAborted{Reason: "No context bound"}
 	}
@@ -197,13 +197,14 @@ func (API) GetFramebufferAttachmentInfo(
 	thread uint64,
 	attachment api.FramebufferAttachment) (inf api.FramebufferAttachmentInfo, err error) {
 
-	return GetFramebufferAttachmentInfoByID(state, thread, attachment, 0)
+	return GetFramebufferAttachmentInfoByID(ctx, state, thread, attachment, 0)
 }
 
 // GetFramebufferAttachmentInfoByID returns the width, height and format of the
 // specified attachment of the framebuffer with the given id.
 // If fb is 0 then the currently bound framebuffer is used.
 func GetFramebufferAttachmentInfoByID(
+	ctx context.Context,
 	state *api.GlobalState,
 	thread uint64,
 	attachment api.FramebufferAttachment,
@@ -212,7 +213,7 @@ func GetFramebufferAttachmentInfoByID(
 	s := GetState(state)
 
 	if fb == 0 {
-		c := s.GetContext(thread)
+		c := s.GetContext(ctx, thread)
 		if c.IsNil() {
 			return api.FramebufferAttachmentInfo{}, fmt.Errorf("No context bound")
 		}
@@ -227,7 +228,7 @@ func GetFramebufferAttachmentInfoByID(
 		return api.FramebufferAttachmentInfo{}, err
 	}
 
-	fbai, err := s.getFramebufferAttachmentInfo(thread, fb, glAtt)
+	fbai, err := s.getFramebufferAttachmentInfo(ctx, thread, fb, glAtt)
 	if fbai.format == 0 {
 		return api.FramebufferAttachmentInfo{}, fmt.Errorf("No format set")
 	}
@@ -249,8 +250,8 @@ func GetFramebufferAttachmentInfoByID(
 }
 
 // Context returns the active context for the given state and thread.
-func (API) Context(s *api.GlobalState, thread uint64) api.Context {
-	if c := GetContext(s, thread); !c.IsNil() {
+func (API) Context(ctx context.Context, s *api.GlobalState, thread uint64) api.Context {
+	if c := GetContext(ctx, s, thread); !c.IsNil() {
 		return c
 	}
 	return nil

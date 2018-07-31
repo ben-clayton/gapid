@@ -61,21 +61,21 @@ func (e externs) unmapMemory(slice memory.Slice) {
 }
 
 func (e externs) GetEGLStaticContextState(EGLDisplay, EGLContext) StaticContextStateʳ {
-	return FindStaticContextState(e.s.Arena, e.cmd.Extras()).Clone(e.s.Arena)
+	return FindStaticContextState(e.s.Arena, e.cmd.Extras()).Clone(e.ctx)
 }
 
 func (e externs) GetEGLDynamicContextState(EGLDisplay, EGLSurface, EGLContext) DynamicContextStateʳ {
-	return FindDynamicContextState(e.s.Arena, e.cmd.Extras()).Clone(e.s.Arena)
+	return FindDynamicContextState(e.s.Arena, e.cmd.Extras()).Clone(e.ctx)
 }
 
 func (e externs) GetAndroidNativeBufferExtra(Voidᵖ) AndroidNativeBufferExtraʳ {
-	return FindAndroidNativeBufferExtra(e.s.Arena, e.cmd.Extras()).Clone(e.s.Arena)
+	return FindAndroidNativeBufferExtra(e.s.Arena, e.cmd.Extras()).Clone(e.ctx)
 }
 
 func (e externs) GetEGLImageData(id EGLImageKHR, _ GLsizei, _ GLsizei) {
 	if d := FindEGLImageData(e.cmd.Extras()); d != nil {
 		if GetState(e.s).EGLImages().Contains(id) {
-			ei := GetState(e.s).EGLImages().Get(id)
+			ei := GetState(e.s).EGLImages().Get(e.ctx, id)
 			for _, img := range ei.Images().All() {
 				poolID, pool := e.s.Memory.New()
 				pool.Write(0, memory.Resource(d.ID, d.Size))
@@ -116,19 +116,19 @@ func (e externs) substr(str string, start, end int32) string {
 }
 
 func (e externs) GetCompileShaderExtra(ctx Contextʳ, obj Shaderʳ, bin BinaryExtraʳ) CompileShaderExtraʳ {
-	return FindCompileShaderExtra(e.s.Arena, e.cmd.Extras(), obj).Clone(e.s.Arena)
+	return FindCompileShaderExtra(e.s.Arena, e.cmd.Extras(), obj).Clone(e.ctx)
 }
 
 func (e externs) GetLinkProgramExtra(ctx Contextʳ, obj Programʳ, bin BinaryExtraʳ) LinkProgramExtraʳ {
-	return FindLinkProgramExtra(e.s.Arena, e.cmd.Extras()).Clone(e.s.Arena)
+	return FindLinkProgramExtra(e.s.Arena, e.cmd.Extras()).Clone(e.ctx)
 }
 
 func (e externs) GetValidateProgramExtra(ctx Contextʳ, obj Programʳ) ValidateProgramExtraʳ {
-	return FindValidateProgramExtra(e.s.Arena, e.cmd.Extras()).Clone(e.s.Arena)
+	return FindValidateProgramExtra(e.s.Arena, e.cmd.Extras()).Clone(e.ctx)
 }
 
 func (e externs) GetValidateProgramPipelineExtra(ctx Contextʳ, obj Pipelineʳ) ValidateProgramPipelineExtraʳ {
-	return FindValidateProgramPipelineExtra(e.s.Arena, e.cmd.Extras()).Clone(e.s.Arena)
+	return FindValidateProgramPipelineExtra(e.s.Arena, e.cmd.Extras()).Clone(e.ctx)
 }
 
 func (e externs) onGlError(err GLenum) {
@@ -174,7 +174,7 @@ func (e externs) addTag(msgID uint32, message *stringtable.Msg) {
 func (e externs) ReadGPUTextureData(texture Textureʳ, level, layer GLint) U8ˢ {
 	poolID, dst := e.s.Memory.New()
 	registry := bind.GetRegistry(e.ctx)
-	img := texture.Levels().Get(level).Layers().Get(layer)
+	img := texture.Levels().Get(e.ctx, level).Layers().Get(e.ctx, layer)
 	dataFormat, dataType := img.getUnsizedFormatAndType()
 	format, err := getImageFormat(dataFormat, dataType)
 	if err != nil {

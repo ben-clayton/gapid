@@ -124,26 +124,26 @@ func (r *ReportResolvable) Resolve(ctx context.Context) (interface{}, error) {
 
 		if as := cmd.Extras().Aborted(); as != nil && as.IsAssert {
 			items = append(items, r.newReportItem(log.Fatal, uint64(id),
-				messages.ErrTraceAssert(as.Reason)))
+				messages.ErrTraceAssert(ctx, as.Reason)))
 		}
 
 		if err := cmd.Mutate(ctx, id, state, nil /* no builder, just mutate */); err != nil {
 			if !api.IsErrCmdAborted(err) {
 				items = append(items, r.newReportItem(log.Error, uint64(id),
-					messages.ErrInternalError(err.Error())))
+					messages.ErrInternalError(ctx, err.Error())))
 			}
 		}
 
 		if filter(id, cmd, state) {
 			for _, item := range items {
-				item.Tags = append(item.Tags, getCommandNameTag(cmd))
+				item.Tags = append(item.Tags, getCommandNameTag(ctx, cmd))
 				builder.Add(ctx, item)
 			}
 			for _, issue := range issues[id] {
 				item := r.newReportItem(log.Severity(issue.Severity), uint64(issue.Command),
-					messages.ErrReplayDriver(issue.Error.Error()))
+					messages.ErrReplayDriver(ctx, issue.Error.Error()))
 				if int(issue.Command) < len(c.Commands) {
-					item.Tags = append(item.Tags, getCommandNameTag(c.Commands[issue.Command]))
+					item.Tags = append(item.Tags, getCommandNameTag(ctx, c.Commands[issue.Command]))
 				}
 				builder.Add(ctx, item)
 			}
@@ -154,6 +154,6 @@ func (r *ReportResolvable) Resolve(ctx context.Context) (interface{}, error) {
 	return builder.Build(), nil
 }
 
-func getCommandNameTag(cmd api.Cmd) *stringtable.Msg {
-	return messages.TagCommandName(cmd.CmdName())
+func getCommandNameTag(ctx context.Context, cmd api.Cmd) *stringtable.Msg {
+	return messages.TagCommandName(ctx, cmd.CmdName())
 }

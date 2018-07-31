@@ -15,28 +15,30 @@
 package resolve
 
 import (
+	"context"
+
 	"github.com/google/gapid/gapis/messages"
 	"github.com/google/gapid/gapis/service"
 	"github.com/google/gapid/gapis/service/path"
 )
 
-func errPathOOB(val uint64, name string, min, max uint64, p path.Node) error {
+func errPathOOB(ctx context.Context, val uint64, name string, min, max uint64, p path.Node) error {
 	return &service.ErrInvalidPath{
-		Reason: messages.ErrValueOutOfBounds(val, name, min, max),
+		Reason: messages.ErrValueOutOfBounds(ctx, val, name, min, max),
 		Path:   p.Path(),
 	}
 }
 
-func errPathSliceOOB(start, end, length uint64, p path.Node) error {
+func errPathSliceOOB(ctx context.Context, start, end, length uint64, p path.Node) error {
 	return &service.ErrInvalidPath{
-		Reason: messages.ErrSliceOutOfBounds(start, end, "Start", "End", uint64(0), length-1),
+		Reason: messages.ErrSliceOutOfBounds(ctx, start, end, "Start", "End", uint64(0), length-1),
 		Path:   p.Path(),
 	}
 }
 
-func errPathNoCapture(p path.Node) error {
+func errPathNoCapture(ctx context.Context, p path.Node) error {
 	return &service.ErrInvalidPath{
-		Reason: messages.ErrPathWithoutCapture(),
+		Reason: messages.ErrPathWithoutCapture(ctx),
 		Path:   p.Path(),
 	}
 }

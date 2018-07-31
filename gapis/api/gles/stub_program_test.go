@@ -17,11 +17,18 @@ package gles_test
 import (
 	"testing"
 
+	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/core/memory/arena"
+	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapis/api/gles"
+	"github.com/google/gapid/gapis/database"
 )
 
 func TestStubShaderSource(t *testing.T) {
+	ctx := log.Testing(t)
+	ctx = database.Put(ctx, database.NewInMemory(ctx))
+	ctx = executor.PutEnv(ctx, executor.NewEnv(ctx, nil, executor.Config{}))
+
 	a := arena.New()
 	defer a.Dispose()
 
@@ -38,7 +45,7 @@ func TestStubShaderSource(t *testing.T) {
 			res.SetType(u.ty)
 			res.SetName(u.name)
 			res.SetArraySize(u.size)
-			m.Add(gles.UniformIndex(i), res)
+			m.Add(ctx, gles.UniformIndex(i), res)
 		}
 		resources := gles.MakeActiveProgramResourcesʳ(a)
 		resources.SetDefaultUniformBlock(m)

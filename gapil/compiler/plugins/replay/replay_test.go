@@ -344,7 +344,7 @@ func (t test) run(ctx context.Context) (succeeded bool) {
 		},
 	}
 
-	exec := executor.New(program, false)
+	exec := executor.NewExecutor(program, false)
 	env := exec.NewEnv(ctx, c)
 	defer env.Dispose()
 

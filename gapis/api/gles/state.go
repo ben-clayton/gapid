@@ -15,6 +15,7 @@
 package gles
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/google/gapid/gapis/api"
@@ -47,7 +48,7 @@ func attachmentToEnum(a api.FramebufferAttachment) (GLenum, error) {
 	}
 }
 
-func (f Framebufferʳ) getAttachment(a GLenum) (FramebufferAttachment, error) {
+func (f Framebufferʳ) getAttachment(ctx context.Context, a GLenum) (FramebufferAttachment, error) {
 	switch a {
 	case GLenum_GL_DEPTH_ATTACHMENT, GLenum_GL_DEPTH_STENCIL_ATTACHMENT:
 		return f.DepthAttachment(), nil
@@ -55,7 +56,7 @@ func (f Framebufferʳ) getAttachment(a GLenum) (FramebufferAttachment, error) {
 		return f.StencilAttachment(), nil
 	default:
 		if a >= GLenum_GL_COLOR_ATTACHMENT0 && a < GLenum_GL_COLOR_ATTACHMENT0+64 {
-			return f.ColorAttachments().Get(GLint(a - GLenum_GL_COLOR_ATTACHMENT0)), nil
+			return f.ColorAttachments().Get(ctx, GLint(a-GLenum_GL_COLOR_ATTACHMENT0)), nil
 		}
 		return FramebufferAttachment{}, fmt.Errorf("Unhandled attachment: %v", a)
 	}
@@ -63,8 +64,8 @@ func (f Framebufferʳ) getAttachment(a GLenum) (FramebufferAttachment, error) {
 
 // TODO: When gfx api macros produce functions instead of inlining, move this logic
 // to the gles.api file.
-func (s *State) getFramebufferAttachmentInfo(thread uint64, fb FramebufferId, att GLenum) (fbai, error) {
-	c := s.GetContext(thread)
+func (s *State) getFramebufferAttachmentInfo(ctx context.Context, thread uint64, fb FramebufferId, att GLenum) (fbai, error) {
+	c := s.GetContext(ctx, thread)
 	if c.IsNil() {
 		return fbai{}, fmt.Errorf("No context bound")
 	}
@@ -72,12 +73,12 @@ func (s *State) getFramebufferAttachmentInfo(thread uint64, fb FramebufferId, at
 		return fbai{}, fmt.Errorf("Context not initialized")
 	}
 
-	framebuffer, ok := c.Objects().Framebuffers().Lookup(fb)
+	framebuffer, ok := c.Objects().Framebuffers().Lookup(ctx, fb)
 	if !ok {
 		return fbai{}, fmt.Errorf("Invalid framebuffer %v", fb)
 	}
 
-	a, err := framebuffer.getAttachment(att)
+	a, err := framebuffer.getAttachment(ctx, att)
 	if err != nil {
 		return fbai{}, err
 	}
@@ -87,7 +88,7 @@ func (s *State) getFramebufferAttachmentInfo(thread uint64, fb FramebufferId, at
 		return fbai{}, fmt.Errorf("%s is not bound", att)
 	case GLenum_GL_TEXTURE:
 		t := a.Texture()
-		l := t.Levels().Get(a.TextureLevel()).Layers().Get(a.TextureLayer())
+		l := t.Levels().Get(ctx, a.TextureLevel()).Layers().Get(ctx, a.TextureLayer())
 		if l.IsNil() {
 			return fbai{}, fmt.Errorf("Texture %v does not have Level[%v].Layer[%v]",
 				t.ID(), a.TextureLevel(), a.TextureLayer())

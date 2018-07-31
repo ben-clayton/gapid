@@ -60,7 +60,7 @@ func (e externs) mapMemory(value Voidᵖᵖ, slice memory.Slice) {
 	if b := e.b; b != nil {
 		switch e.cmd.(type) {
 		case *VkMapMemory:
-			b.Load(protocol.Type_AbsolutePointer, value.value(e.b, e.cmd, e.s))
+			b.Load(protocol.Type_AbsolutePointer, value.value(e.ctx, e.b, e.cmd, e.s))
 			b.MapMemory(memory.Range{Base: slice.Base(), Size: slice.Size()})
 		default:
 			log.E(ctx, "mapBuffer extern called for unsupported command: %v", e.cmd)
@@ -89,24 +89,24 @@ func (e externs) resetCmd(commandBuffer VkCommandBuffer) {
 
 func (e externs) notifyPendingCommandAdded(queue VkQueue) {
 	s := GetState(e.s)
-	queueObject := s.Queues().Get(queue)
-	command := queueObject.PendingCommands().Get(uint32(queueObject.PendingCommands().Len() - 1))
+	queueObject := s.Queues().Get(e.ctx, queue)
+	command := queueObject.PendingCommands().Get(e.ctx, uint32(queueObject.PendingCommands().Len()-1))
 	s.SubCmdIdx[len(s.SubCmdIdx)-1] = uint64(command.CommandIndex())
 	s.queuedCommands[command] = QueuedCommand{
 		submit:          e.cmd,
 		submissionIndex: append([]uint64(nil), s.SubCmdIdx...),
 	}
 
-	queueObject.PendingCommands().Add(uint32(queueObject.PendingCommands().Len()-1), command)
+	queueObject.PendingCommands().Add(e.ctx, uint32(queueObject.PendingCommands().Len()-1), command)
 }
 
 func (e externs) onCommandAdded(buffer VkCommandBuffer) {
 	o := GetState(e.s)
 	o.initialCommands[buffer] =
 		append(o.initialCommands[buffer], e.cmd)
-	b := o.CommandBuffers().Get(buffer)
+	b := o.CommandBuffers().Get(e.ctx, buffer)
 	if o.AddCommand != nil {
-		o.AddCommand(b.CommandReferences().Get(uint32(b.CommandReferences().Len() - 1)))
+		o.AddCommand(b.CommandReferences().Get(e.ctx, uint32(b.CommandReferences().Len()-1)))
 	}
 }
 
@@ -175,7 +175,7 @@ func (e externs) unmapMemory(slice memory.Slice) {
 func (e externs) trackMappedCoherentMemory(start uint64, size memory.Size) {}
 func (e externs) readMappedCoherentMemory(memoryHandle VkDeviceMemory, offsetInMapped uint64, readSize memory.Size) {
 	l := e.s.MemoryLayout
-	mem := GetState(e.s).DeviceMemories().Get(memoryHandle)
+	mem := GetState(e.s).DeviceMemories().Get(e.ctx, memoryHandle)
 	mappedOffset := uint64(mem.MappedOffset())
 	dstStart := mappedOffset + offsetInMapped
 	srcStart := offsetInMapped
@@ -215,7 +215,7 @@ func (e externs) popDebugMarker() {
 
 func (e externs) pushRenderPassMarker(rp VkRenderPass) {
 	if GetState(e.s).pushMarkerGroup != nil {
-		rpObj := GetState(e.s).RenderPasses().Get(rp)
+		rpObj := GetState(e.s).RenderPasses().Get(e.ctx, rp)
 		var name string
 		if !rpObj.DebugInfo().IsNil() && len(rpObj.DebugInfo().ObjectName()) > 0 {
 			name = rpObj.DebugInfo().ObjectName()
@@ -255,7 +255,7 @@ func bindSparse(ctx context.Context, a api.Cmd, id api.CmdID, s *api.GlobalState
 		if !st.Buffers().Contains(buffer) {
 			subVkErrorInvalidBuffer(ctx, a, id, nil, s, nil, a.Thread(), nil, buffer)
 		}
-		bufObj := st.Buffers().Get(buffer)
+		bufObj := st.Buffers().Get(ctx, buffer)
 		blockSize := bufObj.MemoryRequirements().Alignment()
 		for _, bind := range binds.SparseMemoryBinds().All() {
 			// TODO: assert bind.Size and bind.MemoryOffset must be multiple times of
@@ -264,7 +264,7 @@ func bindSparse(ctx context.Context, a api.Cmd, id api.CmdID, s *api.GlobalState
 			memOffset := bind.MemoryOffset()
 			resOffset := bind.ResourceOffset()
 			for i := VkDeviceSize(0); i < numBlocks; i++ {
-				bufObj.SparseMemoryBindings().Add(
+				bufObj.SparseMemoryBindings().Add(ctx,
 					uint64(resOffset),
 					NewVkSparseMemoryBind(s.Arena, // TODO: Use scratch arena?
 						resOffset,     // resourceOffset
@@ -282,7 +282,7 @@ func bindSparse(ctx context.Context, a api.Cmd, id api.CmdID, s *api.GlobalState
 		if !st.Images().Contains(image) {
 			subVkErrorInvalidImage(ctx, a, id, nil, s, nil, a.Thread(), nil, image)
 		}
-		imgObj := st.Images().Get(image)
+		imgObj := st.Images().Get(ctx, image)
 		blockSize := imgObj.MemoryRequirements().Alignment()
 		for _, bind := range binds.SparseMemoryBinds().All() {
 			// TODO: assert bind.Size and bind.MemoryOffset must be multiple times of
@@ -291,7 +291,7 @@ func bindSparse(ctx context.Context, a api.Cmd, id api.CmdID, s *api.GlobalState
 			memOffset := bind.MemoryOffset()
 			resOffset := bind.ResourceOffset()
 			for i := VkDeviceSize(0); i < numBlocks; i++ {
-				imgObj.OpaqueSparseMemoryBindings().Add(
+				imgObj.OpaqueSparseMemoryBindings().Add(ctx,
 					uint64(resOffset),
 					NewVkSparseMemoryBind(s.Arena, // TODO: Use scratch arena?
 						resOffset,     // resourceOffset
@@ -309,7 +309,7 @@ func bindSparse(ctx context.Context, a api.Cmd, id api.CmdID, s *api.GlobalState
 		if !st.Images().Contains(image) {
 			subVkErrorInvalidImage(ctx, a, id, nil, s, nil, a.Thread(), nil, image)
 		}
-		imgObj := st.Images().Get(image)
+		imgObj := st.Images().Get(ctx, image)
 		for _, bind := range binds.SparseImageMemoryBinds().All() {
 			if !imgObj.IsNil() {
 				err := subAddSparseImageMemoryBinding(ctx, a, id, nil, s, nil, a.Thread(), nil, image, bind)
@@ -324,7 +324,7 @@ func bindSparse(ctx context.Context, a api.Cmd, id api.CmdID, s *api.GlobalState
 func (e externs) fetchPhysicalDeviceProperties(inst VkInstance, devs VkPhysicalDeviceˢ) PhysicalDevicesAndPropertiesʳ {
 	for _, ee := range e.cmd.Extras().All() {
 		if p, ok := ee.(PhysicalDevicesAndProperties); ok {
-			return MakePhysicalDevicesAndPropertiesʳ(e.s.Arena).Set(p).Clone(e.s.Arena)
+			return MakePhysicalDevicesAndPropertiesʳ(e.s.Arena).Set(p).Clone(e.ctx)
 		}
 	}
 	return NilPhysicalDevicesAndPropertiesʳ
@@ -342,7 +342,7 @@ func (e externs) fetchPhysicalDeviceMemoryProperties(inst VkInstance, devs VkPhy
 func (e externs) fetchPhysicalDeviceQueueFamilyProperties(inst VkInstance, devs VkPhysicalDeviceˢ) PhysicalDevicesAndQueueFamilyPropertiesʳ {
 	for _, ee := range e.cmd.Extras().All() {
 		if p, ok := ee.(PhysicalDevicesAndQueueFamilyProperties); ok {
-			return MakePhysicalDevicesAndQueueFamilyPropertiesʳ(e.s.Arena).Set(p).Clone(e.s.Arena)
+			return MakePhysicalDevicesAndQueueFamilyPropertiesʳ(e.s.Arena).Set(p).Clone(e.ctx)
 		}
 	}
 	return NilPhysicalDevicesAndQueueFamilyPropertiesʳ
@@ -356,7 +356,7 @@ func (e externs) fetchImageMemoryRequirements(dev VkDevice, img VkImage, hasSpar
 	}
 	for _, ee := range e.cmd.Extras().All() {
 		if r, ok := ee.(ImageMemoryRequirements); ok {
-			return MakeImageMemoryRequirementsʳ(e.s.Arena).Set(r).Clone(e.s.Arena)
+			return MakeImageMemoryRequirementsʳ(e.s.Arena).Set(r).Clone(e.ctx)
 		}
 	}
 	return NilImageMemoryRequirementsʳ
@@ -370,7 +370,7 @@ func (e externs) fetchBufferMemoryRequirements(dev VkDevice, buf VkBuffer) VkMem
 	}
 	for _, ee := range e.cmd.Extras().All() {
 		if r, ok := ee.(VkMemoryRequirements); ok {
-			return r.Clone(e.s.Arena)
+			return r.Clone(e.ctx)
 		}
 	}
 	return MakeVkMemoryRequirements(e.s.Arena)
@@ -384,7 +384,7 @@ func (e externs) fetchLinearImageSubresourceLayouts(dev VkDevice, img ImageObjec
 	}
 	for _, ee := range e.cmd.Extras().All() {
 		if r, ok := ee.(LinearImageLayouts); ok {
-			return MakeLinearImageLayoutsʳ(e.s.Arena).Set(r).Clone(e.s.Arena)
+			return MakeLinearImageLayoutsʳ(e.s.Arena).Set(r).Clone(e.ctx)
 		}
 	}
 	return NilLinearImageLayoutsʳ

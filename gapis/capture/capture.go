@@ -28,6 +28,7 @@ import (
 	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/core/math/interval"
 	"github.com/google/gapid/core/memory/arena"
+	"github.com/google/gapid/core/os/device/host"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/database"
 	"github.com/google/gapid/gapis/memory"
@@ -92,7 +93,16 @@ func New(ctx context.Context, a arena.Arena, name string, header *Header, cmds [
 	for _, cmd := range cmds {
 		b.addCmd(ctx, cmd)
 	}
-	hdr := *header
+	var hdr Header
+	if header != nil {
+		hdr = *header
+	} else {
+		h := host.Instance(ctx)
+		hdr = Header{
+			Device: h,
+			ABI:    h.Configuration.ABIs[0],
+		}
+	}
 	hdr.Version = CurrentCaptureVersion
 	c := b.build(name, &hdr)
 
@@ -145,7 +155,7 @@ func (c *Capture) NewState(ctx context.Context) *api.GlobalState {
 			pool.Write(m.Range.Base, memory.Resource(m.ID, m.Range.Size))
 		}
 		for k, v := range c.InitialState.APIs {
-			s.APIs[k.ID()] = v.Clone(s.Arena)
+			s.APIs[k.ID()] = v.Clone(ctx)
 		}
 		for _, v := range s.APIs {
 			v.SetupInitialState(ctx, s)
@@ -315,32 +325,32 @@ func fromProto(ctx context.Context, r *Record) (out *Capture, err error) {
 			switch {
 			case err.Version.Major > pack.MaxMajorVersion:
 				return nil, &service.ErrUnsupportedVersion{
-					Reason:        messages.ErrFileTooNew(),
+					Reason:        messages.ErrFileTooNew(ctx),
 					SuggestUpdate: true,
 				}
 			case err.Version.Major < pack.MinMajorVersion:
 				return nil, &service.ErrUnsupportedVersion{
-					Reason: messages.ErrFileTooOld(),
+					Reason: messages.ErrFileTooOld(ctx),
 				}
 			default:
 				return nil, &service.ErrUnsupportedVersion{
-					Reason: messages.ErrFileCannotBeRead(),
+					Reason: messages.ErrFileCannotBeRead(ctx),
 				}
 			}
 		case ErrUnsupportedVersion:
 			switch {
 			case err.Version > CurrentCaptureVersion:
 				return nil, &service.ErrUnsupportedVersion{
-					Reason:        messages.ErrFileTooNew(),
+					Reason:        messages.ErrFileTooNew(ctx),
 					SuggestUpdate: true,
 				}
 			case err.Version < CurrentCaptureVersion:
 				return nil, &service.ErrUnsupportedVersion{
-					Reason: messages.ErrFileTooOld(),
+					Reason: messages.ErrFileTooOld(ctx),
 				}
 			default:
 				return nil, &service.ErrUnsupportedVersion{
-					Reason: messages.ErrFileCannotBeRead(),
+					Reason: messages.ErrFileCannotBeRead(ctx),
 				}
 			}
 		}

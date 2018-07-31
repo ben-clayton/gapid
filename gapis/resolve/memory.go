@@ -87,7 +87,7 @@ func Memory(ctx context.Context, p *path.Memory) (*service.Memory, error) {
 	// Check whether the requested pool was ever created.
 	pool, err := s.Memory.Get(memory.PoolID(p.Pool))
 	if err != nil {
-		return nil, &service.ErrDataUnavailable{Reason: messages.ErrInvalidMemoryPool(p.Pool)}
+		return nil, &service.ErrDataUnavailable{Reason: messages.ErrInvalidMemoryPool(ctx, p.Pool)}
 	}
 
 	slice := pool.Slice(r)

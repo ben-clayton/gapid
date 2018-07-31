@@ -43,5 +43,5 @@ func As(ctx context.Context, p *path.As) (interface{}, error) {
 			return o.ConvertTo(ctx, f)
 		}
 	}
-	return nil, &service.ErrDataUnavailable{Reason: messages.ErrUnsupportedConversion()}
+	return nil, &service.ErrDataUnavailable{Reason: messages.ErrUnsupportedConversion(ctx)}
 }

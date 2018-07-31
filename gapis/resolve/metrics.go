@@ -44,7 +44,7 @@ func memoryBreakdown(ctx context.Context, c *path.Command) (*api.MemoryBreakdown
 	}
 	a := cmd.API()
 	if a == nil {
-		return nil, &service.ErrDataUnavailable{Reason: messages.ErrStateUnavailable()}
+		return nil, &service.ErrDataUnavailable{Reason: messages.ErrStateUnavailable(ctx)}
 	}
 
 	state, err := GlobalState(ctx, c.GlobalStateAfter())
@@ -52,7 +52,7 @@ func memoryBreakdown(ctx context.Context, c *path.Command) (*api.MemoryBreakdown
 		return nil, err
 	}
 	if ml, ok := a.(api.MemoryBreakdownProvider); ok {
-		return ml.MemoryBreakdown(state)
+		return ml.MemoryBreakdown(ctx, state)
 	} else {
 		return nil, fmt.Errorf("Memory breakdown not supported for API %v", a.Name())
 	}

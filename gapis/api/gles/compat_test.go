@@ -22,6 +22,7 @@ import (
 	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/core/memory/arena"
 	"github.com/google/gapid/core/os/device"
+	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/api/gles"
 	"github.com/google/gapid/gapis/api/transform"
@@ -59,6 +60,14 @@ func TestGlVertexAttribPointerCompatTest(t *testing.T) {
 	}
 
 	ctx = capture.Put(ctx, capturePath)
+
+	c, err := capture.Resolve(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	ctx = executor.PutEnv(ctx, executor.NewEnv(ctx, c, executor.Config{}))
+
 	ctx = gles.PutUnusedIDMap(ctx)
 
 	dev := &device.Instance{Configuration: &device.Configuration{
@@ -106,9 +115,9 @@ func TestGlVertexAttribPointerCompatTest(t *testing.T) {
 		}
 
 		if _, ok := cmd.(*gles.GlDrawElements); ok {
-			ctx := gles.GetContext(s, cmd.Thread())
-			vao := ctx.Bound().VertexArray()
-			array := vao.VertexAttributeArrays().Get(0)
+			c := gles.GetContext(ctx, s, cmd.Thread())
+			vao := c.Bound().VertexArray()
+			array := vao.VertexAttributeArrays().Get(ctx, 0)
 			binding := array.Binding()
 			if !binding.Buffer().IsNil() && array.Pointer() == 0 {
 				found = true

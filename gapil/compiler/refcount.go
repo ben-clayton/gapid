@@ -30,8 +30,8 @@ type refRel struct {
 }
 
 func (f *refRel) declare(c *C, name, ref, rel string, ty codegen.Type) {
-	f.reference = c.M.Function(c.T.Void, ref, ty).LinkOnceODR().Inline()
-	f.release = c.M.Function(c.T.Void, rel, ty).LinkOnceODR().Inline()
+	f.reference = c.M.Function(c.T.Void, ref, c.T.CtxPtr, ty).LinkOnceODR().Inline()
+	f.release = c.M.Function(c.T.Void, rel, c.T.CtxPtr, ty).LinkOnceODR().Inline()
 	f.name = name
 }
 
@@ -47,7 +47,7 @@ func (f *refRel) build(
 	del func(s *S, val *codegen.Value),
 ) {
 	c.Build(f.reference, func(s *S) {
-		val := s.Parameter(0)
+		val := s.Parameter(1)
 		s.If(isNull(s, val), func(s *S) {
 			s.Return(nil)
 		})
@@ -64,7 +64,7 @@ func (f *refRel) build(
 	})
 
 	c.Build(f.release, func(s *S) {
-		val := s.Parameter(0)
+		val := s.Parameter(1)
 		s.If(isNull(s, val), func(s *S) {
 			s.Return(nil)
 		})
@@ -207,17 +207,17 @@ func (c *C) buildRefRels() {
 
 	sli := r[slicePrototype]
 	c.Build(sli.reference, func(s *S) {
-		sli := s.Parameter(0)
+		sli := s.Parameter(1)
 		pool := sli.Extract(SlicePool)
-		s.If(s.Not(pool.IsNull()), func(s *S) {
-			s.Call(c.callbacks.poolReference, pool)
+		s.If(s.NotEqual(pool, s.Zero(pool.Type())), func(s *S) {
+			s.Call(c.callbacks.poolReference, s.Ctx, pool)
 		})
 	})
 	c.Build(sli.release, func(s *S) {
-		sli := s.Parameter(0)
+		sli := s.Parameter(1)
 		pool := sli.Extract(SlicePool)
-		s.If(s.Not(pool.IsNull()), func(s *S) {
-			s.Call(c.callbacks.poolRelease, pool)
+		s.If(s.NotEqual(pool, s.Zero(pool.Type())), func(s *S) {
+			s.Call(c.callbacks.poolRelease, s.Ctx, pool)
 		})
 	})
 
@@ -267,7 +267,7 @@ func (c *C) buildRefRels() {
 					},
 					func(s *S, mapPtr *codegen.Value) {
 						s.Arena = mapPtr.Index(0, MapArena).Load().SetName("arena")
-						s.Call(c.T.Maps[apiTy].Clear, mapPtr)
+						s.Call(c.T.Maps[apiTy].Clear, mapPtr, s.Ctx)
 						c.Free(s, mapPtr)
 					})
 
@@ -281,13 +281,13 @@ func (c *C) buildRefRels() {
 				}
 
 				c.Build(funcs.reference, func(s *S) {
-					val := s.Parameter(0)
+					val := s.Parameter(1)
 					for _, f := range refFields {
 						c.reference(s, val.Extract(f.Name()), f.Type)
 					}
 				})
 				c.Build(funcs.release, func(s *S) {
-					val := s.Parameter(0)
+					val := s.Parameter(1)
 					for _, f := range refFields {
 						c.release(s, val.Extract(f.Name()), f.Type)
 					}
@@ -301,13 +301,13 @@ func (c *C) buildRefRels() {
 
 func (c *C) reference(s *S, val *codegen.Value, ty semantic.Type) {
 	if f, ok := c.refRels.tys[semantic.Underlying(ty)]; ok {
-		s.Call(f.reference, val)
+		s.Call(f.reference, s.Ctx, val)
 	}
 }
 
 func (c *C) release(s *S, val *codegen.Value, ty semantic.Type) {
 	if f, ok := c.refRels.tys[semantic.Underlying(ty)]; ok {
-		s.Call(f.release, val)
+		s.Call(f.release, s.Ctx, val)
 	}
 }
 

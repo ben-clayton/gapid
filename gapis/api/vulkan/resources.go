@@ -531,7 +531,10 @@ func (t ImageObjectʳ) imageInfo(ctx context.Context, s *api.GlobalState, format
 	case VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT,
 		VkImageAspectFlagBits_VK_IMAGE_ASPECT_DEPTH_BIT,
 		VkImageAspectFlagBits_VK_IMAGE_ASPECT_STENCIL_BIT:
-		l := t.Aspects().Get(VkImageAspectFlagBits(t.ImageAspect())).Layers().Get(layer).Levels().Get(level)
+		l := t.
+			Aspects().Get(ctx, VkImageAspectFlagBits(t.ImageAspect())).
+			Layers().Get(ctx, layer).
+			Levels().Get(ctx, level)
 		if l.Data().Size() == 0 {
 			return nil
 		}
@@ -544,9 +547,15 @@ func (t ImageObjectʳ) imageInfo(ctx context.Context, s *api.GlobalState, format
 		}
 
 	case VkImageAspectFlagBits_VK_IMAGE_ASPECT_DEPTH_BIT | VkImageAspectFlagBits_VK_IMAGE_ASPECT_STENCIL_BIT:
-		depthLevel := t.Aspects().Get(VkImageAspectFlagBits_VK_IMAGE_ASPECT_DEPTH_BIT).Layers().Get(layer).Levels().Get(level)
+		depthLevel := t.
+			Aspects().Get(ctx, VkImageAspectFlagBits_VK_IMAGE_ASPECT_DEPTH_BIT).
+			Layers().Get(ctx, layer).
+			Levels().Get(ctx, level)
 		depthData := depthLevel.Data().MustRead(ctx, nil, s, nil)
-		stencilLevel := t.Aspects().Get(VkImageAspectFlagBits_VK_IMAGE_ASPECT_STENCIL_BIT).Layers().Get(layer).Levels().Get(level)
+		stencilLevel := t.
+			Aspects().Get(ctx, VkImageAspectFlagBits_VK_IMAGE_ASPECT_STENCIL_BIT).
+			Layers().Get(ctx, layer).
+			Levels().Get(ctx, level)
 		stencilData := stencilLevel.Data().MustRead(ctx, nil, s, nil)
 		dsData := make([]uint8, len(depthData)+len(stencilData))
 
@@ -603,7 +612,7 @@ func (t ImageObjectʳ) ResourceData(ctx context.Context, s *api.GlobalState) (*a
 	vkFmt := t.Info().Fmt()
 	format, err := getImageFormatFromVulkanFormat(vkFmt)
 	if err != nil {
-		return nil, &service.ErrDataUnavailable{Reason: messages.ErrNoTextureData(t.ResourceHandle())}
+		return nil, &service.ErrDataUnavailable{Reason: messages.ErrNoTextureData(ctx, t.ResourceHandle())}
 	}
 	switch t.Info().ImageType() {
 	case VkImageType_VK_IMAGE_TYPE_2D:
@@ -699,7 +708,7 @@ func (t ImageObjectʳ) ResourceData(ctx context.Context, s *api.GlobalState) (*a
 		return api.NewResourceData(api.NewTexture(&api.Texture1D{Levels: levels})), nil
 
 	default:
-		return nil, &service.ErrDataUnavailable{Reason: messages.ErrNoTextureData(t.ResourceHandle())}
+		return nil, &service.ErrDataUnavailable{Reason: messages.ErrNoTextureData(ctx, t.ResourceHandle())}
 	}
 }
 

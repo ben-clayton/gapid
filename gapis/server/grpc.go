@@ -169,13 +169,14 @@ func (s *grpcServer) Get(ctx xctx.Context, req *service.GetRequest) (*service.Ge
 	if err := service.NewError(err); err != nil {
 		return &service.GetResponse{Res: &service.GetResponse_Error{Error: err}}, nil
 	}
-	val := service.NewValue(res)
+	val := service.NewValue(ctx, res)
 	return &service.GetResponse{Res: &service.GetResponse_Value{Value: val}}, nil
 }
 
 func (s *grpcServer) Set(ctx xctx.Context, req *service.SetRequest) (*service.SetResponse, error) {
 	defer s.inRPC()()
-	res, err := s.handler.Set(s.bindCtx(ctx), req.Path, req.Value.Get())
+	bctx := s.bindCtx(ctx)
+	res, err := s.handler.Set(bctx, req.Path, req.Value.Get(bctx))
 	if err := service.NewError(err); err != nil {
 		return &service.SetResponse{Res: &service.SetResponse_Error{Error: err}}, nil
 	}

@@ -130,7 +130,7 @@ func newGlesDependencyGraphBehaviourProvider() *GlesDependencyGraphBehaviourProv
 func (*GlesDependencyGraphBehaviourProvider) GetBehaviourForCommand(
 	ctx context.Context, s *api.GlobalState, id api.CmdID, cmd api.Cmd, g *dependencygraph.DependencyGraph) dependencygraph.CmdBehaviour {
 	b := dependencygraph.CmdBehaviour{}
-	c := GetContext(s, cmd.Thread())
+	c := GetContext(ctx, s, cmd.Thread())
 	if err := cmd.Mutate(ctx, id, s, nil /* builder */); err != nil {
 		log.W(ctx, "Command %v %v: %v", id, cmd, err)
 		return dependencygraph.CmdBehaviour{Aborted: true}
@@ -148,8 +148,8 @@ func (*GlesDependencyGraphBehaviourProvider) GetBehaviourForCommand(
 		// BUG: https://github.com/google/gapid/issues/846.
 		if isEglSwapBuffers {
 			// Get default renderbuffers
-			fb := c.Objects().Framebuffers().Get(0)
-			color := fb.ColorAttachments().Get(0).Renderbuffer()
+			fb := c.Objects().Framebuffers().Get(ctx, 0)
+			color := fb.ColorAttachments().Get(ctx, 0).Renderbuffer()
 			depth := fb.DepthAttachment().Renderbuffer()
 			stencil := fb.StencilAttachment().Renderbuffer()
 			if !c.Other().PreserveBuffersOnSwap() {
@@ -172,24 +172,24 @@ func (*GlesDependencyGraphBehaviourProvider) GetBehaviourForCommand(
 		} else if cmd.CmdFlags(ctx, id, s).IsClear() {
 			switch cmd := cmd.(type) {
 			case *GlClearBufferfi:
-				clearBuffer(g, &b, cmd.Buffer(), cmd.Drawbuffer(), c)
+				clearBuffer(ctx, g, &b, cmd.Buffer(), cmd.Drawbuffer(), c)
 			case *GlClearBufferfv:
-				clearBuffer(g, &b, cmd.Buffer(), cmd.Drawbuffer(), c)
+				clearBuffer(ctx, g, &b, cmd.Buffer(), cmd.Drawbuffer(), c)
 			case *GlClearBufferiv:
-				clearBuffer(g, &b, cmd.Buffer(), cmd.Drawbuffer(), c)
+				clearBuffer(ctx, g, &b, cmd.Buffer(), cmd.Drawbuffer(), c)
 			case *GlClearBufferuiv:
-				clearBuffer(g, &b, cmd.Buffer(), cmd.Drawbuffer(), c)
+				clearBuffer(ctx, g, &b, cmd.Buffer(), cmd.Drawbuffer(), c)
 			case *GlClear:
 				if (cmd.Mask() & GLbitfield_GL_COLOR_BUFFER_BIT) != 0 {
 					for i := range c.Bound().DrawFramebuffer().ColorAttachments().All() {
-						clearBuffer(g, &b, GLenum_GL_COLOR, i, c)
+						clearBuffer(ctx, g, &b, GLenum_GL_COLOR, i, c)
 					}
 				}
 				if (cmd.Mask() & GLbitfield_GL_DEPTH_BUFFER_BIT) != 0 {
-					clearBuffer(g, &b, GLenum_GL_DEPTH, 0, c)
+					clearBuffer(ctx, g, &b, GLenum_GL_DEPTH, 0, c)
 				}
 				if (cmd.Mask() & GLbitfield_GL_STENCIL_BUFFER_BIT) != 0 {
-					clearBuffer(g, &b, GLenum_GL_STENCIL, 0, c)
+					clearBuffer(ctx, g, &b, GLenum_GL_STENCIL, 0, c)
 				}
 			default:
 				log.E(ctx, "Unknown clear command: %v", cmd)
@@ -200,22 +200,22 @@ func (*GlesDependencyGraphBehaviourProvider) GetBehaviourForCommand(
 				// TODO: This assumes whole-image copy.  Handle sub-range copies.
 				// TODO: This does not handle multiple layers well.
 				if cmd.SrcTarget() == GLenum_GL_RENDERBUFFER {
-					b.Read(g, renderbufferDataKey{c.Objects().Renderbuffers().Get(RenderbufferId(cmd.SrcName()))})
+					b.Read(g, renderbufferDataKey{c.Objects().Renderbuffers().Get(ctx, RenderbufferId(cmd.SrcName()))})
 				} else {
-					data, size := c.Objects().Textures().Get(TextureId(cmd.SrcName())).dataAndSize(cmd.SrcLevel(), 0)
+					data, size := c.Objects().Textures().Get(ctx, TextureId(cmd.SrcName())).dataAndSize(cmd.SrcLevel(), 0)
 					b.Read(g, data)
 					b.Read(g, size)
 				}
 				if cmd.DstTarget() == GLenum_GL_RENDERBUFFER {
 					b.Write(g,
-						renderbufferDataKey{c.Objects().Renderbuffers().Get(RenderbufferId(cmd.DstName()))})
+						renderbufferDataKey{c.Objects().Renderbuffers().Get(ctx, RenderbufferId(cmd.DstName()))})
 				} else {
-					data, size := c.Objects().Textures().Get(TextureId(cmd.DstName())).dataAndSize(cmd.DstLevel(), 0)
+					data, size := c.Objects().Textures().Get(ctx, TextureId(cmd.DstName())).dataAndSize(cmd.DstLevel(), 0)
 					b.Write(g, data)
 					b.Write(g, size)
 				}
 			case *GlFramebufferTexture2D:
-				b.Read(g, textureSizeKey{c.Objects().Textures().Get(cmd.Texture()), cmd.Texture(), cmd.Level(), 0})
+				b.Read(g, textureSizeKey{c.Objects().Textures().Get(ctx, cmd.Texture()), cmd.Texture(), cmd.Level(), 0})
 				b.KeepAlive = true // Changes untracked state
 			case *GlCompressedTexImage2D:
 				texData, texSize := getTextureDataAndSize(ctx, cmd, id, s, c.Bound().TextureUnit(), cmd.Target(), cmd.Level())
@@ -236,7 +236,7 @@ func (*GlesDependencyGraphBehaviourProvider) GetBehaviourForCommand(
 				if err != nil {
 					log.E(ctx, "Can not find bound texture %v", cmd.Target())
 				}
-				if baseLevel, ok := tex.Levels().Lookup(0); ok {
+				if baseLevel, ok := tex.Levels().Lookup(ctx, 0); ok {
 					for layerIndex := range baseLevel.Layers().All() {
 						data, size := tex.dataAndSize(0, layerIndex)
 						b.Read(g, data)
@@ -272,11 +272,11 @@ func (*GlesDependencyGraphBehaviourProvider) GetBehaviourForCommand(
 	return b
 }
 
-func clearBuffer(g *dependencygraph.DependencyGraph, b *dependencygraph.CmdBehaviour, buffer GLenum, index GLint, c Contextʳ) {
+func clearBuffer(ctx context.Context, g *dependencygraph.DependencyGraph, b *dependencygraph.CmdBehaviour, buffer GLenum, index GLint, c Contextʳ) {
 	var data, size dependencygraph.StateKey
 	switch buffer {
 	case GLenum_GL_COLOR:
-		data, size = c.Bound().DrawFramebuffer().ColorAttachments().Get(index).dataAndSize(g, c)
+		data, size = c.Bound().DrawFramebuffer().ColorAttachments().Get(ctx, index).dataAndSize(g, c)
 	case GLenum_GL_DEPTH:
 		data, size = c.Bound().DrawFramebuffer().DepthAttachment().dataAndSize(g, c)
 	case GLenum_GL_STENCIL:
@@ -306,7 +306,7 @@ func getAllUsedTextureData(ctx context.Context, cmd api.Cmd, id api.CmdID, s *ap
 		}
 		units := AsU32ˢ(s.Arena, uniform.Values(), s.MemoryLayout).MustRead(ctx, cmd, s, nil)
 		for _, unit := range units {
-			if tu := c.Objects().TextureUnits().Get(TextureUnitId(unit)); !tu.IsNil() {
+			if tu := c.Objects().TextureUnits().Get(ctx, TextureUnitId(unit)); !tu.IsNil() {
 				tex, err := subGetBoundTextureForUnit(ctx, cmd, id, nil, s, GetState(s), cmd.Thread(), nil, tu, target)
 				if !tex.IsNil() && err == nil {
 					if !tex.EGLImage().IsNil() {

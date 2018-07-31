@@ -65,7 +65,7 @@ func Context(ctx context.Context, p *path.Context) (*api.ContextInfo, error) {
 		}
 	}
 	return nil, &service.ErrInvalidPath{
-		Reason: messages.ErrContextDoesNotExist(p.ID),
+		Reason: messages.ErrContextDoesNotExist(ctx, p.ID),
 		Path:   p.Path(),
 	}
 }
@@ -108,7 +108,7 @@ func (r *ContextListResolvable) Resolve(ctx context.Context) (interface{}, error
 			return nil
 		}
 
-		context := api.Context(s, cmd.Thread())
+		context := api.Context(ctx, s, cmd.Thread())
 		if context == nil {
 			return nil
 		}

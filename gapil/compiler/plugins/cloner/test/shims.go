@@ -26,9 +26,6 @@ import (
 
 type CustomState struct{}
 
-// Definition is a no-op function so that API conforms to the api.API interface.
-func (API) Definition() api.Definition { return api.Definition{} }
-
 // ConstantSets is a no-op function so that API conforms to the api.API
 // interface.
 func (API) ConstantSets() *constset.Pack { return nil }
@@ -45,7 +42,7 @@ func (API) GetFramebufferAttachmentInfo(
 }
 
 // Context is a no-op function so that API conforms to the api.API interface.
-func (API) Context(state *api.GlobalState, thread uint64) api.Context {
+func (API) Context(ctx context.Context, state *api.GlobalState, thread uint64) api.Context {
 	return nil
 }
 

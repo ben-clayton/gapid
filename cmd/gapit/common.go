@@ -289,7 +289,7 @@ func printCommand(ctx context.Context, client service.Service, p *path.Command, 
 
 	params := make([]string, len(c.Parameters))
 	for i, p := range c.Parameters {
-		v := p.Value.Get()
+		v := p.Value.Get(ctx)
 		if p.Constants != nil {
 			constants, err := getConstantSet(ctx, client, p.Constants)
 			if err != nil {
@@ -301,7 +301,7 @@ func printCommand(ctx context.Context, client service.Service, p *path.Command, 
 	}
 	fmt.Printf("%v %v(%v)", indices, c.Name, strings.Join(params, ", "))
 	if c.Result != nil {
-		v := c.Result.Value.Get()
+		v := c.Result.Value.Get(ctx)
 		if c.Result.Constants != nil {
 			constants, err := getConstantSet(ctx, client, c.Result.Constants)
 			if err != nil {

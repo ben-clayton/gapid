@@ -31,12 +31,12 @@ var (
 )
 
 func buildStubProgram(ctx context.Context, thread uint64, e *api.CmdExtras, s *api.GlobalState, programID ProgramId) []api.Cmd {
-	programInfo := FindLinkProgramExtra(s.Arena, e).Clone(s.Arena)
+	programInfo := FindLinkProgramExtra(s.Arena, e).Clone(ctx)
 	vss, fss, err := stubShaderSource(programInfo)
 	if err != nil {
 		log.E(ctx, "Unable to build stub shader: %v", err)
 	}
-	c := GetContext(s, thread)
+	c := GetContext(ctx, s, thread)
 	vertexShaderID := ShaderId(newUnusedID(ctx, 'S', func(x uint32) bool {
 		ok := c.Objects().Buffers().Contains(BufferId(x))
 		return ok

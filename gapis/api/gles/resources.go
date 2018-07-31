@@ -72,7 +72,7 @@ func (t Textureʳ) ResourceData(ctx context.Context, s *api.GlobalState) (*api.R
 
 		levels := make([]*image.Info, count)
 		for i, level := range t.Levels().All() {
-			img, err := level.Layers().Get(0).ImageInfo(ctx, s)
+			img, err := level.Layers().Get(ctx, 0).ImageInfo(ctx, s)
 			if err != nil {
 				return nil, err
 			}
@@ -110,7 +110,7 @@ func (t Textureʳ) ResourceData(ctx context.Context, s *api.GlobalState) (*api.R
 		for layer := range layers {
 			levels := make([]*image.Info, t.Levels().Len())
 			for level := range levels {
-				img, err := t.Levels().Get(GLint(level)).Layers().Get(GLint(layer)).ImageInfo(ctx, s)
+				img, err := t.Levels().Get(ctx, GLint(level)).Layers().Get(ctx, GLint(layer)).ImageInfo(ctx, s)
 				if err != nil {
 					return nil, err
 				}
@@ -126,7 +126,7 @@ func (t Textureʳ) ResourceData(ctx context.Context, s *api.GlobalState) (*api.R
 		for layer := range layers {
 			levels := make([]*image.Info, t.Levels().Len())
 			for level := range levels {
-				img, err := t.Levels().Get(GLint(level)).Layers().Get(GLint(layer)).ImageInfo(ctx, s)
+				img, err := t.Levels().Get(ctx, GLint(level)).Layers().Get(ctx, GLint(layer)).ImageInfo(ctx, s)
 				if err != nil {
 					return nil, err
 				}
@@ -146,7 +146,7 @@ func (t Textureʳ) ResourceData(ctx context.Context, s *api.GlobalState) (*api.R
 	case GLenum_GL_TEXTURE_3D:
 		levels := make([]*image.Info, t.Levels().Len())
 		for i, level := range t.Levels().All() {
-			img := level.Layers().Get(0)
+			img := level.Layers().Get(ctx, 0)
 			l := &image.Info{
 				Width:  uint32(img.Width()),
 				Height: uint32(img.Height()),
@@ -158,7 +158,7 @@ func (t Textureʳ) ResourceData(ctx context.Context, s *api.GlobalState) (*api.R
 			}
 			bytes := []byte{}
 			for i, c := 0, level.Layers().Len(); i < c; i++ {
-				l := level.Layers().Get(GLint(i))
+				l := level.Layers().Get(ctx, GLint(i))
 				if l.IsNil() {
 					continue
 				}
@@ -213,7 +213,7 @@ func (t Textureʳ) ResourceData(ctx context.Context, s *api.GlobalState) (*api.R
 		}
 		return api.NewResourceData(api.NewTexture(&api.Cubemap{Levels: levels})), nil
 	}
-	return nil, &service.ErrDataUnavailable{Reason: messages.ErrNoTextureData(t.ResourceHandle())}
+	return nil, &service.ErrDataUnavailable{Reason: messages.ErrNoTextureData(ctx, t.ResourceHandle())}
 }
 
 func (t Textureʳ) SetResourceData(ctx context.Context, at *path.Command,
@@ -546,11 +546,11 @@ func (p Programʳ) ResourceData(ctx context.Context, s *api.GlobalState) (*api.R
 			}
 
 			uniforms = append(uniforms, &api.Uniform{
-				UniformLocation: uint32(activeUniform.Locations().Get(0)),
+				UniformLocation: uint32(activeUniform.Locations().Get(ctx, 0)),
 				Name:            activeUniform.Name(),
 				Format:          uniformFormat,
 				Type:            uniformType,
-				Value:           box.NewValue(uniformValue(ctx, s, uniformType, activeUniform.Value())),
+				Value:           box.NewValue(ctx, uniformValue(ctx, s, uniformType, activeUniform.Value())),
 			})
 		}
 	}

@@ -72,7 +72,7 @@ func NCmds(ctx context.Context, p *path.Capture, n uint64) ([]api.Cmd, error) {
 		return nil, err
 	}
 	if count := uint64(len(list)); n > count {
-		return nil, errPathOOB(n-1, "Index", 0, count-1, p.Command(n-1))
+		return nil, errPathOOB(ctx, n-1, "Index", 0, count-1, p.Command(n-1))
 	}
 	return list, nil
 }
@@ -121,7 +121,7 @@ func Cmd(ctx context.Context, p *path.Command) (api.Cmd, error) {
 			}
 		}
 		if !found {
-			return nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage("Not a valid subcommand")}
+			return nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage(ctx, "Not a valid subcommand")}
 		}
 	}
 	cmds, err := NCmds(ctx, p.Capture, cmdIdx+1)
@@ -144,7 +144,7 @@ func Parameter(ctx context.Context, p *path.Parameter) (interface{}, error) {
 		return param, nil
 	case api.ErrParameterNotFound:
 		return nil, &service.ErrInvalidPath{
-			Reason: messages.ErrParameterDoesNotExist(cmd.CmdName(), p.Name),
+			Reason: messages.ErrParameterDoesNotExist(ctx, cmd.CmdName(), p.Name),
 			Path:   p.Path(),
 		}
 	default:
@@ -165,7 +165,7 @@ func Result(ctx context.Context, p *path.Result) (interface{}, error) {
 		return param, nil
 	case api.ErrResultNotFound:
 		return nil, &service.ErrInvalidPath{
-			Reason: messages.ErrResultDoesNotExist(cmd.CmdName()),
+			Reason: messages.ErrResultDoesNotExist(ctx, cmd.CmdName()),
 			Path:   p.Path(),
 		}
 	default:

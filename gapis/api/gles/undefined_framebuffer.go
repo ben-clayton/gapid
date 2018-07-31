@@ -30,7 +30,7 @@ func undefinedFramebuffer(ctx context.Context, device *device.Instance) transfor
 	return transform.Transform("DirtyFramebuffer", func(ctx context.Context, id api.CmdID, cmd api.Cmd, out transform.Writer) {
 		out.MutateAndWrite(ctx, id, cmd)
 		s := out.State()
-		c := GetContext(s, cmd.Thread())
+		c := GetContext(ctx, s, cmd.Thread())
 		if c.IsNil() || !c.Other().Initialized() {
 			return // We can't do anything without a context.
 		}
@@ -95,7 +95,7 @@ func drawUndefinedFramebuffer(ctx context.Context, id api.CmdID, cmd api.Cmd, de
 
 	dID := id.Derived()
 	cb := CommandBuilder{Thread: cmd.Thread(), Arena: s.Arena}
-	t := newTweaker(out, id, cb)
+	t := newTweaker(ctx, out, id, cb)
 
 	// Temporarily change rasterizing/blending state and enable VAP 0.
 	t.glDisable(ctx, GLenum_GL_BLEND)
@@ -116,10 +116,10 @@ func drawUndefinedFramebuffer(ctx context.Context, id api.CmdID, cmd api.Cmd, de
 	attrib.SetType(GLenum_GL_FLOAT_VEC2)
 	attrib.SetName(aScreenCoords)
 	attrib.SetArraySize(1)
-	attrib.SetLocations(NewU32ːGLintᵐ(s.Arena).Add(0, 0))
+	attrib.SetLocations(NewU32ːGLintᵐ(s.Arena).Add(ctx, 0, 0))
 
 	resources := MakeActiveProgramResourcesʳ(s.Arena)
-	resources.SetProgramInputs(NewU32ːProgramResourceʳᵐ(s.Arena).Add(0, attrib))
+	resources.SetProgramInputs(NewU32ːProgramResourceʳᵐ(s.Arena).Add(ctx, 0, attrib))
 
 	extra := MakeLinkProgramExtra(s.Arena)
 	extra.SetLinkStatus(GLboolean_GL_TRUE)

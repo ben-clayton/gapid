@@ -19,6 +19,7 @@
   package {{$.Package}}¶
 ¶
   import (»¶
+    "context"¶
     "github.com/google/gapid/gapis/stringtable"¶
   «)¶
 
@@ -27,6 +28,7 @@
     ¶
     // {{$name}} returns a {{.Key}} message with the provided arguments.¶
     func {{$name}}(
+      ctx context.Context,
     {{if .Parameters}}
         {{range $i, $p := .Parameters}}
           {{if $i}},•{{end}}{{$p.Identifier}}
@@ -40,7 +42,7 @@
         {{else}}
             Arguments: map[string]*stringtable.Value{»¶
                 {{range $i, $p := .Parameters}}
-                  "{{$p.Identifier}}":║stringtable.ToValue({{$p.Identifier}}),¶
+                  "{{$p.Identifier}}":║stringtable.ToValue(ctx, {{$p.Identifier}}),¶
                 {{end}}
             «},¶
         {{end}}

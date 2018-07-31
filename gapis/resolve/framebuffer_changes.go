@@ -53,7 +53,7 @@ func (c AttachmentFramebufferChanges) Get(ctx context.Context, after *path.Comma
 	}
 	if info.Err != nil {
 		log.W(ctx, "Framebuffer error after %v: %v", after, info.Err)
-		return FramebufferAttachmentInfo{}, &service.ErrDataUnavailable{Reason: messages.ErrFramebufferUnavailable()}
+		return FramebufferAttachmentInfo{}, &service.ErrDataUnavailable{Reason: messages.ErrFramebufferUnavailable(ctx)}
 	}
 	return info, nil
 }

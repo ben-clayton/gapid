@@ -112,10 +112,10 @@ func (p *imagePrimer) primeByRendering(img ImageObjectʳ, opaqueBoundRanges []Vk
 				inputImageObjects := copyJob.srcAspectsToDsts[aspect].dstImgs
 				inputImages := make([]ipRenderImage, len(inputImageObjects))
 				for i, iimg := range inputImageObjects {
-					layout := iimg.Aspects().Get(
-						VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT).Layers().Get(
-						layer).Levels().Get(
-						level).Layout()
+					layout := iimg.Aspects().Get(p.sb.ctx, VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT).
+						Layers().Get(p.sb.ctx, layer).
+						Levels().Get(p.sb.ctx, level).
+						Layout()
 					inputImages[i] = ipRenderImage{
 						image:         iimg,
 						aspect:        VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT,
@@ -133,7 +133,7 @@ func (p *imagePrimer) primeByRendering(img ImageObjectʳ, opaqueBoundRanges []Vk
 						layer:         layer,
 						level:         level,
 						initialLayout: VkImageLayout_VK_IMAGE_LAYOUT_UNDEFINED,
-						finalLayout:   img.Aspects().Get(aspect).Layers().Get(layer).Levels().Get(level).Layout(),
+						finalLayout:   img.Aspects().Get(p.sb.ctx, aspect).Layers().Get(p.sb.ctx, layer).Levels().Get(p.sb.ctx, level).Layout(),
 					},
 				})
 			}
@@ -198,7 +198,7 @@ func (p *imagePrimer) primeByImageStore(img ImageObjectʳ, opaqueBoundRanges []V
 	transitionInfo := []imageSubRangeInfo{}
 	oldLayouts := []VkImageLayout{}
 	walkImageSubresourceRange(p.sb, img, whole, func(aspect VkImageAspectFlagBits, layer, level uint32, unused byteSizeAndExtent) {
-		l := GetState(p.sb.newState).Images().Get(img.VulkanHandle()).Aspects().Get(aspect).Layers().Get(layer).Levels().Get(level)
+		l := GetState(p.sb.newState).Images().Get(p.sb.ctx, img.VulkanHandle()).Aspects().Get(p.sb.ctx, aspect).Layers().Get(p.sb.ctx, layer).Levels().Get(p.sb.ctx, level)
 		transitionInfo = append(transitionInfo, imageSubRangeInfo{
 			aspectMask:     VkImageAspectFlags(aspect),
 			baseMipLevel:   level,
@@ -234,7 +234,7 @@ func (p *imagePrimer) primeByPreinitialization(img ImageObjectʳ, opaqueBoundRan
 	if queue.IsNil() {
 		return log.Err(p.sb.ctx, nil, "[Priming image data by pre-initialization] Nil queue")
 	}
-	newImg := GetState(p.sb.newState).Images().Get(img.VulkanHandle())
+	newImg := GetState(p.sb.newState).Images().Get(p.sb.ctx, img.VulkanHandle())
 	newMem := newImg.BoundMemory()
 	boundOffset := img.BoundMemoryOffset()
 	boundSize := img.MemoryRequirements().Size()
@@ -257,7 +257,7 @@ func (p *imagePrimer) primeByPreinitialization(img ImageObjectʳ, opaqueBoundRan
 	for _, rng := range opaqueBoundRanges {
 		walkImageSubresourceRange(p.sb, img, rng,
 			func(aspect VkImageAspectFlagBits, layer, level uint32, unused byteSizeAndExtent) {
-				origLevel := img.Aspects().Get(aspect).Layers().Get(layer).Levels().Get(level)
+				origLevel := img.Aspects().Get(p.sb.ctx, aspect).Layers().Get(p.sb.ctx, layer).Levels().Get(p.sb.ctx, level)
 				origDataSlice := origLevel.Data()
 				linearLayout := origLevel.LinearLayout()
 
@@ -344,13 +344,13 @@ func (p *imagePrimer) allocStagingImages(img ImageObjectʳ, aspect VkImageAspect
 	stagingElementInfo, _ := subGetElementAndTexelBlockSize(p.sb.ctx, nil, api.CmdNoID, nil, p.sb.oldState, GetState(p.sb.oldState), 0, nil, stagingImgFormat)
 	stagingElementSize := stagingElementInfo.ElementSize()
 
-	stagingInfo := img.Info().Clone(p.sb.newState.Arena)
+	stagingInfo := img.Info().Clone(p.sb.ctx)
 	stagingInfo.SetDedicatedAllocationNV(NilDedicatedAllocationBufferImageCreateInfoNVʳ)
 	stagingInfo.SetFmt(stagingImgFormat)
 	stagingInfo.SetUsage(VkImageUsageFlags(VkImageUsageFlagBits_VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits_VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VkImageUsageFlagBits_VK_IMAGE_USAGE_SAMPLED_BIT))
 
-	dev := p.sb.s.Devices().Get(img.Device())
-	phyDevMemProps := p.sb.s.PhysicalDevices().Get(dev.PhysicalDevice()).MemoryProperties()
+	dev := p.sb.s.Devices().Get(p.sb.ctx, img.Device())
+	phyDevMemProps := p.sb.s.PhysicalDevices().Get(p.sb.ctx, dev.PhysicalDevice()).MemoryProperties()
 	memTypeBits := img.MemoryRequirements().MemoryTypeBits()
 	memIndex := memoryTypeIndexFor(memTypeBits, phyDevMemProps, VkMemoryPropertyFlags(VkMemoryPropertyFlagBits_VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
 	if memIndex < 0 {
@@ -367,7 +367,7 @@ func (p *imagePrimer) allocStagingImages(img ImageObjectʳ, aspect VkImageAspect
 			return GetState(p.sb.newState).Images().Contains(VkImage(x))
 		}))
 		vkCreateImage(p.sb, dev.VulkanHandle(), stagingInfo, stagingImgHandle)
-		stagingImg := GetState(p.sb.newState).Images().Get(stagingImgHandle)
+		stagingImg := GetState(p.sb.newState).Images().Get(p.sb.ctx, stagingImgHandle)
 		// Query the memory requirements so validation layers are happy
 		vkGetImageMemoryRequirements(p.sb, dev.VulkanHandle(), stagingImgHandle, MakeVkMemoryRequirements(p.sb.ta))
 
@@ -381,7 +381,7 @@ func (p *imagePrimer) allocStagingImages(img ImageObjectʳ, aspect VkImageAspect
 		// Since we cannot guess how much the driver will actually request of us,
 		// overallocating by a factor of 2 should be enough.
 		vkAllocateMemory(p.sb, dev.VulkanHandle(), VkDeviceSize(stagingImgSize*2), uint32(memIndex), memHandle)
-		mem := GetState(p.sb.newState).DeviceMemories().Get(memHandle)
+		mem := GetState(p.sb.newState).DeviceMemories().Get(p.sb.ctx, memHandle)
 
 		vkBindImageMemory(p.sb, dev.VulkanHandle(), stagingImgHandle, memHandle, 0)
 		stagingImgs = append(stagingImgs, stagingImg)
@@ -392,24 +392,24 @@ func (p *imagePrimer) allocStagingImages(img ImageObjectʳ, aspect VkImageAspect
 }
 
 type ipLayoutInfo interface {
-	layoutOf(aspect VkImageAspectFlagBits, layer, level uint32) VkImageLayout
+	layoutOf(ctx context.Context, aspect VkImageAspectFlagBits, layer, level uint32) VkImageLayout
 }
 
 type ipLayoutInfoFromImage struct {
 	img ImageObjectʳ
 }
 
-func (i *ipLayoutInfoFromImage) layoutOf(aspect VkImageAspectFlagBits, layer, level uint32) VkImageLayout {
-	if _, ok := i.img.Aspects().Lookup(aspect); !ok {
+func (i *ipLayoutInfoFromImage) layoutOf(ctx context.Context, aspect VkImageAspectFlagBits, layer, level uint32) VkImageLayout {
+	if _, ok := i.img.Aspects().Lookup(ctx, aspect); !ok {
 		return VkImageLayout_VK_IMAGE_LAYOUT_UNDEFINED
 	}
-	if _, ok := i.img.Aspects().Get(aspect).Layers().Lookup(layer); !ok {
+	if _, ok := i.img.Aspects().Get(ctx, aspect).Layers().Lookup(ctx, layer); !ok {
 		return VkImageLayout_VK_IMAGE_LAYOUT_UNDEFINED
 	}
-	if _, ok := i.img.Aspects().Get(aspect).Layers().Get(layer).Levels().Lookup(level); !ok {
+	if _, ok := i.img.Aspects().Get(ctx, aspect).Layers().Get(ctx, layer).Levels().Lookup(ctx, level); !ok {
 		return VkImageLayout_VK_IMAGE_LAYOUT_UNDEFINED
 	}
-	return i.img.Aspects().Get(aspect).Layers().Get(layer).Levels().Get(level).Layout()
+	return i.img.Aspects().Get(ctx, aspect).Layers().Get(ctx, layer).Levels().Get(ctx, level).Layout()
 }
 
 func sameLayoutsOfImage(img ImageObjectʳ) ipLayoutInfo {
@@ -420,7 +420,7 @@ type ipLayoutInfoFromLayout struct {
 	layout VkImageLayout
 }
 
-func (i *ipLayoutInfoFromLayout) layoutOf(aspect VkImageAspectFlagBits, layer, level uint32) VkImageLayout {
+func (i *ipLayoutInfoFromLayout) layoutOf(ctx context.Context, aspect VkImageAspectFlagBits, layer, level uint32) VkImageLayout {
 	return i.layout
 }
 
@@ -519,10 +519,10 @@ func (h *ipStoreHandler) store(job *ipStoreJob, queue VkQueue) error {
 
 	dev := job.storeTarget.Device()
 
-	phyDev := h.sb.s.Devices().Get(dev).PhysicalDevice()
+	phyDev := h.sb.s.Devices().Get(h.sb.ctx, dev).PhysicalDevice()
 	maxTexelBufferElements := uint32(specMaxTexelBufferElements)
-	if h.sb.s.PhysicalDevices().Get(phyDev).PhysicalDeviceProperties().Limits().MaxTexelBufferElements() > specMaxTexelBufferElements {
-		maxTexelBufferElements = h.sb.s.PhysicalDevices().Get(phyDev).PhysicalDeviceProperties().Limits().MaxTexelBufferElements()
+	if h.sb.s.PhysicalDevices().Get(h.sb.ctx, phyDev).PhysicalDeviceProperties().Limits().MaxTexelBufferElements() > specMaxTexelBufferElements {
+		maxTexelBufferElements = h.sb.s.PhysicalDevices().Get(h.sb.ctx, phyDev).PhysicalDeviceProperties().Limits().MaxTexelBufferElements()
 	}
 
 	// create descriptor pool
@@ -628,7 +628,7 @@ func (h *ipStoreHandler) store(job *ipStoreJob, queue VkQueue) error {
 		job.storeTarget.Info().Fmt(),
 		0, job.aspect).levelSize)
 	data := job.storeTarget.Aspects().
-		Get(job.aspect).Layers().Get(job.layer).Levels().Get(job.level).
+		Get(h.sb.ctx, job.aspect).Layers().Get(h.sb.ctx, job.layer).Levels().Get(h.sb.ctx, job.level).
 		Data().Slice(opaqueDataOffset, opaqueDataSizeInBytes).
 		MustRead(h.sb.ctx, nil, h.sb.oldState, nil)
 
@@ -957,7 +957,7 @@ func (h *ipStoreHandler) getOrCreateComputePipeline(info ipStoreShaderInfo) (Com
 		memory.Nullptr, h.sb.MustAllocWriteData(handle).Ptr(),
 		VkResult_VK_SUCCESS,
 	))
-	h.pipelines[info] = GetState(h.sb.newState).ComputePipelines().Get(handle)
+	h.pipelines[info] = GetState(h.sb.newState).ComputePipelines().Get(h.sb.ctx, handle)
 	return h.pipelines[info], nil
 }
 
@@ -976,7 +976,7 @@ func (h *ipStoreHandler) getOrCreateShaderModule(info ipStoreShaderInfo) (Shader
 		return NilShaderModuleObjectʳ, log.Errf(h.sb.ctx, nil, "no SPIR-V code generated")
 	}
 	vkCreateShaderModule(h.sb, info.dev, code, handle)
-	h.shaders[info] = GetState(h.sb.newState).ShaderModules().Get(handle)
+	h.shaders[info] = GetState(h.sb.newState).ShaderModules().Get(h.sb.ctx, handle)
 	return h.shaders[info], nil
 }
 
@@ -1343,9 +1343,9 @@ func (h *ipRenderHandler) render(job *ipRenderJob, tsk *scratchTask) error {
 		0, // pNext
 		0, // srcAccessMask
 		VkAccessFlags(VkAccessFlagBits_VK_ACCESS_MEMORY_WRITE_BIT), // dstAccessMask
-		GetState(h.sb.newState).Images().Get(job.renderTarget.image.VulkanHandle()).Aspects().Get(
-			job.renderTarget.aspect).Layers().Get(
-			job.renderTarget.layer).Levels().Get(
+		GetState(h.sb.newState).Images().Get(h.sb.ctx, job.renderTarget.image.VulkanHandle()).Aspects().Get(h.sb.ctx,
+			job.renderTarget.aspect).Layers().Get(h.sb.ctx,
+			job.renderTarget.layer).Levels().Get(h.sb.ctx,
 			job.renderTarget.level).Layout(), // oldLayout
 		outputPreRenderLayout,                 // newLayout
 		queueFamilyIgnore,                     // srcQueueFamilyIndex
@@ -1709,7 +1709,7 @@ func (h *ipRenderHandler) createFramebuffer(dev VkDevice, renderPass VkRenderPas
 		h.sb.MustAllocWriteData(handle).Ptr(),
 		VkResult_VK_SUCCESS,
 	))
-	return GetState(h.sb.newState).Framebuffers().Get(handle)
+	return GetState(h.sb.newState).Framebuffers().Get(h.sb.ctx, handle)
 }
 
 func (h *ipRenderHandler) createImageView(dev VkDevice, img ImageObjectʳ, aspect VkImageAspectFlagBits, layer, level uint32) ImageViewObjectʳ {
@@ -1745,7 +1745,7 @@ func (h *ipRenderHandler) createImageView(dev VkDevice, img ImageObjectʳ, aspec
 		h.sb.MustAllocWriteData(handle).Ptr(),
 		VkResult_VK_SUCCESS,
 	))
-	return GetState(h.sb.newState).ImageViews().Get(handle)
+	return GetState(h.sb.newState).ImageViews().Get(h.sb.ctx, handle)
 }
 
 func (h *ipRenderHandler) allocDescriptorSet(dev VkDevice, pool VkDescriptorPool, layout VkDescriptorSetLayout) DescriptorSetObjectʳ {
@@ -1753,7 +1753,7 @@ func (h *ipRenderHandler) allocDescriptorSet(dev VkDevice, pool VkDescriptorPool
 		return GetState(h.sb.newState).DescriptorSets().Contains(VkDescriptorSet(x))
 	}))
 	vkAllocateDescriptorSet(h.sb, dev, pool, layout, handle)
-	return GetState(h.sb.newState).DescriptorSets().Get(handle)
+	return GetState(h.sb.newState).DescriptorSets().Get(h.sb.ctx, handle)
 }
 
 func (h *ipRenderHandler) createDescriptorPool(descSetInfo ipRenderDescriptorSetInfo) DescriptorPoolObjectʳ {
@@ -1779,7 +1779,7 @@ func (h *ipRenderHandler) createDescriptorPool(descSetInfo ipRenderDescriptorSet
 	vkCreateDescriptorPool(h.sb, descSetInfo.dev, VkDescriptorPoolCreateFlags(
 		VkDescriptorPoolCreateFlagBits_VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT),
 		1, poolSizes, handle)
-	return GetState(h.sb.newState).DescriptorPools().Get(handle)
+	return GetState(h.sb.newState).DescriptorPools().Get(h.sb.ctx, handle)
 }
 
 func (h *ipRenderHandler) createRenderPass(info ipRenderPassInfo, finalLayout VkImageLayout) RenderPassObjectʳ {
@@ -1882,7 +1882,7 @@ func (h *ipRenderHandler) createRenderPass(info ipRenderPassInfo, finalLayout Vk
 		VkResult_VK_SUCCESS,
 	))
 
-	return GetState(h.sb.newState).RenderPasses().Get(handle)
+	return GetState(h.sb.newState).RenderPasses().Get(h.sb.ctx, handle)
 }
 
 func (h *ipRenderHandler) getOrCreateShaderModule(info ipRenderShaderInfo) (ShaderModuleObjectʳ, error) {
@@ -1906,7 +1906,7 @@ func (h *ipRenderHandler) getOrCreateShaderModule(info ipRenderShaderInfo) (Shad
 		return NilShaderModuleObjectʳ, log.Errf(h.sb.ctx, nil, "no SPIR-V code generated")
 	}
 	vkCreateShaderModule(h.sb, info.dev, code, handle)
-	h.shaders[info] = GetState(h.sb.newState).ShaderModules().Get(handle)
+	h.shaders[info] = GetState(h.sb.newState).ShaderModules().Get(h.sb.ctx, handle)
 	return h.shaders[info], nil
 }
 
@@ -2128,7 +2128,7 @@ func (h *ipRenderHandler) getOrCreateGraphicsPipeline(info ipGfxPipelineInfo, re
 		memory.Nullptr, h.sb.MustAllocWriteData(handle).Ptr(), VkResult_VK_SUCCESS,
 	))
 
-	h.pipelines[info] = GetState(h.sb.newState).GraphicsPipelines().Get(handle)
+	h.pipelines[info] = GetState(h.sb.newState).GraphicsPipelines().Get(h.sb.ctx, handle)
 	return h.pipelines[info], nil
 }
 
@@ -2141,7 +2141,7 @@ func (h *ipRenderHandler) getOrCreatePipelineLayout(descSetInfo ipRenderDescript
 	}))
 	descriptorSet := h.getOrCreateDescriptorSetLayout(descSetInfo)
 	vkCreatePipelineLayout(h.sb, descSetInfo.dev, []VkDescriptorSetLayout{descriptorSet.VulkanHandle()}, []VkPushConstantRange{}, handle)
-	h.pipelineLayouts[descSetInfo] = GetState(h.sb.newState).PipelineLayouts().Get(handle)
+	h.pipelineLayouts[descSetInfo] = GetState(h.sb.newState).PipelineLayouts().Get(h.sb.ctx, handle)
 	return h.pipelineLayouts[descSetInfo]
 }
 
@@ -2176,7 +2176,7 @@ func (h *ipRenderHandler) getOrCreateDescriptorSetLayout(descSetInfo ipRenderDes
 	}
 
 	vkCreateDescriptorSetLayout(h.sb, descSetInfo.dev, bindings, handle)
-	h.descriptorSetLayouts[descSetInfo] = GetState(h.sb.newState).DescriptorSetLayouts().Get(handle)
+	h.descriptorSetLayouts[descSetInfo] = GetState(h.sb.newState).DescriptorSetLayouts().Get(h.sb.ctx, handle)
 	return h.descriptorSetLayouts[descSetInfo]
 }
 
@@ -2303,7 +2303,6 @@ func (h *ipBufferCopySession) collectCopiesFromSparseImageBindings() {
 }
 
 func (h *ipBufferCopySession) rolloutBufCopies(queue VkQueue) error {
-
 	if h.totalSize == 0 || len(h.copies) == 0 || len(h.content) == 0 {
 		return log.Errf(h.sb.ctx, nil, "no content for buf->img copy")
 	}
@@ -2341,7 +2340,7 @@ func (h *ipBufferCopySession) rolloutBufCopies(queue VkQueue) error {
 					VkAccessFlags((VkAccessFlagBits_VK_ACCESS_MEMORY_WRITE_BIT-1)|VkAccessFlagBits_VK_ACCESS_MEMORY_WRITE_BIT), // srcAccessMask
 					VkAccessFlags((VkAccessFlagBits_VK_ACCESS_MEMORY_WRITE_BIT-1)|VkAccessFlagBits_VK_ACCESS_MEMORY_WRITE_BIT), // dstAccessMask
 					VkImageLayout_VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,                                                         // oldLayout
-					h.job.finalLayout.layoutOf(aspect, layer, level),                                                           // newLayout
+					h.job.finalLayout.layoutOf(h.sb.ctx, aspect, layer, level),                                                 // newLayout
 					queueFamilyIgnore,                                                                                          // srcQueueFamilyIndex
 					queueFamilyIgnore,                                                                                          // dstQueueFamilyIndex
 					dstImg.VulkanHandle(),                                                                                      // image
@@ -2383,7 +2382,7 @@ func (h *ipBufferCopySession) rolloutBufCopies(queue VkQueue) error {
 				h.content[dstImg] = h.content[dstImg][len(bufContent):]
 				scratchBuffer := tsk.newBuffer(bufContent, VkBufferUsageFlagBits_VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
 				tsk.deferUntilExecuted(func() {
-					h.sb.write(h.sb.cb.VkDestroyBuffer(h.sb.s.Queues().Get(tsk.queue).Device(), scratchBuffer, memory.Nullptr))
+					h.sb.write(h.sb.cb.VkDestroyBuffer(h.sb.s.Queues().Get(h.sb.ctx, tsk.queue).Device(), scratchBuffer, memory.Nullptr))
 				})
 
 				tsk.recordCmdBufCommand(func(commandBuffer VkCommandBuffer) {
@@ -2479,9 +2478,9 @@ func (h *ipBufferCopySession) getCopyAndData(dstImg ImageObjectʳ, dstAspect VkI
 		srcImg.Info().Fmt(),
 		0, srcAspect).levelSize)
 	dataSlice := srcImg.
-		Aspects().Get(srcAspect).
-		Layers().Get(layer).
-		Levels().Get(level).
+		Aspects().Get(h.sb.ctx, srcAspect).
+		Layers().Get(h.sb.ctx, layer).
+		Levels().Get(h.sb.ctx, level).
 		Data().Slice(srcImgDataOffset, srcImgDataOffset+srcImgDataSizeInBytes)
 
 	errorIfUnexpectedLength := func(dataLen uint64) error {
@@ -2722,11 +2721,11 @@ func vkCreateImage(sb *stateBuilder, dev VkDevice, info ImageInfo, handle VkImag
 	)
 
 	if sb.s.Images().Contains(handle) {
-		obj := sb.s.Images().Get(handle)
+		obj := sb.s.Images().Get(sb.ctx, handle)
 		imgMemReq := MakeImageMemoryRequirements(sb.newState.Arena)
 		imgMemReq.SetMemoryRequirements(obj.MemoryRequirements())
 		for bit, req := range obj.SparseMemoryRequirements().All() {
-			imgMemReq.AspectBitsToSparseMemoryRequirements().Add(bit, req)
+			imgMemReq.AspectBitsToSparseMemoryRequirements().Add(sb.ctx, bit, req)
 		}
 		create.Extras().Add(imgMemReq)
 	}

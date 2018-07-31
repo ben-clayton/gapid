@@ -43,8 +43,8 @@ func newReadFramebuffer(ctx context.Context, device *device.Instance) *readFrame
 	return &readFramebuffer{targetVersion: targetVersion}
 }
 
-func getBoundFramebufferID(thread uint64, s *api.GlobalState) (FramebufferId, error) {
-	c := GetContext(s, thread)
+func getBoundFramebufferID(ctx context.Context, thread uint64, s *api.GlobalState) (FramebufferId, error) {
+	c := GetContext(ctx, s, thread)
 	if c.IsNil() {
 		return 0, fmt.Errorf("No OpenGL ES context")
 	}
@@ -90,26 +90,26 @@ func postFBData(ctx context.Context,
 	res replay.Result) {
 
 	s := out.State()
-	c := GetContext(s, thread)
+	c := GetContext(ctx, s, thread)
 
 	if fb == 0 {
 		var err error
-		if fb, err = getBoundFramebufferID(thread, s); err != nil {
+		if fb, err = getBoundFramebufferID(ctx, thread, s); err != nil {
 			log.W(ctx, "Could not read framebuffer after cmd %v: %v", id, err)
-			res(nil, &service.ErrDataUnavailable{Reason: messages.ErrFramebufferUnavailable()})
+			res(nil, &service.ErrDataUnavailable{Reason: messages.ErrFramebufferUnavailable(ctx)})
 			return
 		}
 	}
 
-	fbai, err := GetState(s).getFramebufferAttachmentInfo(thread, fb, attachment)
+	fbai, err := GetState(s).getFramebufferAttachmentInfo(ctx, thread, fb, attachment)
 	if err != nil {
 		log.W(ctx, "Failed to read framebuffer after cmd %v: %v", id, err)
-		res(nil, &service.ErrDataUnavailable{Reason: messages.ErrFramebufferUnavailable()})
+		res(nil, &service.ErrDataUnavailable{Reason: messages.ErrFramebufferUnavailable(ctx)})
 		return
 	}
 	if fbai.format == 0 {
 		log.W(ctx, "Failed to read framebuffer after cmd %v: no image format", id)
-		res(nil, &service.ErrDataUnavailable{Reason: messages.ErrFramebufferUnavailable()})
+		res(nil, &service.ErrDataUnavailable{Reason: messages.ErrFramebufferUnavailable(ctx)})
 		return
 	}
 
@@ -129,7 +129,7 @@ func postFBData(ctx context.Context,
 
 	dID := id.Derived()
 	cb := CommandBuilder{Thread: thread, Arena: s.Arena}
-	t := newTweaker(out, dID, cb)
+	t := newTweaker(ctx, out, dID, cb)
 	defer t.revert(ctx)
 	t.glBindFramebuffer_Read(ctx, fb)
 

@@ -208,7 +208,7 @@ func (v *Error) Get() error { return protoutil.OneOf(v.Err).(error) }
 
 // NewValue attempts to box and return v into a Value.
 // If v cannot be boxed into a Value then nil is returned.
-func NewValue(v interface{}) *Value {
+func NewValue(ctx context.Context, v interface{}) *Value {
 	switch v := v.(type) {
 	case nil:
 		return &Value{}
@@ -264,7 +264,7 @@ func NewValue(v interface{}) *Value {
 		return &Value{Val: &Value_TraceConfig{v}}
 
 	default:
-		if v := box.NewValue(v); v != nil {
+		if v := box.NewValue(ctx, v); v != nil {
 			return &Value{Val: &Value_Box{v}}
 		}
 	}
@@ -272,12 +272,12 @@ func NewValue(v interface{}) *Value {
 }
 
 // Get returns the boxed value.
-func (v *Value) Get() interface{} {
+func (v *Value) Get(ctx context.Context) interface{} {
 	switch v := v.Val.(type) {
 	case nil:
 		return nil
 	case *Value_Box:
-		return v.Box.Get()
+		return v.Box.Get(ctx)
 	default:
 		return protoutil.OneOf(v)
 	}

@@ -36,6 +36,8 @@ namespace gapii {
 
 typedef uint32_t GLenum_Error;
 
+struct Pool;
+
 class SpyBase;
 
 // CallObserver collects observation data in API function calls. It is supposed
@@ -178,8 +180,15 @@ class CallObserver : public context_t {
   // The list of pending memory observations is cleared on returning.
   void observePending();
 
-  // allocate_pool_id returns the next unallocated pool identifier.
-  uint32_t allocate_pool_id() const;
+  // create_pool returns a new pool with a ref-count of 1.
+  Pool* create_pool(uint64_t size);
+
+  // destroy_pool frees the given pool. The pool must have no remaining
+  // references.
+  void destroy_pool(Pool* pool);
+
+  // get_pool returns the pool with the given ID.
+  Pool* get_pool(uint64_t id);
 
  private:
   // shouldObserve returns true if the given slice is located in application

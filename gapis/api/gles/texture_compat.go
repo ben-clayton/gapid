@@ -220,7 +220,7 @@ func (tc *textureCompat) postTexParameter(ctx context.Context, target, parameter
 func decompressTexImage2D(ctx context.Context, i api.CmdID, a *GlCompressedTexImage2D, s *api.GlobalState, out transform.Writer) error {
 	ctx = log.Enter(ctx, "decompressTexImage2D")
 	dID := i.Derived()
-	c := GetContext(s, a.Thread())
+	c := GetContext(ctx, s, a.Thread())
 	cb := CommandBuilder{Thread: a.Thread(), Arena: s.Arena}
 	data := AsU8ˢ(s.Arena, a.Data().Slice(0, uint64(a.ImageSize()), s.MemoryLayout), s.MemoryLayout)
 	if pb := c.Bound().PixelUnpackBuffer(); !pb.IsNil() {
@@ -273,7 +273,7 @@ func decompressTexImage2D(ctx context.Context, i api.CmdID, a *GlCompressedTexIm
 func decompressTexSubImage2D(ctx context.Context, i api.CmdID, a *GlCompressedTexSubImage2D, s *api.GlobalState, out transform.Writer) error {
 	ctx = log.Enter(ctx, "decompressTexSubImage2D")
 	dID := i.Derived()
-	c := GetContext(s, a.Thread())
+	c := GetContext(ctx, s, a.Thread())
 	cb := CommandBuilder{Thread: a.Thread(), Arena: s.Arena}
 	data := AsU8ˢ(s.Arena, a.Data().Slice(0, uint64(a.ImageSize()), s.MemoryLayout), s.MemoryLayout)
 	if pb := c.Bound().PixelUnpackBuffer(); !pb.IsNil() {

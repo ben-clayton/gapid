@@ -139,7 +139,7 @@ func (m *bufferCompat) bindBufferRange(ctx context.Context, out transform.Writer
 	// We have a glBindBufferRange() taking a uniform buffer with an illegal
 	// offset alignment.
 
-	orig := c.Objects().Buffers().Get(cmd.Buffer())
+	orig := c.Objects().Buffers().Get(ctx, cmd.Buffer())
 	if orig.IsNil() {
 		return // Don't know what buffer this is referring to.
 	}

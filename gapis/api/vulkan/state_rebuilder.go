@@ -137,25 +137,25 @@ func (s *State) RebuildState(ctx context.Context, oldState *api.GlobalState) ([]
 	sb.newState.Memory.NewAt(sb.oldState.Memory.NextPoolID())
 
 	for _, k := range s.Instances().Keys() {
-		sb.createInstance(k, s.Instances().Get(k))
+		sb.createInstance(k, s.Instances().Get(ctx, k))
 	}
 
 	sb.createPhysicalDevices(s.PhysicalDevices())
 
 	for _, su := range s.Surfaces().Keys() {
-		sb.createSurface(s.Surfaces().Get(su))
+		sb.createSurface(s.Surfaces().Get(ctx, su))
 	}
 
 	for _, d := range s.Devices().Keys() {
-		sb.createDevice(s.Devices().Get(d))
+		sb.createDevice(s.Devices().Get(ctx, d))
 	}
 
 	for _, q := range s.Queues().Keys() {
-		sb.createQueue(s.Queues().Get(q))
+		sb.createQueue(s.Queues().Get(ctx, q))
 	}
 
 	for _, swp := range s.Swapchains().Keys() {
-		sb.createSwapchain(s.Swapchains().Get(swp))
+		sb.createSwapchain(s.Swapchains().Get(ctx, swp))
 	}
 
 	// Create all non-dedicated allocations.
@@ -163,99 +163,99 @@ func (s *State) RebuildState(ctx context.Context, oldState *api.GlobalState) ([]
 	// objects
 	for _, mem := range s.DeviceMemories().Keys() {
 		// TODO: Handle KHR dedicated allocation as well as NV
-		sb.createDeviceMemory(s.DeviceMemories().Get(mem), false)
+		sb.createDeviceMemory(s.DeviceMemories().Get(ctx, mem), false)
 	}
 
 	for _, buf := range s.Buffers().Keys() {
-		sb.createBuffer(s.Buffers().Get(buf))
+		sb.createBuffer(s.Buffers().Get(ctx, buf))
 	}
 
 	{
 		imgPrimer := newImagePrimer(sb)
 		defer imgPrimer.free()
 		for _, img := range s.Images().Keys() {
-			sb.createImage(s.Images().Get(img), imgPrimer)
+			sb.createImage(s.Images().Get(ctx, img), imgPrimer)
 		}
 	}
 
 	for _, smp := range s.Samplers().Keys() {
-		sb.createSampler(s.Samplers().Get(smp))
+		sb.createSampler(s.Samplers().Get(ctx, smp))
 	}
 
 	for _, fnc := range s.Fences().Keys() {
-		sb.createFence(s.Fences().Get(fnc))
+		sb.createFence(s.Fences().Get(ctx, fnc))
 	}
 
 	for _, sem := range s.Semaphores().Keys() {
-		sb.createSemaphore(s.Semaphores().Get(sem))
+		sb.createSemaphore(s.Semaphores().Get(ctx, sem))
 	}
 
 	for _, evt := range s.Events().Keys() {
-		sb.createEvent(s.Events().Get(evt))
+		sb.createEvent(s.Events().Get(ctx, evt))
 	}
 
 	for _, cp := range s.CommandPools().Keys() {
-		sb.createCommandPool(s.CommandPools().Get(cp))
+		sb.createCommandPool(s.CommandPools().Get(ctx, cp))
 	}
 
 	for _, pc := range s.PipelineCaches().Keys() {
-		sb.createPipelineCache(s.PipelineCaches().Get(pc))
+		sb.createPipelineCache(s.PipelineCaches().Get(ctx, pc))
 	}
 
 	for _, dsl := range s.DescriptorSetLayouts().Keys() {
-		sb.createDescriptorSetLayout(s.DescriptorSetLayouts().Get(dsl))
+		sb.createDescriptorSetLayout(s.DescriptorSetLayouts().Get(ctx, dsl))
 	}
 
 	for _, pl := range s.PipelineLayouts().Keys() {
-		sb.createPipelineLayout(s.PipelineLayouts().Get(pl))
+		sb.createPipelineLayout(s.PipelineLayouts().Get(ctx, pl))
 	}
 
 	for _, rp := range s.RenderPasses().Keys() {
-		sb.createRenderPass(s.RenderPasses().Get(rp))
+		sb.createRenderPass(s.RenderPasses().Get(ctx, rp))
 	}
 
 	for _, sm := range s.ShaderModules().Keys() {
-		sb.createShaderModule(s.ShaderModules().Get(sm))
+		sb.createShaderModule(s.ShaderModules().Get(ctx, sm))
 	}
 
-	for _, cp := range getPipelinesInOrder(s, true) {
-		sb.createComputePipeline(s.ComputePipelines().Get(cp))
+	for _, cp := range getPipelinesInOrder(ctx, s, true) {
+		sb.createComputePipeline(s.ComputePipelines().Get(ctx, cp))
 	}
 
-	for _, gp := range getPipelinesInOrder(s, false) {
-		sb.createGraphicsPipeline(s.GraphicsPipelines().Get(gp))
+	for _, gp := range getPipelinesInOrder(ctx, s, false) {
+		sb.createGraphicsPipeline(s.GraphicsPipelines().Get(ctx, gp))
 	}
 
 	for _, iv := range s.ImageViews().Keys() {
-		sb.createImageView(s.ImageViews().Get(iv))
+		sb.createImageView(s.ImageViews().Get(ctx, iv))
 	}
 
 	for _, bv := range s.BufferViews().Keys() {
-		sb.createBufferView(s.BufferViews().Get(bv))
+		sb.createBufferView(s.BufferViews().Get(ctx, bv))
 	}
 
 	for _, dp := range s.DescriptorPools().Keys() {
-		sb.createDescriptorPoolAndAllocateDescriptorSets(s.DescriptorPools().Get(dp))
+		sb.createDescriptorPoolAndAllocateDescriptorSets(s.DescriptorPools().Get(ctx, dp))
 	}
 
 	for _, fb := range s.Framebuffers().Keys() {
-		sb.createFramebuffer(s.Framebuffers().Get(fb))
+		sb.createFramebuffer(s.Framebuffers().Get(ctx, fb))
 	}
 
 	for _, ds := range s.DescriptorSets().Keys() {
-		sb.writeDescriptorSet(s.DescriptorSets().Get(ds))
+		sb.writeDescriptorSet(s.DescriptorSets().Get(ctx, ds))
 	}
 
 	for _, qp := range s.QueryPools().Keys() {
-		sb.createQueryPool(s.QueryPools().Get(qp))
+		sb.createQueryPool(s.QueryPools().Get(ctx, qp))
 	}
 
 	for _, qp := range s.CommandBuffers().Keys() {
-		sb.createCommandBuffer(s.CommandBuffers().Get(qp), VkCommandBufferLevel_VK_COMMAND_BUFFER_LEVEL_SECONDARY)
+		sb.createCommandBuffer(s.CommandBuffers().Get(ctx, qp), VkCommandBufferLevel_VK_COMMAND_BUFFER_LEVEL_SECONDARY)
 	}
 
 	for _, qp := range s.CommandBuffers().Keys() {
-		sb.createCommandBuffer(s.CommandBuffers().Get(qp), VkCommandBufferLevel_VK_COMMAND_BUFFER_LEVEL_PRIMARY)
+		sb.createCommandBuffer(s.CommandBuffers().Get(ctx, qp), VkCommandBufferLevel_VK_COMMAND_BUFFER_LEVEL_PRIMARY)
 	}
 
 	sb.flushAllScratchResources()
@@ -264,18 +264,18 @@ func (s *State) RebuildState(ctx context.Context, oldState *api.GlobalState) ([]
 	return out.cmds, sb.memoryIntervals
 }
 
-func getPipelinesInOrder(s *State, compute bool) []VkPipeline {
+func getPipelinesInOrder(ctx context.Context, s *State, compute bool) []VkPipeline {
 	pipelines := []VkPipeline{}
 	unhandledPipelines := map[VkPipeline]VkPipeline{}
 	handledPipelines := map[VkPipeline]bool{}
 	if compute {
 		for _, p := range s.ComputePipelines().Keys() {
-			pp := s.ComputePipelines().Get(p)
+			pp := s.ComputePipelines().Get(ctx, p)
 			unhandledPipelines[pp.VulkanHandle()] = pp.BasePipeline()
 		}
 	} else {
 		for _, p := range s.GraphicsPipelines().Keys() {
-			pp := s.GraphicsPipelines().Get(p)
+			pp := s.GraphicsPipelines().Get(ctx, p)
 			unhandledPipelines[pp.VulkanHandle()] = pp.BasePipeline()
 		}
 	}
@@ -455,7 +455,7 @@ func (sb *stateBuilder) createInstance(vk VkInstance, inst InstanceObjectʳ) {
 func (sb *stateBuilder) createPhysicalDevices(Map VkPhysicalDeviceːPhysicalDeviceObjectʳᵐ) {
 	devices := map[VkInstance][]VkPhysicalDevice{}
 	for _, k := range Map.Keys() {
-		v := Map.Get(k)
+		v := Map.Get(sb.ctx, k)
 		_, ok := devices[v.Instance()]
 		if !ok {
 			devices[v.Instance()] = []VkPhysicalDevice{}
@@ -473,8 +473,8 @@ func (sb *stateBuilder) createPhysicalDevices(Map VkPhysicalDeviceːPhysicalDevi
 		))
 		props := MakePhysicalDevicesAndProperties(sb.newState.Arena)
 		for _, dev := range devs {
-			v := Map.Get(dev)
-			props.PhyDevToProperties().Add(dev, v.PhysicalDeviceProperties())
+			v := Map.Get(sb.ctx, dev)
+			props.PhyDevToProperties().Add(sb.ctx, dev, v.PhysicalDeviceProperties())
 		}
 		enumerateWithProps := sb.cb.VkEnumeratePhysicalDevices(
 			i,
@@ -486,7 +486,7 @@ func (sb *stateBuilder) createPhysicalDevices(Map VkPhysicalDeviceːPhysicalDevi
 		sb.write(enumerateWithProps)
 
 		for _, device := range devs {
-			pd := Map.Get(device)
+			pd := Map.Get(sb.ctx, device)
 			sb.write(sb.cb.VkGetPhysicalDeviceProperties(
 				device,
 				NewVkPhysicalDevicePropertiesᵖ(sb.MustAllocWriteData(pd.PhysicalDeviceProperties()).Ptr()),
@@ -694,10 +694,10 @@ type imageSubRangeInfo struct {
 
 func (sb *stateBuilder) changeImageSubRangeLayoutAndOwnership(image VkImage, subRngInfo []imageSubRangeInfo) {
 	makeBarrier := func(info imageSubRangeInfo) VkImageMemoryBarrier {
-		newFamily := sb.s.Queues().Get(info.newQueue).Family()
+		newFamily := sb.s.Queues().Get(sb.ctx, info.newQueue).Family()
 		oldFamily := newFamily
 		if info.oldQueue != VkQueue(0) {
-			oldFamily = sb.s.Queues().Get(info.oldQueue).Family()
+			oldFamily = sb.s.Queues().Get(sb.ctx, info.oldQueue).Family()
 		}
 		return NewVkImageMemoryBarrier(sb.ta,
 			VkStructureType_VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, // sType
@@ -726,8 +726,8 @@ func (sb *stateBuilder) changeImageSubRangeLayoutAndOwnership(image VkImage, sub
 			acquireBarriers[info.newQueue] = append(acquireBarriers[info.newQueue], makeBarrier(info))
 			continue
 		}
-		oldFamily := sb.s.Queues().Get(info.oldQueue).Family()
-		newFamily := sb.s.Queues().Get(info.newQueue).Family()
+		oldFamily := sb.s.Queues().Get(sb.ctx, info.oldQueue).Family()
+		newFamily := sb.s.Queues().Get(sb.ctx, info.newQueue).Family()
 		if oldFamily == newFamily {
 			acquireBarriers[info.newQueue] = append(acquireBarriers[info.newQueue], makeBarrier(info))
 			continue
@@ -820,7 +820,7 @@ func (sb *stateBuilder) createSwapchain(swp SwapchainObjectʳ) {
 
 	images := []VkImage{}
 	for _, v := range swp.SwapchainImages().Keys() {
-		images = append(images, swp.SwapchainImages().Get(v).VulkanHandle())
+		images = append(images, swp.SwapchainImages().Get(sb.ctx, v).VulkanHandle())
 	}
 
 	sb.write(sb.cb.VkGetSwapchainImagesKHR(
@@ -835,13 +835,13 @@ func (sb *stateBuilder) createSwapchain(swp SwapchainObjectʳ) {
 		ownerTransferInfo := []imageSubRangeInfo{}
 		walkImageSubresourceRange(sb, v, sb.imageWholeSubresourceRange(v),
 			func(aspect VkImageAspectFlagBits, layer, level uint32, unused byteSizeAndExtent) {
-				l := v.Aspects().Get(aspect).Layers().Get(layer).Levels().Get(level)
+				l := v.Aspects().Get(sb.ctx, aspect).Layers().Get(sb.ctx, layer).Levels().Get(sb.ctx, level)
 				if l.Layout() == VkImageLayout_VK_IMAGE_LAYOUT_UNDEFINED || l.LastBoundQueue() == NilQueueObjectʳ {
 					return
 				}
 				q := sb.getQueueFor(
 					VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT|VkQueueFlagBits_VK_QUEUE_COMPUTE_BIT|VkQueueFlagBits_VK_QUEUE_TRANSFER_BIT,
-					queueFamilyIndicesToU32Slice(v.Info().QueueFamilyIndices()),
+					queueFamilyIndicesToU32Slice(sb.ctx, v.Info().QueueFamilyIndices()),
 					v.Device(),
 					l.LastBoundQueue())
 				if q.IsNil() {
@@ -923,11 +923,11 @@ func (sb *stateBuilder) createDeviceMemory(mem DeviceMemoryObjectʳ, allowDedica
 }
 
 func (sb *stateBuilder) GetScratchBufferMemoryIndex(device DeviceObjectʳ) uint32 {
-	physicalDeviceObject := sb.s.PhysicalDevices().Get(device.PhysicalDevice())
+	physicalDeviceObject := sb.s.PhysicalDevices().Get(sb.ctx, device.PhysicalDevice())
 
 	typeBits := uint32((uint64(1) << uint64(physicalDeviceObject.MemoryProperties().MemoryTypeCount())) - 1)
 	if sb.s.TransferBufferMemoryRequirements().Contains(device.VulkanHandle()) {
-		typeBits = sb.s.TransferBufferMemoryRequirements().Get(device.VulkanHandle()).MemoryTypeBits()
+		typeBits = sb.s.TransferBufferMemoryRequirements().Get(sb.ctx, device.VulkanHandle()).MemoryTypeBits()
 	}
 	index := memoryTypeIndexFor(typeBits, physicalDeviceObject.MemoryProperties(), VkMemoryPropertyFlags(VkMemoryPropertyFlagBits_VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT))
 	if index >= 0 {
@@ -1017,9 +1017,9 @@ func (sb *stateBuilder) getQueueFor(queueFlagBits VkQueueFlagBits, queueFamilyIn
 		return false
 	}
 	flagPass := func(q QueueObjectʳ) bool {
-		dev := sb.s.Devices().Get(q.Device())
-		phyDev := sb.s.PhysicalDevices().Get(dev.PhysicalDevice())
-		familyProp := phyDev.QueueFamilyProperties().Get(q.Family())
+		dev := sb.s.Devices().Get(sb.ctx, q.Device())
+		phyDev := sb.s.PhysicalDevices().Get(sb.ctx, dev.PhysicalDevice())
+		familyProp := phyDev.QueueFamilyProperties().Get(sb.ctx, q.Family())
 		if uint32(familyProp.QueueFlags())&uint32(queueFlagBits) != 0 {
 			return true
 		}
@@ -1123,7 +1123,7 @@ func (sb *stateBuilder) createBuffer(buffer BufferObjectʳ) {
 
 	queue := sb.getQueueFor(
 		VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT|VkQueueFlagBits_VK_QUEUE_COMPUTE_BIT|VkQueueFlagBits_VK_QUEUE_TRANSFER_BIT,
-		queueFamilyIndicesToU32Slice(buffer.Info().QueueFamilyIndices()),
+		queueFamilyIndicesToU32Slice(sb.ctx, buffer.Info().QueueFamilyIndices()),
 		buffer.Device(),
 		buffer.LastBoundQueue())
 
@@ -1138,14 +1138,14 @@ func (sb *stateBuilder) createBuffer(buffer BufferObjectʳ) {
 		memories := make(map[VkDeviceMemory]bool)
 		sparseQueue := sb.getQueueFor(
 			VkQueueFlagBits_VK_QUEUE_SPARSE_BINDING_BIT,
-			queueFamilyIndicesToU32Slice(buffer.Info().QueueFamilyIndices()),
+			queueFamilyIndicesToU32Slice(sb.ctx, buffer.Info().QueueFamilyIndices()),
 			buffer.Device(), buffer.LastBoundQueue())
 		oldFamilyIndex = sparseQueue.Family()
 		if !buffer.Info().DedicatedAllocationNV().IsNil() {
 			for _, bind := range buffer.SparseMemoryBindings().All() {
 				if _, ok := memories[bind.Memory()]; !ok {
 					memories[bind.Memory()] = true
-					sb.createDeviceMemory(os.DeviceMemories().Get(bind.Memory()), true)
+					sb.createDeviceMemory(os.DeviceMemories().Get(sb.ctx, bind.Memory()), true)
 				}
 			}
 		}
@@ -1186,7 +1186,7 @@ func (sb *stateBuilder) createBuffer(buffer BufferObjectʳ) {
 		if sparseResidency || IsFullyBound(0, buffer.Info().Size(), buffer.SparseMemoryBindings()) {
 			for _, bind := range buffer.SparseMemoryBindings().All() {
 				size := bind.Size()
-				dataSlice := sb.s.DeviceMemories().Get(bind.Memory()).Data().Slice(
+				dataSlice := sb.s.DeviceMemories().Get(sb.ctx, bind.Memory()).Data().Slice(
 					uint64(bind.MemoryOffset()),
 					uint64(bind.MemoryOffset()+size))
 				contents = append(contents, newBufferSubRangeFillInfoFromSlice(sb, dataSlice, uint64(offset)))
@@ -1386,7 +1386,7 @@ func (sb *stateBuilder) imageAllLastBoundQueues(img ImageObjectʳ) []VkQueue {
 	walkImageSubresourceRange(sb, img, sb.imageWholeSubresourceRange(img),
 		func(aspect VkImageAspectFlagBits, layer, level uint32, unused byteSizeAndExtent) {
 			// No need to handle for undefined layout
-			imgLevel := img.Aspects().Get(aspect).Layers().Get(layer).Levels().Get(level)
+			imgLevel := img.Aspects().Get(sb.ctx, aspect).Layers().Get(sb.ctx, layer).Levels().Get(sb.ctx, level)
 			if imgLevel.LastBoundQueue().IsNil() {
 				return
 			}
@@ -1519,7 +1519,7 @@ func (sb *stateBuilder) createImage(img ImageObjectʳ, imgPrimer *imagePrimer) {
 	// layout. The unused byteSizeAndExtent is to meet the requirement of
 	// walkImageSubresourceRange()
 	appendImageLevelToOpaqueRanges := func(aspect VkImageAspectFlagBits, layer, level uint32, unused byteSizeAndExtent) {
-		imgLevel := img.Aspects().Get(aspect).Layers().Get(layer).Levels().Get(level)
+		imgLevel := img.Aspects().Get(sb.ctx, aspect).Layers().Get(sb.ctx, layer).Levels().Get(sb.ctx, level)
 		if imgLevel.Layout() == VkImageLayout_VK_IMAGE_LAYOUT_UNDEFINED {
 			return
 		}
@@ -1537,11 +1537,11 @@ func (sb *stateBuilder) createImage(img ImageObjectʳ, imgPrimer *imagePrimer) {
 		// now
 		candidates := []QueueObjectʳ{}
 		for _, q := range sb.imageAllLastBoundQueues(img) {
-			candidates = append(candidates, sb.s.Queues().Get(q))
+			candidates = append(candidates, sb.s.Queues().Get(sb.ctx, q))
 		}
 		sparseQueue = sb.getQueueFor(
 			VkQueueFlagBits_VK_QUEUE_SPARSE_BINDING_BIT,
-			queueFamilyIndicesToU32Slice(img.Info().QueueFamilyIndices()),
+			queueFamilyIndicesToU32Slice(sb.ctx, img.Info().QueueFamilyIndices()),
 			img.Device(), candidates...)
 
 		memories := make(map[VkDeviceMemory]bool)
@@ -1556,7 +1556,7 @@ func (sb *stateBuilder) createImage(img ImageObjectʳ, imgPrimer *imagePrimer) {
 							// If this was a dedicated allocation set it here
 							if _, ok := memories[block.Memory()]; !ok {
 								memories[block.Memory()] = true
-								sb.createDeviceMemory(sb.s.DeviceMemories().Get(block.Memory()), true)
+								sb.createDeviceMemory(sb.s.DeviceMemories().Get(sb.ctx, block.Memory()), true)
 							}
 							nonSparseInfos = append(nonSparseInfos, NewVkSparseImageMemoryBind(sb.ta,
 								NewVkImageSubresource(sb.ta, // subresource
@@ -1688,13 +1688,13 @@ func (sb *stateBuilder) createImage(img ImageObjectʳ, imgPrimer *imagePrimer) {
 		walkImageSubresourceRange(sb, img, sb.imageWholeSubresourceRange(img),
 			func(aspect VkImageAspectFlagBits, layer, level uint32, unused byteSizeAndExtent) {
 				// No need to handle for undefined layout
-				imgLevel := img.Aspects().Get(aspect).Layers().Get(layer).Levels().Get(level)
+				imgLevel := img.Aspects().Get(sb.ctx, aspect).Layers().Get(sb.ctx, layer).Levels().Get(sb.ctx, level)
 				if imgLevel.Layout() == VkImageLayout_VK_IMAGE_LAYOUT_UNDEFINED || imgLevel.LastBoundQueue().IsNil() {
 					return
 				}
 				q := sb.getQueueFor(
 					VkQueueFlagBits_VK_QUEUE_TRANSFER_BIT|VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT|VkQueueFlagBits_VK_QUEUE_COMPUTE_BIT,
-					queueFamilyIndicesToU32Slice(img.Info().QueueFamilyIndices()),
+					queueFamilyIndicesToU32Slice(sb.ctx, img.Info().QueueFamilyIndices()),
 					img.Device(), imgLevel.LastBoundQueue())
 				if q.IsNil() {
 					return
@@ -1739,11 +1739,11 @@ func (sb *stateBuilder) createImage(img ImageObjectʳ, imgPrimer *imagePrimer) {
 	var queue QueueObjectʳ
 	queueCandidates := []QueueObjectʳ{}
 	for _, q := range sb.imageAllLastBoundQueues(img) {
-		queueCandidates = append(queueCandidates, sb.s.Queues().Get(q))
+		queueCandidates = append(queueCandidates, sb.s.Queues().Get(sb.ctx, q))
 	}
 
 	prime := func(flagBits VkQueueFlagBits, primerFunc func(ImageObjectʳ, []VkImageSubresourceRange, QueueObjectʳ) error) error {
-		queue = sb.getQueueFor(flagBits, queueFamilyIndicesToU32Slice(img.Info().QueueFamilyIndices()), img.Device(), queueCandidates...)
+		queue = sb.getQueueFor(flagBits, queueFamilyIndicesToU32Slice(sb.ctx, img.Info().QueueFamilyIndices()), img.Device(), queueCandidates...)
 		if queue.IsNil() {
 			return log.Errf(sb.ctx, nil, "cannot get a proper queue to prime data")
 		}
@@ -1773,7 +1773,7 @@ func (sb *stateBuilder) createImage(img ImageObjectʳ, imgPrimer *imagePrimer) {
 		walkImageSubresourceRange(sb, img, sb.imageWholeSubresourceRange(img),
 			func(aspect VkImageAspectFlagBits, layer, level uint32, unused byteSizeAndExtent) {
 				// No need to handle for undefined layout
-				imgLevel := img.Aspects().Get(aspect).Layers().Get(layer).Levels().Get(level)
+				imgLevel := img.Aspects().Get(sb.ctx, aspect).Layers().Get(sb.ctx, layer).Levels().Get(sb.ctx, level)
 				if imgLevel.Layout() == VkImageLayout_VK_IMAGE_LAYOUT_UNDEFINED || imgLevel.LastBoundQueue().IsNil() {
 					return
 				}
@@ -1944,12 +1944,12 @@ func (sb *stateBuilder) createPipelineCache(pc PipelineCacheObjectʳ) {
 func (sb *stateBuilder) createDescriptorSetLayout(dsl DescriptorSetLayoutObjectʳ) {
 	bindings := []VkDescriptorSetLayoutBinding{}
 	for _, k := range dsl.Bindings().Keys() {
-		b := dsl.Bindings().Get(k)
+		b := dsl.Bindings().Get(sb.ctx, k)
 		smp := NewVkSamplerᶜᵖ(memory.Nullptr)
 		if b.ImmutableSamplers().Len() > 0 {
 			immutableSamplers := []VkSampler{}
 			for _, kk := range b.ImmutableSamplers().Keys() {
-				immutableSamplers = append(immutableSamplers, b.ImmutableSamplers().Get(kk).VulkanHandle())
+				immutableSamplers = append(immutableSamplers, b.ImmutableSamplers().Get(sb.ctx, kk).VulkanHandle())
 			}
 			allocateResult := sb.MustAllocReadData(immutableSamplers)
 			smp = NewVkSamplerᶜᵖ(allocateResult.Ptr())
@@ -1984,7 +1984,7 @@ func (sb *stateBuilder) createDescriptorSetLayout(dsl DescriptorSetLayoutObject�
 func (sb *stateBuilder) createPipelineLayout(pl PipelineLayoutObjectʳ) {
 	descriptorSets := []VkDescriptorSetLayout{}
 	for _, k := range pl.SetLayouts().Keys() {
-		descriptorSets = append(descriptorSets, pl.SetLayouts().Get(k).VulkanHandle())
+		descriptorSets = append(descriptorSets, pl.SetLayouts().Get(sb.ctx, k).VulkanHandle())
 	}
 
 	sb.write(sb.cb.VkCreatePipelineLayout(
@@ -2009,7 +2009,7 @@ func (sb *stateBuilder) createPipelineLayout(pl PipelineLayoutObjectʳ) {
 func (sb *stateBuilder) createRenderPass(rp RenderPassObjectʳ) {
 	subpassDescriptions := []VkSubpassDescription{}
 	for _, k := range rp.SubpassDescriptions().Keys() {
-		sd := rp.SubpassDescriptions().Get(k)
+		sd := rp.SubpassDescriptions().Get(sb.ctx, k)
 		depthStencil := NewVkAttachmentReferenceᶜᵖ(memory.Nullptr)
 		if !sd.DepthStencilAttachment().IsNil() {
 			depthStencil = NewVkAttachmentReferenceᶜᵖ(sb.MustAllocReadData(sd.DepthStencilAttachment().Get()).Ptr())
@@ -2153,7 +2153,7 @@ func (sb *stateBuilder) createGraphicsPipeline(gp GraphicsPipelineObjectʳ) {
 	temporaryShaderModules := []ShaderModuleObjectʳ{}
 	stages := []VkPipelineShaderStageCreateInfo{}
 	for _, ss := range stagesInOrder {
-		s := gp.Stages().Get(ss)
+		s := gp.Stages().Get(sb.ctx, ss)
 		if !GetState(sb.newState).ShaderModules().Contains(s.Module().VulkanHandle()) {
 			// create temporary shader modules for the pipeline to be created.
 			sb.createShaderModule(s.Module())
@@ -2165,21 +2165,21 @@ func (sb *stateBuilder) createGraphicsPipeline(gp GraphicsPipelineObjectʳ) {
 	if !GetState(sb.newState).PipelineLayouts().Contains(gp.Layout().VulkanHandle()) {
 		// create temporary pipeline layout for the pipeline to be created.
 		sb.createPipelineLayout(gp.Layout())
-		temporaryPipelineLayout = GetState(sb.newState).PipelineLayouts().Get(gp.Layout().VulkanHandle())
+		temporaryPipelineLayout = GetState(sb.newState).PipelineLayouts().Get(sb.ctx, gp.Layout().VulkanHandle())
 	}
 
 	var temporaryRenderPass RenderPassObjectʳ
 	if !GetState(sb.newState).RenderPasses().Contains(gp.RenderPass().VulkanHandle()) {
 		// create temporary render pass for the pipeline to be created.
 		sb.createRenderPass(gp.RenderPass())
-		temporaryRenderPass = GetState(sb.newState).RenderPasses().Get(gp.RenderPass().VulkanHandle())
+		temporaryRenderPass = GetState(sb.newState).RenderPasses().Get(sb.ctx, gp.RenderPass().VulkanHandle())
 	}
 
 	// DO NOT! coalesce the prevous calls with this one. createShaderModule()
 	// makes calls which means pending read/write observations will get
 	// shunted off with it instead of on the VkCreateGraphicsPipelines call
 	for _, ss := range stagesInOrder {
-		s := gp.Stages().Get(ss)
+		s := gp.Stages().Get(sb.ctx, ss)
 		specializationInfo := NewVkSpecializationInfoᶜᵖ(memory.Nullptr)
 		if !s.Specialization().IsNil() {
 			data := s.Specialization().Data()
@@ -2498,12 +2498,12 @@ func (sb *stateBuilder) createFramebuffer(fb FramebufferObjectʳ) {
 
 	if !GetState(sb.newState).RenderPasses().Contains(fb.RenderPass().VulkanHandle()) {
 		sb.createRenderPass(fb.RenderPass())
-		temporaryRenderPass = GetState(sb.newState).RenderPasses().Get(fb.RenderPass().VulkanHandle())
+		temporaryRenderPass = GetState(sb.newState).RenderPasses().Get(sb.ctx, fb.RenderPass().VulkanHandle())
 	}
 
 	imageViews := []VkImageView{}
 	for _, v := range fb.ImageAttachments().Keys() {
-		imageViews = append(imageViews, fb.ImageAttachments().Get(v).VulkanHandle())
+		imageViews = append(imageViews, fb.ImageAttachments().Get(sb.ctx, v).VulkanHandle())
 	}
 
 	sb.write(sb.cb.VkCreateFramebuffer(
@@ -2544,7 +2544,7 @@ func (sb *stateBuilder) writeDescriptorSet(ds DescriptorSetObjectʳ) {
 
 	writes := []VkWriteDescriptorSet{}
 	for _, k := range ds.Bindings().Keys() {
-		binding := ds.Bindings().Get(k)
+		binding := ds.Bindings().Get(sb.ctx, k)
 		switch binding.BindingType() {
 		case VkDescriptorType_VK_DESCRIPTOR_TYPE_SAMPLER,
 			VkDescriptorType_VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -2554,7 +2554,7 @@ func (sb *stateBuilder) writeDescriptorSet(ds DescriptorSetObjectʳ) {
 
 			numImages := uint32(binding.ImageBinding().Len())
 			for i := uint32(0); i < numImages; i++ {
-				im := binding.ImageBinding().Get(i)
+				im := binding.ImageBinding().Get(sb.ctx, i)
 				if im.Sampler() == 0 && im.ImageView() == 0 {
 					continue
 				}
@@ -2589,7 +2589,7 @@ func (sb *stateBuilder) writeDescriptorSet(ds DescriptorSetObjectʳ) {
 			VkDescriptorType_VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
 			numBuffers := uint32(binding.BufferBinding().Len())
 			for i := uint32(0); i < numBuffers; i++ {
-				buff := binding.BufferBinding().Get(i)
+				buff := binding.BufferBinding().Get(sb.ctx, i)
 				if buff.Buffer() == 0 {
 					continue
 				}
@@ -2614,7 +2614,7 @@ func (sb *stateBuilder) writeDescriptorSet(ds DescriptorSetObjectʳ) {
 			VkDescriptorType_VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
 			numBuffers := uint32(binding.BufferViewBindings().Len())
 			for i := uint32(0); i < numBuffers; i++ {
-				bv := binding.BufferViewBindings().Get(i)
+				bv := binding.BufferViewBindings().Get(sb.ctx, i)
 				if bv == 0 {
 					continue
 				}
@@ -2684,14 +2684,14 @@ func (sb *stateBuilder) createQueryPool(qp QueryPoolObjectʳ) {
 	defer tsk.commit()
 	tsk.recordCmdBufCommand(func(commandBuffer VkCommandBuffer) {
 		for i := uint32(0); i < qp.QueryCount(); i++ {
-			if qp.Status().Get(i) != QueryStatus_QUERY_STATUS_INACTIVE {
+			if qp.Status().Get(sb.ctx, i) != QueryStatus_QUERY_STATUS_INACTIVE {
 				sb.write(sb.cb.VkCmdBeginQuery(
 					commandBuffer,
 					qp.VulkanHandle(),
 					i,
 					VkQueryControlFlags(0)))
 			}
-			if qp.Status().Get(i) == QueryStatus_QUERY_STATUS_COMPLETE {
+			if qp.Status().Get(sb.ctx, i) == QueryStatus_QUERY_STATUS_COMPLETE {
 				sb.write(sb.cb.VkCmdEndQuery(
 					commandBuffer,
 					qp.VulkanHandle(),
@@ -2758,7 +2758,7 @@ func (sb *stateBuilder) createCommandBuffer(cb CommandBufferObjectʳ, level VkCo
 	hasError := false
 	// fill command buffer
 	for i, c := uint32(0), uint32(cb.CommandReferences().Len()); i < c; i++ {
-		arg := GetCommandArgs(sb.ctx, cb.CommandReferences().Get(i), GetState(sb.oldState))
+		arg := GetCommandArgs(sb.ctx, cb.CommandReferences().Get(sb.ctx, i), GetState(sb.oldState))
 		cleanup, cmd, err := AddCommand(sb.ctx, sb.cb, cb.VulkanHandle(), sb.oldState, sb.newState, arg)
 		if err != nil {
 			log.W(sb.ctx, "Command Buffer %v is invalid, it will not be recorded: - %v", cb.VulkanHandle(), err)
@@ -2779,10 +2779,10 @@ func (sb *stateBuilder) createCommandBuffer(cb CommandBufferObjectʳ, level VkCo
 	}
 }
 
-func queueFamilyIndicesToU32Slice(m U32ːu32ᵐ) []uint32 {
+func queueFamilyIndicesToU32Slice(ctx context.Context, m U32ːu32ᵐ) []uint32 {
 	r := make([]uint32, 0, m.Len())
 	for _, k := range m.Keys() {
-		r = append(r, m.Get(k))
+		r = append(r, m.Get(ctx, k))
 	}
 	return r
 }

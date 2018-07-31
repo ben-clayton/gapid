@@ -107,10 +107,10 @@ func (c *C) defineMapTypes() {
 			name := fmt.Sprintf("%v_%v", api.Name(), t.Name())
 			mi.MapMethods = MapMethods{
 				Contains: c.M.Function(c.T.Bool, name+"_contains", c.T.Pointer(mi.Type), mi.Key).LinkPrivate().Inline(),
-				Index:    c.M.Function(valPtrTy, name+"_index", c.T.Pointer(mi.Type), mi.Key, c.T.Bool).LinkPrivate().Inline(),
-				Lookup:   c.M.Function(mi.Val, name+"_lookup", c.T.Pointer(mi.Type), mi.Key).LinkPrivate().Inline(),
-				Remove:   c.M.Function(c.T.Void, name+"_remove", c.T.Pointer(mi.Type), mi.Key).LinkPrivate().Inline(),
-				Clear:    c.M.Function(c.T.Void, name+"_clear", c.T.Pointer(mi.Type)).LinkPrivate().Inline(),
+				Index:    c.M.Function(valPtrTy, name+"_index", c.T.Pointer(mi.Type), c.T.CtxPtr, mi.Key, c.T.Bool).LinkPrivate().Inline(),
+				Lookup:   c.M.Function(mi.Val, name+"_lookup", c.T.Pointer(mi.Type), c.T.CtxPtr, mi.Key).LinkPrivate().Inline(),
+				Remove:   c.M.Function(c.T.Void, name+"_remove", c.T.Pointer(mi.Type), c.T.CtxPtr, mi.Key).LinkPrivate().Inline(),
+				Clear:    c.M.Function(c.T.Void, name+"_clear", c.T.Pointer(mi.Type), c.T.CtxPtr).LinkPrivate().Inline(),
 			}
 
 			// Use the mangled name of the map to determine whether the map has
@@ -125,10 +125,10 @@ func (c *C) defineMapTypes() {
 				impls[mangled] = impl
 				impl.MapMethods = MapMethods{
 					Contains: c.Method(true, mi.Type, c.T.Bool, "contains", mi.Key).LinkOnceODR(),
-					Index:    c.Method(false, mi.Type, valPtrTy, "index", mi.Key, c.T.Bool).LinkOnceODR(),
-					Lookup:   c.Method(true, mi.Type, mi.Val, "lookup", mi.Key).LinkOnceODR(),
-					Remove:   c.Method(false, mi.Type, c.T.Void, "remove", mi.Key).LinkOnceODR(),
-					Clear:    c.Method(false, mi.Type, c.T.Void, "clear").LinkOnceODR(),
+					Index:    c.Method(false, mi.Type, valPtrTy, "index", c.T.CtxPtr, mi.Key, c.T.Bool).LinkOnceODR(),
+					Lookup:   c.Method(true, mi.Type, mi.Val, "lookup", c.T.CtxPtr, mi.Key).LinkOnceODR(),
+					Remove:   c.Method(false, mi.Type, c.T.Void, "remove", c.T.CtxPtr, mi.Key).LinkOnceODR(),
+					Clear:    c.Method(false, mi.Type, c.T.Void, "clear", c.T.CtxPtr).LinkOnceODR(),
 				}
 				c.T.mapImpls = append(c.T.mapImpls, mapImpl{t.KeyType, t.ValueType, impl})
 			}
@@ -280,9 +280,8 @@ func (c *C) buildMap(keyTy, valTy semantic.Type, mi *MapInfo) {
 	f32Type := c.T.Target(semantic.Float32Type)
 	c.Build(mi.Index, func(s *S) {
 		m := s.Parameter(0).SetName("map")
-		k := s.Parameter(1).SetName("key")
-		addIfNotFound := s.Parameter(2).SetName("addIfNotFound")
-		s.Arena = m.Index(0, MapArena).Load().SetName("arena")
+		k := s.Parameter(2).SetName("key")
+		addIfNotFound := s.Parameter(3).SetName("addIfNotFound")
 
 		countPtr := m.Index(0, MapCount)
 		capacityPtr := m.Index(0, MapCapacity)
@@ -384,10 +383,9 @@ func (c *C) buildMap(keyTy, valTy semantic.Type, mi *MapInfo) {
 
 	c.Build(mi.Lookup, func(s *S) {
 		m := s.Parameter(0).SetName("map")
-		k := s.Parameter(1).SetName("key")
-		s.Arena = m.Index(0, MapArena).Load().SetName("arena")
+		k := s.Parameter(2).SetName("key")
 
-		ptr := s.Call(mi.Index, m, k, s.Scalar(false))
+		ptr := s.Call(mi.Index, m, s.Ctx, k, s.Scalar(false))
 		s.If(ptr.IsNull(), func(s *S) {
 			v := c.initialValue(s, valTy)
 			c.reference(s, v, valTy)
@@ -400,8 +398,7 @@ func (c *C) buildMap(keyTy, valTy semantic.Type, mi *MapInfo) {
 
 	c.Build(mi.Remove, func(s *S) {
 		m := s.Parameter(0).SetName("map")
-		k := s.Parameter(1).SetName("key")
-		s.Arena = m.Index(0, MapArena).Load().SetName("arena")
+		k := s.Parameter(2).SetName("key")
 
 		countPtr := m.Index(0, MapCount)
 		capacity := m.Index(0, MapCapacity).Load()
@@ -438,7 +435,6 @@ func (c *C) buildMap(keyTy, valTy semantic.Type, mi *MapInfo) {
 
 	c.Build(mi.Clear, func(s *S) {
 		m := s.Parameter(0).SetName("map")
-		s.Arena = m.Index(0, MapArena).Load().SetName("arena")
 
 		capacity := m.Index(0, MapCapacity).Load()
 		elements := m.Index(0, MapElements).Load()

@@ -21,6 +21,9 @@ import (
 	"github.com/google/gapid/core/assert"
 	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/core/memory/arena"
+	"github.com/google/gapid/gapil/executor"
+	"github.com/google/gapid/gapis/capture"
+	"github.com/google/gapid/gapis/database"
 	"github.com/google/gapid/gapis/memory"
 )
 
@@ -86,12 +89,14 @@ func checkBasicTypesZero(ctx context.Context, o BasicTypes) {
 
 func TestCloneBasicTypes(t *testing.T) {
 	ctx := log.Testing(t)
+	ctx = database.Put(ctx, database.NewInMemory(ctx))
 
-	a1, a2 := arena.New(), arena.New()
+	_, a1 := newEnv(ctx)
+	ctx2, a2 := newEnv(ctx)
 
 	orig := MakeBasicTypesʳ(a1)
 	primeBasicTypes(orig.Get())
-	clone := orig.Clone(a2)
+	clone := orig.Clone(ctx2)
 
 	assert.For(ctx, "arena").That(a2.Stats()).Equals(a1.Stats())
 
@@ -102,12 +107,14 @@ func TestCloneBasicTypes(t *testing.T) {
 
 func TestCloneNested(t *testing.T) {
 	ctx := log.Testing(t)
+	ctx = database.Put(ctx, database.NewInMemory(ctx))
 
-	a1, a2 := arena.New(), arena.New()
+	_, a1 := newEnv(ctx)
+	ctx2, a2 := newEnv(ctx)
 
 	orig := MakeNestedʳ(a1)
 	primeBasicTypes(orig.Class())
-	clone := orig.Clone(a2)
+	clone := orig.Clone(ctx2)
 
 	assert.For(ctx, "arena").That(a2.Stats()).Equals(a1.Stats())
 
@@ -118,8 +125,10 @@ func TestCloneNested(t *testing.T) {
 
 func TestCloneRefs(t *testing.T) {
 	ctx := log.Testing(t)
+	ctx = database.Put(ctx, database.NewInMemory(ctx))
 
-	a1, a2 := arena.New(), arena.New()
+	_, a1 := newEnv(ctx)
+	ctx2, a2 := newEnv(ctx)
 
 	orig := MakeRefsʳ(a1)
 	orig.SetBasicRef(MakeBasicTypesʳ(a1))
@@ -129,7 +138,7 @@ func TestCloneRefs(t *testing.T) {
 	orig.CyclicRef().SetBasicRef(MakeBasicTypesʳ(a1))
 	primeBasicTypes(orig.CyclicRef().BasicRef().Get())
 
-	clone := orig.Clone(a2)
+	clone := orig.Clone(ctx2)
 
 	assert.For(ctx, "arena").That(a2.Stats()).Equals(a1.Stats())
 
@@ -149,8 +158,10 @@ func TestCloneRefs(t *testing.T) {
 
 func TestCloneCyclicRefs(t *testing.T) {
 	ctx := log.Testing(t)
+	ctx = database.Put(ctx, database.NewInMemory(ctx))
 
-	a1, a2 := arena.New(), arena.New()
+	_, a1 := newEnv(ctx)
+	ctx2, a2 := newEnv(ctx)
 
 	orig := MakeRefsʳ(a1)
 	orig.SetBasicRef(MakeBasicTypesʳ(a1))
@@ -158,7 +169,7 @@ func TestCloneCyclicRefs(t *testing.T) {
 	orig.CyclicRef().SetCyclicRef(orig)
 	primeBasicTypes(orig.BasicRef().Get())
 
-	clone := orig.Clone(a2)
+	clone := orig.Clone(ctx2)
 
 	assert.For(ctx, "arena").That(a2.Stats()).Equals(a1.Stats())
 
@@ -179,33 +190,39 @@ func TestCloneCyclicRefs(t *testing.T) {
 
 func TestCloneMaps(t *testing.T) {
 	ctx := log.Testing(t)
+	ctx = database.Put(ctx, database.NewInMemory(ctx))
 
-	a1, a2 := arena.New(), arena.New()
+	ctx1, a1 := newEnv(ctx)
+	ctx2, a2 := newEnv(ctx)
 
 	orig := NewMapsʳ(a1,
-		NewU8ːu8ᵐ(a1).Add(1, 10).Add(2, 20).Add(3, 30),             // A
-		NewStringːBasicTypesʳᵐ(a1).Add("foo", MakeBasicTypesʳ(a1)), // B
+		NewU8ːu8ᵐ(a1).Add(ctx1, 1, 10).Add(ctx1, 2, 20).Add(ctx1, 3, 30), // A
+		NewStringːBasicTypesʳᵐ(a1).Add(ctx1, "foo", MakeBasicTypesʳ(a1)), // B
 	)
-	primeBasicTypes(orig.B().Get("foo").Get())
+	primeBasicTypes(orig.B().Get(ctx1, "foo").Get())
 
-	clone := orig.Clone(a2)
+	clone := orig.Clone(ctx2)
 
 	assert.For(ctx, "arena").That(a2.Stats()).Equals(a1.Stats())
 
-	orig.A().Clear()
-	zeroBasicTypes(orig.B().Get("foo").Get())
+	orig.A().Clear(ctx1)
+	zeroBasicTypes(orig.B().Get(ctx1, "foo").Get())
 
 	assert.For(ctx, "a").That(clone.A().Len()).Equals(3)
-	assert.For(ctx, "a[1]").That(clone.A().Get(1)).Equals(uint8(10))
-	assert.For(ctx, "a[2]").That(clone.A().Get(2)).Equals(uint8(20))
-	assert.For(ctx, "a[3]").That(clone.A().Get(3)).Equals(uint8(30))
-	checkBasicTypesPrimed(ctx, clone.B().Get("foo").Get())
+	assert.For(ctx, "a[1]").That(clone.A().Get(ctx2, 1)).Equals(uint8(10))
+	assert.For(ctx, "a[2]").That(clone.A().Get(ctx2, 2)).Equals(uint8(20))
+	assert.For(ctx, "a[3]").That(clone.A().Get(ctx2, 3)).Equals(uint8(30))
+	checkBasicTypesPrimed(ctx2, clone.B().Get(ctx2, "foo").Get())
 }
 
 func TestCloneArrays(t *testing.T) {
 	ctx := log.Testing(t)
+	ctx = database.Put(ctx, database.NewInMemory(ctx))
 
-	a1, a2, tmp := arena.New(), arena.New(), arena.New()
+	_, a1 := newEnv(ctx)
+	ctx2, a2 := newEnv(ctx)
+
+	tmp := arena.New()
 
 	orig := NewArraysʳ(a1,
 		NewU8ː4ᵃ(tmp, 10, 20, 30, 40),                                                                             // A
@@ -215,7 +232,7 @@ func TestCloneArrays(t *testing.T) {
 
 	tmp.Dispose()
 
-	clone := orig.Clone(a2)
+	clone := orig.Clone(ctx2)
 
 	assert.For(ctx, "arena").That(a2.Stats()).Equals(a1.Stats())
 
@@ -238,8 +255,10 @@ func TestCloneArrays(t *testing.T) {
 
 func TestCloneStrings(t *testing.T) {
 	ctx := log.Testing(t)
+	ctx = database.Put(ctx, database.NewInMemory(ctx))
 
-	a1, a2 := arena.New(), arena.New()
+	_, a1 := newEnv(ctx)
+	ctx2, a2 := newEnv(ctx)
 
 	orig := NewStringsʳ(a1,
 		"cat",  // A
@@ -247,7 +266,7 @@ func TestCloneStrings(t *testing.T) {
 		"meow", // C
 	)
 
-	clone := orig.Clone(a2)
+	clone := orig.Clone(ctx2)
 
 	assert.For(ctx, "arena").That(a2.Stats()).Equals(a1.Stats())
 
@@ -262,14 +281,15 @@ func TestCloneStrings(t *testing.T) {
 
 func TestCloneCmd(t *testing.T) {
 	ctx := log.Testing(t)
+	ctx = database.Put(ctx, database.NewInMemory(ctx))
 
-	a1, a2 := arena.New(), arena.New()
+	_, a1 := newEnv(ctx)
+	ctx2, a2 := newEnv(ctx)
 
 	cb := CommandBuilder{Arena: a1, Thread: 99}
-
 	orig := cb.Foo(U8ᵖ(0x1234), 123.456, true, 42)
 
-	clone := orig.Clone(a2)
+	clone := orig.Clone(ctx2)
 
 	assert.For(ctx, "arena").That(a2.Stats()).Equals(a1.Stats())
 
@@ -283,4 +303,24 @@ func TestCloneCmd(t *testing.T) {
 	assert.For(ctx, "c").That(clone.C()).Equals(true)
 	assert.For(ctx, "res").That(clone.Result()).Equals(memory.Int(42))
 	assert.For(ctx, "thread").That(clone.Thread()).Equals(uint64(99))
+}
+
+func newEnv(ctx context.Context) (context.Context, arena.Arena) {
+	p, err := capture.New(ctx, arena.New(), "cloned", nil, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	ctx = capture.Put(ctx, p)
+
+	c, err := capture.Resolve(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	env := executor.NewEnv(ctx, c, executor.Config{})
+
+	ctx = executor.PutEnv(ctx, env)
+
+	return ctx, c.Arena
 }

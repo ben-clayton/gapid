@@ -22,7 +22,7 @@
 namespace gapil {
 
 template <typename T>
-void Slice<T>::init(pool_t* pool, uint64_t root, uint64_t base, uint64_t size,
+void Slice<T>::init(uint64_t pool, uint64_t root, uint64_t base, uint64_t size,
                     uint64_t count, bool add_ref /* = true */) {
   data.pool = pool;
   data.root = root;
@@ -30,14 +30,14 @@ void Slice<T>::init(pool_t* pool, uint64_t root, uint64_t base, uint64_t size,
   data.size = size;
   data.count = count;
 
-  if (add_ref && pool != nullptr) {
+  if (add_ref && pool != GAPIL_APPLICATION_POOL) {
     reference();
   }
 }
 
 template <typename T>
 Slice<T>::Slice() {
-  init(nullptr, 0, 0, 0, 0);
+  init(GAPIL_APPLICATION_POOL, 0, 0, 0, 0);
 }
 
 template <typename T>
@@ -51,13 +51,13 @@ Slice<T>::Slice(Slice<T>&& other) {
   init(other.data.pool, other.data.root, other.data.base, other.data.size,
        other.data.count);
 
-  other.data.pool = nullptr;
+  other.data.pool = GAPIL_APPLICATION_POOL;
 }
 
 template <typename T>
 Slice<T>::Slice(T* base, uint64_t count) {
   auto ptr = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(base));
-  init(/* pool */ nullptr,
+  init(/* pool */ GAPIL_APPLICATION_POOL,
        /* root */ ptr,
        /* base */ ptr,
        /* size */ count * sizeof(T),
@@ -65,20 +65,20 @@ Slice<T>::Slice(T* base, uint64_t count) {
 }
 
 template <typename T>
-Slice<T>::Slice(pool_t* pool, uint64_t root, uint64_t base, uint64_t size,
+Slice<T>::Slice(uint64_t pool, uint64_t root, uint64_t base, uint64_t size,
                 uint64_t count, bool add_ref /* = true */) {
   init(pool, root, base, size, count, add_ref);
 }
 
 template <typename T>
 Slice<T>::~Slice() {
-  if (data.pool != nullptr) {
+  if (data.pool != GAPIL_APPLICATION_POOL) {
     release();
   }
 }
 
 template <typename T>
-Slice<T> Slice<T>::create(pool_t* pool, uint64_t size, bool add_ref) {
+Slice<T> Slice<T>::create(uint64_t pool, uint64_t size, bool add_ref) {
   return Slice<T>(/* pool */ pool,
                   /* root */ 0,
                   /* base */ 0,
@@ -101,7 +101,7 @@ Slice<T> Slice<T>::create(context_t* ctx, uint64_t count) {
 
 template <typename T>
 Slice<T>& Slice<T>::operator=(const Slice<T>& other) {
-  if (data.pool != nullptr) {
+  if (data.pool != GAPIL_APPLICATION_POOL) {
     release();
   }
   init(other.data.pool, other.data.root, other.data.base, other.data.size,
@@ -128,16 +128,11 @@ uint64_t Slice<T>::size() const {
 
 template <typename T>
 bool Slice<T>::is_app_pool() const {
-  return data.pool == nullptr;
+  return data.pool == GAPIL_APPLICATION_POOL;
 }
 
 template <typename T>
-uint32_t Slice<T>::pool_id() const {
-  return (data.pool != nullptr) ? gapil_pool_id(data.pool) : 0;
-}
-
-template <typename T>
-const pool_t* Slice<T>::pool() const {
+uint64_t Slice<T>::pool() const {
   return data.pool;
 }
 
@@ -162,7 +157,7 @@ Slice<T> Slice<T>::operator()(uint64_t start, uint64_t end) const {
   out.data.base = data.base + start * sizeof(T);
   out.data.size = count * sizeof(T);
   out.data.count = count;
-  if (data.pool != nullptr) {
+  if (data.pool != GAPIL_APPLICATION_POOL) {
     reference();
   }
   return out;
@@ -210,15 +205,15 @@ T* Slice<T>::end() const {
 
 template <typename T>
 void Slice<T>::release() {
-  if (data.pool != nullptr) {
-    gapil_pool_release(data.pool);
+  if (data.pool != GAPIL_APPLICATION_POOL) {
+    gapil_pool_release(nullptr, data.pool);
   }
 }
 
 template <typename T>
 void Slice<T>::reference() const {
-  if (data.pool != nullptr) {
-    gapil_pool_reference(data.pool);
+  if (data.pool != GAPIL_APPLICATION_POOL) {
+    gapil_pool_reference(nullptr, data.pool);
   }
 }
 

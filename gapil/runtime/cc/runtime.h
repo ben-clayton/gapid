@@ -23,9 +23,10 @@ extern "C" {
 #endif  // __cplusplus
 
 typedef struct arena_t arena;
-typedef struct pool_t pool;
 typedef struct globals_t globals;
 typedef struct string_t string;
+
+#define GAPIL_APPLICATION_POOL 0
 
 #define GAPIL_ERR_SUCCESS 0
 #define GAPIL_ERR_ABORTED 1
@@ -52,7 +53,7 @@ typedef struct context_t {
 
 // slice is the data of a gapil slice type (elty foo[]).
 typedef struct slice_t {
-  pool* pool;  // the underlying pool. nullptr represents the application pool.
+  uint64_t pool;   // the pool identifier. 0 represents the application pool.
   uint64_t root;   // original offset in bytes from pool base that this slice
                    // derives from.
   uint64_t base;   // offset in bytes from pool base of the first element.
@@ -123,8 +124,8 @@ typedef struct gapil_runtime_callbacks_t {
   void (*apply_writes)(context*);
 
   // Returns a pointer to the pool's data starting at pointer for size bytes.
-  void* (*resolve_pool_data)(context*, pool*, uint64_t ptr, gapil_data_access,
-                             uint64_t size);
+  void* (*resolve_pool_data)(context*, uint64_t pool_id, uint64_t ptr,
+                             gapil_data_access, uint64_t size);
 
   // stores the buffer at ptr of the given size into the database.
   // Writes the 20-byte database identifier of the stored data to id.
@@ -133,22 +134,14 @@ typedef struct gapil_runtime_callbacks_t {
 
   // allocates a new pool with the given size in bytes and an initial reference
   // count of 1. The new pool's identifier is returned.
-  pool* (*make_pool)(context*, uint64_t size);
+  uint64_t (*make_pool)(context*, uint64_t size);
 
   // increments the reference count of the given pool.
-  void (*pool_reference)(pool*);
+  void (*pool_reference)(context*, uint64_t pool_id);
 
   // decrements the reference count of the given pool, freeing it if the
   // reference count reaches 0.
-  void (*pool_release)(pool*);
-
-  // returns the unique pool identifier.
-  uint64_t (*pool_id)(pool*);
-
-  // assigns to file and line the current source location within the .api file.
-  // if there is no current source location then file and line are unassigned.
-  void (*get_code_location)(context*, char** file, uint32_t* line);
-
+  void (*pool_release)(context*, uint64_t pool_id);
 } gapil_runtime_callbacks;
 
 void gapil_set_runtime_callbacks(gapil_runtime_callbacks*);
@@ -166,8 +159,8 @@ void gapil_destroy_context(context*);
 void gapil_string_reference(string*);
 void gapil_string_release(string*);
 
-void gapil_slice_reference(slice);
-void gapil_slice_release(slice);
+void gapil_slice_reference(context*, slice);
+void gapil_slice_release(context*, slice);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Runtime API implemented in runtime.cpp                                     //
@@ -241,8 +234,8 @@ DECL_GAPIL_CB(void, gapil_apply_reads, context*);
 DECL_GAPIL_CB(void, gapil_apply_writes, context*);
 
 // Returns a pointer to the pool's data starting at pointer for size bytes.
-DECL_GAPIL_CB(void*, gapil_resolve_pool_data, context*, pool*, uint64_t ptr,
-              gapil_data_access, uint64_t size);
+DECL_GAPIL_CB(void*, gapil_resolve_pool_data, context*, uint64_t pool_id,
+              uint64_t ptr, gapil_data_access, uint64_t size);
 
 // stores the buffer at ptr of the given size into the database.
 // Writes the 20-byte database identifier of the stored data to id.
@@ -251,17 +244,14 @@ DECL_GAPIL_CB(void, gapil_store_in_database, context* ctx, void* ptr,
 
 // allocates a new pool with the given size in bytes and an initial reference
 // count of 1. The new pool's identifier is returned.
-DECL_GAPIL_CB(pool*, gapil_make_pool, context*, uint64_t size);
+DECL_GAPIL_CB(uint64_t, gapil_make_pool, context*, uint64_t size);
 
 // increments the reference count of the given pool.
-DECL_GAPIL_CB(void, gapil_pool_reference, pool*);
+DECL_GAPIL_CB(void, gapil_pool_reference, context*, uint64_t pool_id);
 
 // decrements the reference count of the given pool, freeing it if the reference
 // count reaches 0.
-DECL_GAPIL_CB(void, gapil_pool_release, pool*);
-
-// returns the unique pool identifier.
-DECL_GAPIL_CB(uint64_t, gapil_pool_id, pool*);
+DECL_GAPIL_CB(void, gapil_pool_release, context*, uint64_t pool_id);
 
 #undef DECL_GAPIL_CB
 

@@ -26,28 +26,25 @@ void StateSerializer::prepareForState(
   serialize_buffers(this);
 
   mObserver->on_slice_encoded([&](slice_t* slice) {
-    auto p = slice->pool;
-    if (p != nullptr && mSeenPools.count(p->id) == 0) {
-      mSeenPools.insert(p->id);
+    auto id = slice->pool;
+    if (id != GAPIL_APPLICATION_POOL && mSeenPools.count(id) == 0) {
+      mSeenPools.insert(id);
+
+      auto pool = mObserver->get_pool(id);
 
       memory::Observation observation;
-      observation.set_pool(p->id);
+      observation.set_pool(id);
       observation.set_base(0);
-      sendData(&observation, true, p->buffer, p->size);
+      sendData(&observation, true, pool->buffer, pool->size);
     }
   });
 }
 
-pool_t* StateSerializer::createPool(
+uint64_t StateSerializer::createPool(
     uint64_t pool_size,
     std::function<void(memory::Observation*)> init_observation) {
-  auto arena = mSpy->arena();
-  auto pool = arena->create<pool_t>();
-  pool->arena = reinterpret_cast<arena_t*>(arena);
-  pool->id = mObserver->allocate_pool_id();
+  auto pool = mObserver->create_pool(0);
   pool->size = pool_size;
-  pool->ref_count = 1;
-  pool->buffer = nullptr;
 
   mSeenPools.insert(pool->id);
 
@@ -66,7 +63,7 @@ pool_t* StateSerializer::createPool(
     observation.set_res_index(mEmptyIndex);
   }
   mObserver->encode(&observation);
-  return pool;
+  return pool->id;
 }
 
 }  // namespace gapii

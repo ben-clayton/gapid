@@ -15,6 +15,7 @@
 package vulkan
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -30,8 +31,8 @@ var (
 
 type sparseBindingMap map[VkDeviceMemory][]*api.MemoryBinding
 
-// Implements api.MemoryBreakdownProvider
-func (a API) MemoryBreakdown(st *api.GlobalState) (*api.MemoryBreakdown, error) {
+// MemoryBreakdown implements api.MemoryBreakdownProvider
+func (a API) MemoryBreakdown(ctx context.Context, st *api.GlobalState) (*api.MemoryBreakdown, error) {
 	s := GetState(st)
 
 	// Iterate over images and buffers looking for sparsely-bound objects.
@@ -56,7 +57,7 @@ func (a API) MemoryBreakdown(st *api.GlobalState) (*api.MemoryBreakdown, error) 
 
 			continue
 		}
-		if err := sparseBindings.getImageSparseBindings(info); err != nil {
+		if err := sparseBindings.getImageSparseBindings(ctx, info); err != nil {
 			return nil, err
 		}
 	}
@@ -65,11 +66,11 @@ func (a API) MemoryBreakdown(st *api.GlobalState) (*api.MemoryBreakdown, error) 
 	for handle, info := range s.DeviceMemories().All() {
 		device := info.Device()
 		typ := info.MemoryTypeIndex()
-		flags, err := s.getMemoryTypeFlags(device, typ)
+		flags, err := s.getMemoryTypeFlags(ctx, device, typ)
 		if err != nil {
 			return nil, err
 		}
-		bindings, err := s.getAllocationBindings(info.Get())
+		bindings, err := s.getAllocationBindings(ctx, info.Get())
 		if err != nil {
 			return nil, err
 		}
@@ -147,7 +148,7 @@ func getAspects(aspects uint32) []api.AspectType {
 	return aspectTypes
 }
 
-func (s sparseBindingMap) getImageSparseBindings(info ImageObjectʳ) error {
+func (s sparseBindingMap) getImageSparseBindings(ctx context.Context, info ImageObjectʳ) error {
 	opaque := (info.Info().Flags() & VkImageCreateFlags(
 		VkImageCreateFlagBits_VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT)) ==
 		VkImageCreateFlags(0)
@@ -196,7 +197,7 @@ func (s sparseBindingMap) getImageSparseBindings(info ImageObjectʳ) error {
 				VkSparseMemoryBindFlagBits_VK_SPARSE_MEMORY_BIND_METADATA_BIT)) !=
 				VkSparseMemoryBindFlags(0) {
 
-				reqs, ok := info.SparseMemoryRequirements().Lookup(
+				reqs, ok := info.SparseMemoryRequirements().Lookup(ctx,
 					uint32(VkImageAspectFlagBits_VK_IMAGE_ASPECT_METADATA_BIT))
 				if !ok {
 					return fmt.Errorf("Metadata binding present but no metadata sparse memory requirements for image %v", handle)
@@ -283,13 +284,13 @@ func (s sparseBindingMap) getImageSparseBindings(info ImageObjectʳ) error {
 	return nil
 }
 
-func (s *State) getMemoryTypeFlags(device VkDevice, typeIndex uint32) (VkMemoryPropertyFlags, error) {
-	deviceObject := s.Devices().Get(device)
+func (s *State) getMemoryTypeFlags(ctx context.Context, device VkDevice, typeIndex uint32) (VkMemoryPropertyFlags, error) {
+	deviceObject := s.Devices().Get(ctx, device)
 	if deviceObject.IsNil() {
 		return VkMemoryPropertyFlags(0), fmt.Errorf("Failed to find device %v", device)
 	}
 	physicalDevice := deviceObject.PhysicalDevice()
-	physicalDeviceObject := s.PhysicalDevices().Get(physicalDevice)
+	physicalDeviceObject := s.PhysicalDevices().Get(ctx, physicalDevice)
 	if physicalDeviceObject.IsNil() {
 		return VkMemoryPropertyFlags(0), fmt.Errorf("Failed to find physical device %v", physicalDevice)
 	}
@@ -301,7 +302,7 @@ func (s *State) getMemoryTypeFlags(device VkDevice, typeIndex uint32) (VkMemoryP
 	return props.MemoryTypes().Get(int(typeIndex)).PropertyFlags(), nil
 }
 
-func (s *State) getAllocationBindings(allocation DeviceMemoryObject) ([]*api.MemoryBinding, error) {
+func (s *State) getAllocationBindings(ctx context.Context, allocation DeviceMemoryObject) ([]*api.MemoryBinding, error) {
 	bindings := []*api.MemoryBinding{}
 	for handle, offset := range allocation.BoundObjects().All() {
 		binding := api.MemoryBinding{
@@ -309,10 +310,10 @@ func (s *State) getAllocationBindings(allocation DeviceMemoryObject) ([]*api.Mem
 			Name:   strconv.FormatUint(handle, 10),
 			Offset: uint64(offset),
 		}
-		if buffer, ok := s.Buffers().Lookup(VkBuffer(handle)); ok {
+		if buffer, ok := s.Buffers().Lookup(ctx, VkBuffer(handle)); ok {
 			binding.Size = uint64(buffer.Info().Size())
 			binding.Type = &api.MemoryBinding_Buffer{&api.NormalBinding{}}
-		} else if image, ok := s.Images().Lookup(VkImage(handle)); ok {
+		} else if image, ok := s.Images().Lookup(ctx, VkImage(handle)); ok {
 			binding.Size = uint64(image.MemoryRequirements().Size())
 			binding.Type = &api.MemoryBinding_Image{&api.NormalBinding{}}
 		} else {

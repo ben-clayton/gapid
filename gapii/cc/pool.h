@@ -17,14 +17,17 @@
 #ifndef GAPII_POOL_H
 #define GAPII_POOL_H
 
-#include "gapil/runtime/cc/runtime.h"
+#include <stdint.h>
 
-typedef struct pool_t {
+namespace gapii {
+
+struct Pool {
   uint64_t ref_count;
   uint64_t id;
   uint64_t size;
   uint8_t* buffer;
-  arena_t* arena;
-} pool;
+};
+
+}  // namespace gapii
 
 #endif  // GAPII_POOL_H

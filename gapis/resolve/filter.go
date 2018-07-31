@@ -53,7 +53,7 @@ func buildFilter(ctx context.Context, p *path.Capture, f *path.CommandFilter, sd
 		}
 		filters = append(filters, func(id api.CmdID, cmd api.Cmd, s *api.GlobalState) bool {
 			if api := cmd.API(); api != nil {
-				if ctx := api.Context(s, cmd.Thread()); ctx != nil {
+				if ctx := api.Context(ctx, s, cmd.Thread()); ctx != nil {
 					return ctx.ID() == c.ID
 				}
 			}

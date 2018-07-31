@@ -43,13 +43,13 @@ func (r *FramebufferAttachmentBytesResolvable) Resolve(ctx context.Context) (int
 	api := after.API()
 	if api == nil {
 		log.W(ctx, "No API!")
-		return nil, &service.ErrDataUnavailable{Reason: messages.ErrFramebufferUnavailable()}
+		return nil, &service.ErrDataUnavailable{Reason: messages.ErrFramebufferUnavailable(ctx)}
 	}
 
 	query, ok := api.(replay.QueryFramebufferAttachment)
 	if !ok {
 		log.E(ctx, "API %s does not implement QueryFramebufferAttachment", api.Name())
-		return nil, &service.ErrDataUnavailable{Reason: messages.ErrFramebufferUnavailable()}
+		return nil, &service.ErrDataUnavailable{Reason: messages.ErrFramebufferUnavailable(ctx)}
 	}
 
 	mgr := replay.GetManager(ctx)

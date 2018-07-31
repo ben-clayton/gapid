@@ -15,8 +15,11 @@
 package test
 
 import (
+	"context"
+
 	"github.com/google/gapid/core/data/compare"
 	"github.com/google/gapid/core/memory/arena"
+	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapis/memory"
 )
 
@@ -59,11 +62,12 @@ func init() {
 }
 
 // BuildComplex returns a Complex populated with data.
-func BuildComplex(a arena.Arena) Complex {
+func BuildComplex(ctx context.Context) Complex {
+	a := executor.GetEnv(ctx).Arena
 	o := NewTestObjectʳ(a, 42)
 	m := NewU32ːTestObjectᵐ(a).
-		Add(4, NewTestObject(a, 40)).
-		Add(5, NewTestObject(a, 50))
+		Add(ctx, 4, NewTestObject(a, 40)).
+		Add(ctx, 5, NewTestObject(a, 50))
 	cycle := NewTestListʳ(a,
 		1, // value
 		NewTestListʳ(a, // next
@@ -92,17 +96,17 @@ func BuildComplex(a arena.Arena) Complex {
 		m,              // EntriesAlias
 		NewU32ːTestObjectᵐ(a), // NilMap
 		NewU32ːTestObjectʳᵐ(a). // RefEntries
-					Add(0, o).
-					Add(6, NewTestObjectʳ(a, 60)).
-					Add(7, NewTestObjectʳ(a, 70)).
-					Add(9, NilTestObjectʳ),
+					Add(ctx, 0, o).
+					Add(ctx, 6, NewTestObjectʳ(a, 60)).
+					Add(ctx, 7, NewTestObjectʳ(a, 70)).
+					Add(ctx, 9, NilTestObjectʳ),
 		NewStringːu32ᵐ(a). // Strings
-					Add("one", 1).
-					Add("two", 2).
-					Add("three", 3),
+					Add(ctx, "one", 1).
+					Add(ctx, "two", 2).
+					Add(ctx, "three", 3),
 		NewU32ːboolᵐ(a). // BoolMap
-					Add(0, false).
-					Add(1, true),
+					Add(ctx, 0, false).
+					Add(ctx, 1, true),
 		NewTestListʳ(a, // LinkedList
 			1, // value
 			NewTestListʳ(a, // next
@@ -112,9 +116,9 @@ func BuildComplex(a arena.Arena) Complex {
 		),
 		cycle, // Cycle
 		NewU32ːNestedRefʳᵐ(a). // NestedRefs
-					Add(6, NewNestedRefʳ(a, o)).
-					Add(7, NewNestedRefʳ(a, o)).
-					Add(8, NewNestedRefʳ(a, NilTestObjectʳ)).
-					Add(9, NilNestedRefʳ),
+					Add(ctx, 6, NewNestedRefʳ(a, o)).
+					Add(ctx, 7, NewNestedRefʳ(a, o)).
+					Add(ctx, 8, NewNestedRefʳ(a, NilTestObjectʳ)).
+					Add(ctx, 9, NilNestedRefʳ),
 	)
 }

@@ -112,6 +112,7 @@ go_library(
         "//core/os/device:go_default_library",  # keep
         "//gapil/bapi:go_default_library",  # keep
         "//gapil/constset:go_default_library",  # keep
+        "//gapil/executor:go_default_library",  # keep
         "//gapis/api:go_default_library",
         "//gapis/api/test/test_pb:go_default_library",  # keep
         "//gapis/memory:go_default_library",

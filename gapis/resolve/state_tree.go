@@ -127,7 +127,7 @@ func stateTreeNode(ctx context.Context, tree *stateTree, p *path.StateTreeNode) 
 		case nil:
 		case errIndexOOB:
 			at := &path.StateTreeNode{Tree: p.Tree, Indices: p.Indices[:i+1]}
-			return nil, errPathOOB(err.idx, "Index", 0, err.count-1, at)
+			return nil, errPathOOB(ctx, err.idx, "Index", 0, err.count-1, at)
 		default:
 			return nil, err
 		}
@@ -209,8 +209,8 @@ func (n *stn) buildChildren(ctx context.Context, tree *stateTree) {
 		for _, key := range dict.Keys() {
 			children = append(children, &stn{
 				name:  fmt.Sprint(key),
-				value: deref(reflect.ValueOf(dict.Get(key))),
-				path:  path.NewMapIndex(key, n.path),
+				value: deref(reflect.ValueOf(dict.Get(ctx, key))),
+				path:  path.NewMapIndex(ctx, key, n.path),
 			})
 		}
 
@@ -313,7 +313,7 @@ func isNil(v reflect.Value) bool {
 
 func (n *stn) service(ctx context.Context, tree *stateTree) *service.StateTreeNode {
 	n.buildChildren(ctx, tree)
-	preview, previewIsValue := stateValuePreview(n.value)
+	preview, previewIsValue := stateValuePreview(ctx, n.value)
 	return &service.StateTreeNode{
 		NumChildren:    uint64(len(n.children)),
 		Name:           n.name,
@@ -328,11 +328,11 @@ func isFieldVisible(f reflect.StructField) bool {
 	return f.PkgPath == "" && f.Tag.Get("hidden") != "true"
 }
 
-func stateValuePreview(v reflect.Value) (*box.Value, bool) {
+func stateValuePreview(ctx context.Context, v reflect.Value) (*box.Value, bool) {
 	t := v.Type()
 	switch {
 	case box.IsMemoryPointer(t), box.IsMemorySlice(t):
-		return box.NewValue(v.Interface()), true
+		return box.NewValue(ctx, v.Interface()), true
 	}
 
 	switch v.Kind() {
@@ -340,25 +340,25 @@ func stateValuePreview(v reflect.Value) (*box.Value, bool) {
 		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
 		reflect.Float32, reflect.Float64:
-		return box.NewValue(v.Interface()), true
+		return box.NewValue(ctx, v.Interface()), true
 	case reflect.Array, reflect.Slice:
 		const maxLen = 4
 		if v.Len() > maxLen {
-			return box.NewValue(v.Slice(0, maxLen).Interface()), false
+			return box.NewValue(ctx, v.Slice(0, maxLen).Interface()), false
 		}
-		return box.NewValue(v.Interface()), true
+		return box.NewValue(ctx, v.Interface()), true
 	case reflect.String:
 		const maxLen = 64
 		runes := []rune(v.Interface().(string))
 		if len(runes) > maxLen {
-			return box.NewValue(string(append(runes[:maxLen-1], '…'))), false
+			return box.NewValue(ctx, string(append(runes[:maxLen-1], '…'))), false
 		}
-		return box.NewValue(v.Interface()), true
+		return box.NewValue(ctx, v.Interface()), true
 	case reflect.Interface, reflect.Ptr:
 		if isNil(v) {
-			return box.NewValue(v.Interface()), true
+			return box.NewValue(ctx, v.Interface()), true
 		}
-		return stateValuePreview(v.Elem())
+		return stateValuePreview(ctx, v.Elem())
 	default:
 		return nil, false
 	}

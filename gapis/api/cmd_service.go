@@ -15,6 +15,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/google/gapid/core/data/id"
@@ -24,7 +25,7 @@ import (
 )
 
 // CmdToService returns the service command representing command c.
-func CmdToService(c Cmd) (*Command, error) {
+func CmdToService(ctx context.Context, c Cmd) (*Command, error) {
 	out := &Command{
 		Name:   c.CmdName(),
 		Thread: c.Thread(),
@@ -37,7 +38,7 @@ func CmdToService(c Cmd) (*Command, error) {
 	for _, p := range c.CmdParams() {
 		param := &Parameter{
 			Name:  p.Name,
-			Value: box.NewValue(p.Get()),
+			Value: box.NewValue(ctx, p.Get()),
 		}
 		if p.Constants > 0 {
 			param.Constants = out.API.ConstantSet(p.Constants)
@@ -48,7 +49,7 @@ func CmdToService(c Cmd) (*Command, error) {
 	if p := c.CmdResult(); p != nil {
 		out.Result = &Parameter{
 			Name:  p.Name,
-			Value: box.NewValue(p.Get()),
+			Value: box.NewValue(ctx, p.Get()),
 		}
 		if p.Constants >= 0 {
 			out.Result.Constants = out.API.ConstantSet(p.Constants)
@@ -59,7 +60,7 @@ func CmdToService(c Cmd) (*Command, error) {
 }
 
 // ServiceToCmd returns the command built from c.
-func ServiceToCmd(a arena.Arena, c *Command) (Cmd, error) {
+func ServiceToCmd(ctx context.Context, a arena.Arena, c *Command) (Cmd, error) {
 	api := Find(ID(c.GetAPI().GetID().ID()))
 	if api == nil {
 		return nil, fmt.Errorf("Unknown api '%v'", c.GetAPI())
@@ -73,11 +74,11 @@ func ServiceToCmd(a arena.Arena, c *Command) (Cmd, error) {
 	cmd.SetThread(c.Thread)
 
 	for _, s := range c.Parameters {
-		SetParameter(cmd, s.Name, s.Value.Get())
+		SetParameter(cmd, s.Name, s.Value.Get(ctx))
 	}
 
 	if p := cmd.CmdResult(); p != nil && c.Result != nil {
-		cmd.CmdResult().Set(c.Result.Value.Get())
+		cmd.CmdResult().Set(c.Result.Value.Get(ctx))
 	}
 
 	return cmd, nil

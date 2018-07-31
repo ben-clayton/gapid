@@ -71,7 +71,7 @@ func (c *cloner) declareClones() {
 		mangled := c.Mangler(c.Mangle(elTy))
 		impl, seen := impls[mangled]
 		if !seen {
-			impl = c.Method(false, elTy, ptrTy, "clone", c.T.ArenaPtr, c.T.VoidPtr).
+			impl = c.Method(false, elTy, ptrTy, "clone", c.T.CtxPtr, c.T.VoidPtr).
 				LinkPrivate().
 				LinkOnceODR()
 			impls[mangled] = impl
@@ -79,7 +79,7 @@ func (c *cloner) declareClones() {
 		}
 
 		// Delegate the clone method of this type on to the common implmentation.
-		f := c.M.Function(ptrTy, ty.Name()+"_clone", ptrTy, c.T.ArenaPtr, c.T.VoidPtr).
+		f := c.M.Function(ptrTy, ty.Name()+"_clone", ptrTy, c.T.CtxPtr, c.T.VoidPtr).
 			LinkPrivate().
 			LinkOnceODR().
 			Inline()
@@ -95,8 +95,7 @@ func (c *cloner) implementClones() {
 		switch ty := ty.(type) {
 		case *semantic.Reference:
 			c.C.Build(f, func(s *compiler.S) {
-				this, arena, tracker := s.Parameter(0), s.Parameter(1), s.Parameter(2)
-				s.Arena = arena
+				this, tracker := s.Parameter(0), s.Parameter(2)
 
 				refPtrTy := this.Type().(codegen.Pointer)
 				refTy := refPtrTy.Element
@@ -119,8 +118,7 @@ func (c *cloner) implementClones() {
 			})
 		case *semantic.Map:
 			c.C.Build(f, func(s *compiler.S) {
-				this, arena, tracker := s.Parameter(0), s.Parameter(1), s.Parameter(2)
-				s.Arena = arena
+				this, tracker := s.Parameter(0), s.Parameter(2)
 
 				mapPtrTy := this.Type().(codegen.Pointer)
 
@@ -140,7 +138,7 @@ func (c *cloner) implementClones() {
 						c.IterateMap(s, this, semantic.Uint64Type, func(i, k, v *codegen.Value) {
 							dstK, srcK := s.Local("key", mapInfo.Key), k.Load()
 							c.cloneTo(s, ty.KeyType, dstK, srcK, tracker)
-							dstV, srcV := s.Call(mapInfo.Index, clone, dstK.Load(), s.Scalar(true)), v.Load()
+							dstV, srcV := s.Call(mapInfo.Index, clone, s.Ctx, dstK.Load(), s.Scalar(true)), v.Load()
 							c.cloneTo(s, ty.ValueType, dstV, srcV, tracker)
 						})
 						s.Return(clone)
@@ -158,10 +156,9 @@ func (c *cloner) implementClones() {
 		for _, cmd := range api.Functions {
 			params := c.T.CmdParams[cmd]
 			paramsPtr := c.T.Pointer(params)
-			f := c.M.Function(paramsPtr, cmd.Name()+"__clone", paramsPtr, c.T.ArenaPtr, c.T.VoidPtr).LinkOnceODR()
+			f := c.M.Function(paramsPtr, cmd.Name()+"__clone", paramsPtr, c.T.CtxPtr, c.T.VoidPtr).LinkOnceODR()
 			c.C.Build(f, func(s *compiler.S) {
-				this, arena, tracker := s.Parameter(0), s.Parameter(1), s.Parameter(2)
-				s.Arena = arena
+				this, tracker := s.Parameter(0), s.Parameter(2)
 				clone := c.Alloc(s, s.Scalar(1), params)
 				thread := semantic.BuiltinThreadGlobal.Name()
 				c.cloneTo(s, semantic.Uint64Type, clone.Index(0, thread), this.Index(0, thread).Load(), tracker)
@@ -177,7 +174,7 @@ func (c *cloner) implementClones() {
 // cloneTo emits the logic to clone the value src to the pointer dst.
 func (c *cloner) cloneTo(s *compiler.S, ty semantic.Type, dst, src, tracker *codegen.Value) {
 	if f, ok := c.clone[ty]; ok {
-		dst.Store(s.Call(f, src, s.Arena, tracker))
+		dst.Store(s.Call(f, src, s.Ctx, tracker))
 		return
 	}
 

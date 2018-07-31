@@ -50,6 +50,7 @@ import (»
   "github.com/google/gapid/gapis/service/path"
   ϟapi "github.com/google/gapid/gapis/api"
   ϟmem "github.com/google/gapid/gapis/memory"
+  ϟexec "github.com/google/gapid/gapil/executor"
 «)
 ¶
   var ( // Don't error if these packages aren't used.
@@ -118,19 +119,6 @@ import (»
     data := C.CString(s)
     defer C.free((unsafe.Pointer)(data))
     return C.gapil_make_string((*C.arena)(a.Pointer), (C.uint64_t)(len(s)), (unsafe.Pointer)(data))
-  }
-¶
-  func poolToC(a arena.Arena, id ϟmem.PoolID) *C.pool {
-    // TODO
-    return (*C.pool)(unsafe.Pointer(uintptr(id)))
-  }
-¶
-  func poolFromC(p *C.pool) ϟmem.PoolID {
-    if p == nil {
-      return ϟmem.ApplicationPool
-    }
-    // TODO
-    return ϟmem.PoolID(uintptr(unsafe.Pointer(p)))
   }
 {{end}}
 
@@ -244,7 +232,7 @@ import (»
   }
 
   {{if IsNumericType $ty.ValueType}}
-    func (a {{$name}}) value(ϟb *builder.Builder, ϟc ϟapi.Cmd, ϟs *ϟapi.GlobalState) value.Pointer {
+    func (a {{$name}}) value(ϟctx context.Context, ϟb *builder.Builder, ϟc ϟapi.Cmd, ϟs *ϟapi.GlobalState) value.Pointer {
       for i := 0; i < {{$ty.Size}}; i++ {
         ϟb.Push({{Template "Go.Replay.Value" "Type" $ty.ValueType "Name" "a.Get(i)"}})
       }
@@ -252,15 +240,16 @@ import (»
     }
   {{end}}
 
-  // Clone makes a deep copy of this static array, using ϟa for allocations.
-  func (a {{$name}}) Clone(ϟa arena.Arena) {{$name}} {
-    ϟt := C.gapil_create_clone_tracker((*C.arena)(ϟa.Pointer))
+  // Clone makes a deep copy of this static array.
+  func (a {{$name}}) Clone(ϟctx context.Context) {{$name}} {
+    ϟenv := ϟexec.GetEnv(ϟctx)
+    ϟt := C.gapil_create_clone_tracker(((*C.arena)(ϟenv.Arena.Pointer)))
     defer C.gapil_destroy_clone_tracker(ϟt)
-    return a.clone(ϟa, ϟt)
+    return a.clone(ϟenv, ϟt)
   }
 
-  func (a {{$name}}) clone(ϟa arena.Arena, ϟt unsafe.Pointer) {{$name}} {
-    out := New{{$name}}(ϟa)
+  func (a {{$name}}) clone(ϟenv *ϟexec.Env, ϟt unsafe.Pointer) {{$name}} {
+    out := New{{$name}}(ϟenv.Arena)
     for i := 0; i < {{$ty.Size}}; i++ {
       out.Set(i, {{Template "Clone" "Type" $ty.ValueType "Src" "a.Get(i)"}})
     }
@@ -303,27 +292,29 @@ import (»
   // Arena returns the memory arena used to allocate this map.
   func (m {{$name}}) Arena() arena.Arena { return arena.Arena{(unsafe.Pointer)(m.c.arena) } }
 
-  func (m {{$name}}) Get(k {{$key}}) {{$val}} {
-    v, _ := m.Lookup(k)
+  func (m {{$name}}) Get(ϟctx context.Context, k {{$key}}) {{$val}} {
+    v, _ := m.Lookup(ϟctx, k)
     return v
   }
 
-  func (m {{$name}}) Lookup(k {{$key}}) ({{$val}}, bool) {
+  func (m {{$name}}) Lookup(ϟctx context.Context, k {{$key}}) ({{$val}}, bool) {
+    ϟcc := (*C.context)(ϟexec.GetEnv(ϟctx).CContext())
     ϟa := m.Arena(); _ = ϟa
     ck := {{Template "GoToC" "Type" $.KeyType "Name" "k" "Arena" "ϟa"}}
     {{Template "DeferReleaseGoToC" "Object" "ck" "Type" $.KeyType}}
-    ptr := (*{{$cval}})(C.{{$mangled}}__index((unsafe.Pointer)(m.c), ({{Template "CgoSimplifiedType" $.KeyType}})(ck), C.GAPIL_FALSE))
+    ptr := (*{{$cval}})(C.{{$mangled}}__index((unsafe.Pointer)(m.c), ϟcc, ({{Template "CgoSimplifiedType" $.KeyType}})(ck), C.GAPIL_FALSE))
     if ptr == nil {
       return {{Template "Go.Null" $.ValueType}}, false
     }
     return {{Template "CToGo" "Type" $.ValueType "Name" "(*ptr)" "Arena" "ϟa"}}, true
   }
 
-  func (m {{$name}}) Add(k {{$key}}, v {{$val}}) {{$name}} {
+  func (m {{$name}}) Add(ϟctx context.Context, k {{$key}}, v {{$val}}) {{$name}} {
+    ϟcc := (*C.context)(ϟexec.GetEnv(ϟctx).CContext())
     ck := {{Template "GoToC" "Type" $.KeyType   "Name" "k" "Arena" "m.Arena()"}}
     cv := {{Template "GoToC" "Type" $.ValueType "Name" "v" "Arena" "m.Arena()"}}
     {{Template "DeferReleaseGoToC" "Object" "ck" "Type" $.KeyType}}
-    *(*{{$cval}})(C.{{$mangled}}__index((unsafe.Pointer)(m.c), ({{Template "CgoSimplifiedType" $.KeyType}})(ck), C.GAPIL_TRUE)) = cv
+    *(*{{$cval}})(C.{{$mangled}}__index((unsafe.Pointer)(m.c), ϟcc, ({{Template "CgoSimplifiedType" $.KeyType}})(ck), C.GAPIL_TRUE)) = cv
     return m
   }
 
@@ -333,14 +324,16 @@ import (»
     return C.{{$mangled}}__contains((unsafe.Pointer)(m.c), ({{Template "CgoSimplifiedType" $.KeyType}})(ck)) != 0
   }
 
-  func (m {{$name}}) Remove(k {{$key}}) {
+  func (m {{$name}}) Remove(ϟctx context.Context, k {{$key}}) {
+    ϟcc := (*C.context)(ϟexec.GetEnv(ϟctx).CContext())
     ck := {{Template "GoToC" "Type" $.KeyType "Name" "k" "Arena" "m.Arena()"}}
     {{Template "DeferReleaseGoToC" "Object" "ck" "Type" $.KeyType}}
-    C.{{$mangled}}__remove((unsafe.Pointer)(m.c), ({{Template "CgoSimplifiedType" $.KeyType}})(ck))
+    C.{{$mangled}}__remove((unsafe.Pointer)(m.c), ϟcc, ({{Template "CgoSimplifiedType" $.KeyType}})(ck))
   }
 
-  func (m {{$name}}) Clear() {
-    C.{{$mangled}}__clear((unsafe.Pointer)(m.c))
+  func (m {{$name}}) Clear(ϟctx context.Context) {
+    ϟcc := (*C.context)(ϟexec.GetEnv(ϟctx).CContext())
+    C.{{$mangled}}__clear((unsafe.Pointer)(m.c), ϟcc)
   }
 
   func (m {{$name}}) Len() int {
@@ -359,16 +352,18 @@ import (»
     return out
   }
 
-  // Clone makes a deep copy of this map, using ϟa for allocations.
-  func (c {{$name}}) Clone(ϟa arena.Arena) {{$name}} {
-    ϟt := C.gapil_create_clone_tracker((*C.arena)(ϟa.Pointer))
+  // Clone makes a deep copy of this map.
+  func (c {{$name}}) Clone(ϟctx context.Context) {{$name}} {
+    ϟenv := ϟexec.GetEnv(ϟctx)
+    ϟt := C.gapil_create_clone_tracker(((*C.arena)(ϟenv.Arena.Pointer)))
     defer C.gapil_destroy_clone_tracker(ϟt)
-    return c.clone(ϟa, ϟt)
+    return c.clone(ϟenv, ϟt)
   }
 
-  func (c {{$name}}) clone(ϟa arena.Arena, ϟt unsafe.Pointer) {{$name}} {
+  func (c {{$name}}) clone(ϟenv *ϟexec.Env, ϟt unsafe.Pointer) {{$name}} {
+    ϟcc := (*C.context)(ϟenv.CContext())
     return {{$name}}{
-      c: ({{$cmap}})(C.{{$mangled}}__clone((unsafe.Pointer)(c.c), (*C.arena)(ϟa.Pointer), ϟt)),
+      c: ({{$cmap}})(C.{{$mangled}}__clone((unsafe.Pointer)(c.c), ϟcc, ϟt)),
     }
   }
 
@@ -433,16 +428,18 @@ import (»
   // Arena returns the memory arena used to allocate this reference.
   func (c {{$name}}) Arena() arena.Arena { return arena.Arena{(unsafe.Pointer)(c.c.arena) } }
 
-  // Clone makes a deep copy of this reference, using ϟa for allocations.
-  func (c {{$name}}) Clone(ϟa arena.Arena) {{$name}} {
-    ϟt := C.gapil_create_clone_tracker((*C.arena)(ϟa.Pointer))
+  // Clone makes a deep copy of this reference.
+  func (c {{$name}}) Clone(ϟctx context.Context) {{$name}} {
+    ϟenv := ϟexec.GetEnv(ϟctx)
+    ϟt := C.gapil_create_clone_tracker(((*C.arena)(ϟenv.Arena.Pointer)))
     defer C.gapil_destroy_clone_tracker(ϟt)
-    return c.clone(ϟa, ϟt)
+    return c.clone(ϟenv, ϟt)
   }
 
-  func (c {{$name}}) clone(ϟa arena.Arena, ϟt unsafe.Pointer) {{$name}} {
+  func (c {{$name}}) clone(ϟenv *ϟexec.Env, ϟt unsafe.Pointer) {{$name}} {
+    ϟcc := (*C.context)(ϟenv.CContext())
     return {{$name}}{
-      c: C.{{$mangled}}__clone(c.c, (*C.arena)(ϟa.Pointer), ϟt),
+      c: C.{{$mangled}}__clone(c.c, ϟcc, ϟt),
     }
   }
 
@@ -539,9 +536,9 @@ import (»
       pool.Write(0, ϟmem.Blob([]byte(str)))
       return {{$slice_ty}}{
         c: &C.slice{
+          pool:  C.uint64_t(id),
           size:  C.uint64_t(len(str)),
           count: C.uint64_t(len(str)),
-          pool:  poolToC(ϟg.Arena, id),
         },
       }
     }
@@ -566,11 +563,11 @@ import (»
   func New{{$slice_ty}}(a arena.Arena, root, base, size, count uint64, pool ϟmem.PoolID) {{$slice_ty}} {
     return {{$slice_ty}}{
       c: &C.slice{
+        pool:  C.uint64_t(pool),
         root:  C.uint64_t(root),
         base:  C.uint64_t(base),
         size:  C.uint64_t(size),
         count: C.uint64_t(count),
-        pool:  poolToC(a, pool),
       },
     }
   }
@@ -581,9 +578,9 @@ import (»
     id, _ := ϟg.Memory.New()
     return {{$slice_ty}}{
       c: &C.slice{
+        pool:  C.uint64_t(id),
         size:  C.uint64_t(count * {{Template "Go.SizeOf" $s.To}}),
         count: C.uint64_t(count),
-        pool:  poolToC(ϟg.Arena, id),
       },
     }
   }
@@ -595,9 +592,9 @@ import (»
     dst.Write(0, ϟg.Memory.MustGet(s.Pool()).Slice(s.Range()))
     return {{$slice_ty}}{
       c: &C.slice{
+        pool:  C.uint64_t(id),
         size:  C.uint64_t(s.Size()),
         count: C.uint64_t(s.Count()),
-        pool:  poolToC(ϟg.Arena, id),
       },
     }
   }
@@ -616,7 +613,7 @@ import (»
 
   // Pool returns the the pool identifier.
   func (s {{$slice_ty}}) Pool() ϟmem.PoolID {
-    return poolFromC(s.c.pool)
+    return ϟmem.PoolID(s.c.pool)
   }
 
   // ElementType returns the reflect.Type of the elements in the slice.
@@ -674,7 +671,7 @@ import (»
       newSize := newCount * elSize
       return {{$slice_ty}}{
         c: &C.slice{
-          pool:  poolToC(a, s.Pool()),
+          pool:  C.uint64_t(s.Pool()),
           root:  C.uint64_t(s.Root()),
           base:  C.uint64_t(s.Base()),
           size:  C.uint64_t(newSize),
@@ -778,7 +775,7 @@ import (»
         ϟd, dst := s.Decoder(ϟctx, ϟg), value.PointerIndex(s.Base() / uint64(ϟl.GetPointer().GetSize()))
         for i, c := uint64(0), s.Count(); i < c; i++ {
           {{if (GetAnnotation $s.To "replay_remap")}}{{Error "Remappings of pointers not implemented"}}{{end}}
-          ptr := {{$el_ty}}(ϟd.Pointer()).value(ϟb, ϟc, ϟg)
+          ptr := {{$el_ty}}(ϟd.Pointer()).value(ϟctx, ϟb, ϟc, ϟg)
           ϟb.StorePointer(dst, ptr)
           dst++
         }
@@ -792,7 +789,7 @@ import (»
           ptr, step, ϟd := value.ObservedPointer(s.Base()), value.ObservedPointer(s.ElementSize(ϟl)), s.Decoder(ϟctx, ϟg)
           for i, c := uint64(0), s.Count(); i < c; i++ {
             v := {{Template "Go.Decode" $s.To}}
-            if key, remap := v.remap(ϟc, ϟg); remap {
+            if key, remap := v.remap(ϟctx, ϟc, ϟg); remap {
               loadRemap(ϟb, key, {{Template "Go.Replay.Type" $s.To}}, {{Template "Go.Replay.Value" "Type" $s.To "Name" "v"}})
             } else {
               ϟb.Push({{Template "Go.Replay.Value" "Type" $s.To "Name" "v"}})
@@ -825,7 +822,7 @@ import (»
         ptr, step, ϟd := value.ObservedPointer(s.Base()), value.ObservedPointer(size), s.Decoder(ϟctx, ϟg)
         for i, c := uint64(0), s.Count(); i < c; i++ {
           v := {{Template "Go.Decode" $s.To}}
-          if key, remap := v.remap(ϟc, ϟg); remap {
+          if key, remap := v.remap(ϟctx, ϟc, ϟg); remap {
             dst, found := ϟb.Remappings[key]
             if !found {
               dst = ϟb.AllocateMemory(size)
@@ -870,7 +867,7 @@ import (»
     }
     return {{$slice_ty}}{
       c: &C.slice{
-        pool:  s.c.pool, // TODO
+        pool:  s.c.pool,
         root:  C.uint64_t(s.Root()),
         base:  C.uint64_t(s.Base() + start * elSize),
         size:  C.uint64_t(newCount * elSize),
@@ -1030,7 +1027,7 @@ import (»
     count := end-start
     return {{$slice_ty}}{
       c: &C.slice{
-        pool:  nil, // TODO
+        pool:  C.GAPIL_APPLICATION_POOL,
         root:  C.uint64_t(p),
         base:  C.uint64_t(uint64(p) + start * elSize),
         size:  C.uint64_t((count) * elSize),
@@ -1055,7 +1052,7 @@ import (»
   }
 
   {{if not (GetAnnotation $ "replay_custom_value")}}
-    func (p {{$ptr_ty}}) value(ϟb *builder.Builder, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState) value.Pointer {
+    func (p {{$ptr_ty}}) value(ϟctx context.Context, ϟb *builder.Builder, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState) value.Pointer {
       if p != 0 {
         {{if $el_is_ptr}}
           return value.PointerIndex(uint64(p) / uint64(ϟg.MemoryLayout.GetPointer().GetSize()))
@@ -1256,14 +1253,16 @@ import (»
     }
   {{end}}
 
-  // Clone makes a deep copy of this class, using ϟa for allocations.
-  func (c {{$name}}) Clone(ϟa arena.Arena) {{$name}} {
-    ϟt := C.gapil_create_clone_tracker((*C.arena)(ϟa.Pointer))
+  // Clone makes a deep copy of this class.
+  func (c {{$name}}) Clone(ϟctx context.Context) {{$name}} {
+    ϟenv := ϟexec.GetEnv(ϟctx)
+    ϟt := C.gapil_create_clone_tracker(((*C.arena)(ϟenv.Arena.Pointer)))
     defer C.gapil_destroy_clone_tracker(ϟt)
-    return c.clone(ϟa, ϟt)
+    return c.clone(ϟenv, ϟt)
   }
 
-  func (c {{$name}}) clone(ϟa arena.Arena, ϟt unsafe.Pointer) {{$name}} {
+  func (c {{$name}}) clone(ϟenv *ϟexec.Env, ϟt unsafe.Pointer) {{$name}} {
+    ϟa := ϟenv.Arena
     return New{{$name}}(ϟa,
     {{range $f := $.Fields}}
       {{Template "Clone" "Type" $f.Type "Src" (print "c." ($f.Name | GoPublicName) "()")}},
@@ -1385,19 +1384,21 @@ import (»
     {{Template "DeclareGetterSetter" "Struct" $name "Name" $p.Name "Type" $p.Type}}¶
   {{end}}
 
-  // Clone returns a shallow clone of the command. Extras are shared.
-  func (ϟc *{{$name}}) Clone(ϟa arena.Arena) *{{$name}} {
-    ϟt := C.gapil_create_clone_tracker((*C.arena)(ϟa.Pointer))
+  // Clone returns a shallow clone of this command. Extras are shared.
+  func (ϟc *{{$name}}) Clone(ϟctx context.Context) *{{$name}} {
+    ϟenv := ϟexec.GetEnv(ϟctx)
+    ϟt := C.gapil_create_clone_tracker(((*C.arena)(ϟenv.Arena.Pointer)))
     defer C.gapil_destroy_clone_tracker(ϟt)
-    return ϟc.clone(ϟa, ϟt)
+    return ϟc.clone(ϟenv, ϟt)
   }
 
-  func (ϟc {{$name}}) clone(ϟa arena.Arena, ϟt unsafe.Pointer) *{{$name}} {
+  func (ϟc {{$name}}) clone(ϟenv *ϟexec.Env, ϟt unsafe.Pointer) *{{$name}} {
+    ϟcc := (*C.context)(ϟenv.CContext())
     return &{{$name}}{
-      c:      C.{{$.Name}}__clone(ϟc.c, (*C.arena)(ϟa.Pointer), ϟt),
+      c:      C.{{$.Name}}__clone(ϟc.c, ϟcc, ϟt),
       caller: ϟc.caller,
       extras: ϟc.extras,
-      arena:  ϟa,
+      arena:  ϟenv.Arena,
     }
   }
 {{end}}
@@ -1514,8 +1515,10 @@ import (»
     }
   }
 
-  // Clone returns a deep copy of this state object, using ϟa for allocations.
-  func (g *State) Clone(ϟa arena.Arena) ϟapi.State {
+  // Clone returns a deep copy of this state object.
+  func (g *State) Clone(ϟctx context.Context) ϟapi.State {
+    ϟenv := ϟexec.GetEnv(ϟctx)
+    ϟa := ϟenv.Arena
     ϟt := C.gapil_create_clone_tracker((*C.arena)(ϟa.Pointer))
     defer C.gapil_destroy_clone_tracker(ϟt)
 
@@ -1619,7 +1622,7 @@ import (»
       { // {{$.Name}}.{{$name}}
         ϟd.Align({{Template "Go.AlignOf" (TypeOf $f)}})
         addr := value.ObservedPointer(s.Base() + ϟd.Offset())
-        ϟb.Push({{Macro "Go.Type" $f}}(ϟd.Pointer()).value(ϟb, ϟc, ϟg))
+        ϟb.Push({{Macro "Go.Type" $f}}(ϟd.Pointer()).value(ϟctx, ϟb, ϟc, ϟg))
         ϟb.Store(addr)
       }
     {{else if IsClass ($f.Type | Underlying)}}
@@ -1631,7 +1634,7 @@ import (»
           ϟd.Align({{Template "Go.AlignOf" (TypeOf $f)}})
           addr := value.ObservedPointer(s.Base() + ϟd.Offset())
           v := {{Template "Go.Decode" $f.Type}}
-          if key, remap := v.remap(ϟc, ϟg); remap {
+          if key, remap := v.remap(ϟctx, ϟc, ϟg); remap {
             loadRemap(ϟb, key, {{Template "Go.Replay.Type" $f.Type}}, {{Template "Go.Replay.Value" "Type" $f.Type "Name" "v"}})
             ϟb.Store(addr)
           }
@@ -1718,13 +1721,13 @@ import (»
   {{AssertType $.Type "Type"}}
 
   {{     if IsPseudonym     $.Type}}{{Template "Clone" "Type" $.Type.To "Src" $.Src}}
-  {{else if IsStaticArray   $.Type}}{{$.Src}}.clone(ϟa, ϟt)
-  {{else if IsMap           $.Type}}{{$.Src}}.clone(ϟa, ϟt)
-  {{else if IsClass         $.Type}}{{$.Src}}.clone(ϟa, ϟt)
+  {{else if IsStaticArray   $.Type}}{{$.Src}}.clone(ϟenv, ϟt)
+  {{else if IsMap           $.Type}}{{$.Src}}.clone(ϟenv, ϟt)
+  {{else if IsClass         $.Type}}{{$.Src}}.clone(ϟenv, ϟt)
   {{else if IsEnum          $.Type}}{{$.Src}}
   {{else if IsPointer       $.Type}}{{$.Src}}
   {{else if IsSlice         $.Type}}{{$.Src}}
-  {{else if IsReference     $.Type}}{{$.Src}}.clone(ϟa, ϟt)
+  {{else if IsReference     $.Type}}{{$.Src}}.clone(ϟenv, ϟt)
   {{else if IsBool          $.Type}}{{$.Src}}
   {{else if IsInt           $.Type}}{{$.Src}}
   {{else if IsUint          $.Type}}{{$.Src}}

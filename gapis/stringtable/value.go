@@ -15,6 +15,7 @@
 package stringtable
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/google/gapid/gapis/service/box"
@@ -22,12 +23,12 @@ import (
 )
 
 // ToValue returns v boxed in a Value.
-func ToValue(v interface{}) *Value {
+func ToValue(ctx context.Context, v interface{}) *Value {
 	switch v := v.(type) {
 	case *path.Any:
 		return &Value{Value: &Value_Path{Path: v}}
 	default:
-		if val := box.NewValue(v); val != nil {
+		if val := box.NewValue(ctx, v); val != nil {
 			return &Value{Value: &Value_Box{Box: val}}
 		}
 		panic(fmt.Errorf("Unsupported value type %T", v))
@@ -35,10 +36,10 @@ func ToValue(v interface{}) *Value {
 }
 
 // Unpack returns the underlying value wrapped by the Value.
-func (v Value) Unpack() interface{} {
+func (v Value) Unpack(ctx context.Context) interface{} {
 	switch v := v.Value.(type) {
 	case *Value_Box:
-		return v.Box.Get()
+		return v.Box.Get(ctx)
 	case *Value_Path:
 		return v.Path
 	default:

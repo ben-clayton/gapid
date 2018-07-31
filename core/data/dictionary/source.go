@@ -15,6 +15,7 @@
 package dictionary
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/google/gapid/core/data/generic"
@@ -37,18 +38,18 @@ var (
 // K and V can be subsituted with a different type.
 type Source interface {
 	// Get returns the value of the entry with the given key.
-	Get(K) V
+	Get(context.Context, K) V
 	// Add inserts the key-value pair, replacing any existing entry with the
 	// same key.
-	Add(K, V)
+	Add(context.Context, K, V)
 	// Lookup searches for the value of the entry with the given key.
-	Lookup(K) (val V, ok bool)
+	Lookup(context.Context, K) (val V, ok bool)
 	// Contains returns true if the dictionary contains an entry with the given
 	// key.
 	Contains(K) bool
 	// Remove removes the entry with the given key. If no entry with the given
 	// key exists then this call is a no-op.
-	Remove(K)
+	Remove(context.Context, K)
 	// Len returns the number of entries in the dictionary.
 	Len() int
 	// Keys returns all the entry keys in the map.
@@ -94,16 +95,26 @@ type source struct {
 	keys     reflect.Value
 }
 
-func (s source) Get(key interface{}) interface{} {
-	return s.get.Call([]reflect.Value{reflect.ValueOf(key)})[0].Interface()
+func (s source) Get(ctx context.Context, key interface{}) interface{} {
+	return s.get.Call([]reflect.Value{
+		reflect.ValueOf(ctx),
+		reflect.ValueOf(key),
+	})[0].Interface()
 }
 
-func (s source) Add(key interface{}, val interface{}) {
-	s.add.Call([]reflect.Value{reflect.ValueOf(key), reflect.ValueOf(val)})
+func (s source) Add(ctx context.Context, key interface{}, val interface{}) {
+	s.add.Call([]reflect.Value{
+		reflect.ValueOf(ctx),
+		reflect.ValueOf(key),
+		reflect.ValueOf(val),
+	})
 }
 
-func (s source) Lookup(key interface{}) (interface{}, bool) {
-	res := s.lookup.Call([]reflect.Value{reflect.ValueOf(key)})
+func (s source) Lookup(ctx context.Context, key interface{}) (interface{}, bool) {
+	res := s.lookup.Call([]reflect.Value{
+		reflect.ValueOf(ctx),
+		reflect.ValueOf(key),
+	})
 	return res[0].Interface(), res[1].Interface().(bool)
 }
 
@@ -111,8 +122,11 @@ func (s source) Contains(key interface{}) bool {
 	return s.contains.Call([]reflect.Value{reflect.ValueOf(key)})[0].Interface().(bool)
 }
 
-func (s source) Remove(key interface{}) {
-	s.remove.Call([]reflect.Value{reflect.ValueOf(key)})
+func (s source) Remove(ctx context.Context, key interface{}) {
+	s.remove.Call([]reflect.Value{
+		reflect.ValueOf(ctx),
+		reflect.ValueOf(key),
+	})
 }
 
 func (s source) Len() int {

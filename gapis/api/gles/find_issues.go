@@ -122,7 +122,7 @@ func (t *findIssues) Transform(ctx context.Context, id api.CmdID, cmd api.Cmd, o
 
 	dID := id.Derived()
 	s := GetState(t.state)
-	c := s.GetContext(cmd.Thread())
+	c := s.GetContext(ctx, cmd.Thread())
 	if c.IsNil() {
 		return
 	}
@@ -163,7 +163,7 @@ func (t *findIssues) Transform(ctx context.Context, id api.CmdID, cmd api.Cmd, o
 
 	switch cmd := cmd.(type) {
 	case *GlCompileShader:
-		shader := c.Objects().Shaders().Get(cmd.Shader())
+		shader := c.Objects().Shaders().Get(ctx, cmd.Shader())
 		st, err := shader.Type().ShaderType()
 		if err != nil {
 			t.onIssue(cmd, id, service.Severity_ErrorLevel, err)
@@ -231,7 +231,7 @@ func (t *findIssues) Transform(ctx context.Context, id api.CmdID, cmd api.Cmd, o
 				}
 				if r.Uint32() != uint32(GLboolean_GL_TRUE) {
 					originalSource := "<unknown>"
-					if shader := c.Objects().Shaders().Get(cmd.Shader()); !shader.IsNil() {
+					if shader := c.Objects().Shaders().Get(ctx, cmd.Shader()); !shader.IsNil() {
 						originalSource = shader.Source()
 					}
 					t.onIssue(cmd, id, service.Severity_ErrorLevel, fmt.Errorf("Shader %d failed to compile. Error:\n%v\nOriginal source:\n%s\nTranslated source:\n%s",
@@ -262,11 +262,11 @@ func (t *findIssues) Transform(ctx context.Context, id api.CmdID, cmd api.Cmd, o
 				r.Data(msg)
 				if res != uint32(GLboolean_GL_TRUE) {
 					vss, fss := "<unknown>", "<unknown>"
-					if program := c.Objects().Programs().Get(cmd.Program()); !program.IsNil() {
-						if shader := program.Shaders().Get(GLenum_GL_VERTEX_SHADER); !shader.IsNil() {
+					if program := c.Objects().Programs().Get(ctx, cmd.Program()); !program.IsNil() {
+						if shader := program.Shaders().Get(ctx, GLenum_GL_VERTEX_SHADER); !shader.IsNil() {
 							vss = shader.Source()
 						}
-						if shader := program.Shaders().Get(GLenum_GL_FRAGMENT_SHADER); !shader.IsNil() {
+						if shader := program.Shaders().Get(ctx, GLenum_GL_FRAGMENT_SHADER); !shader.IsNil() {
 							fss = shader.Source()
 						}
 					}

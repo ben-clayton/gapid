@@ -27,7 +27,11 @@ import (
 // unpackMapWithAllocator takes a dense map of u32 -> structure, flattens the
 // map into a slice, allocates the appropriate data using a custom provided
 // allocation function and returns it as well as the length of the map.
-func unpackMapWithAllocator(alloc func(v ...interface{}) api.AllocResult, m interface{}) (api.AllocResult, uint32) {
+func unpackMapWithAllocator(
+	ctx context.Context,
+	alloc func(v ...interface{}) api.AllocResult,
+	m interface{}) (api.AllocResult, uint32) {
+
 	u32Type := reflect.TypeOf(uint32(0))
 	d := dictionary.From(m)
 	if d == nil || d.KeyTy() != u32Type {
@@ -36,7 +40,7 @@ func unpackMapWithAllocator(alloc func(v ...interface{}) api.AllocResult, m inte
 	}
 
 	sl := reflect.MakeSlice(reflect.SliceOf(d.ValTy()), d.Len(), d.Len())
-	for _, e := range dictionary.Entries(d) {
+	for _, e := range dictionary.Entries(ctx, d) {
 		i := e.K.(uint32)
 		v := reflect.ValueOf(e.V)
 		sl.Index(int(i)).Set(v)
@@ -49,7 +53,7 @@ func unpackMapWithAllocator(alloc func(v ...interface{}) api.AllocResult, m inte
 // a slice, allocates the appropriate data and returns it as well as the
 // length of the map.
 func unpackMap(ctx context.Context, s *api.GlobalState, m interface{}) (api.AllocResult, uint32) {
-	return unpackMapWithAllocator(func(v ...interface{}) api.AllocResult {
+	return unpackMapWithAllocator(ctx, func(v ...interface{}) api.AllocResult {
 		return s.AllocDataOrPanic(ctx, v...)
 	}, m)
 }
@@ -72,7 +76,7 @@ func allocateNewCmdBufFromExistingOneAndBegin(
 	// DestroyResourcesAtEndOfFrame will handle this actually removing the
 	// command buffer. We have no way to handle WHEN this will be done
 
-	modelCmdBufObj := GetState(s).CommandBuffers().Get(modelCmdBuf)
+	modelCmdBufObj := GetState(s).CommandBuffers().Get(ctx, modelCmdBuf)
 
 	newCmdBufID := VkCommandBuffer(
 		newUnusedID(true, func(x uint64) bool {
@@ -143,7 +147,7 @@ func rebuildVkCmdBeginRenderPass(
 
 	clearValues := make([]VkClearValue, d.ClearValues().Len())
 	for i := range clearValues {
-		clearValues[i] = d.ClearValues().Get(uint32(i))
+		clearValues[i] = d.ClearValues().Get(ctx, uint32(i))
 	}
 
 	clearValuesData := s.AllocDataOrPanic(ctx, clearValues)
@@ -242,7 +246,7 @@ func rebuildVkCmdBindDescriptorSets(
 	d VkCmdBindDescriptorSetsArgsʳ) (func(), api.Cmd, error) {
 
 	for i, c := 0, d.DescriptorSets().Len(); i < c; i++ {
-		ds := d.DescriptorSets().Get(uint32(i))
+		ds := d.DescriptorSets().Get(ctx, uint32(i))
 		if !GetState(s).DescriptorSets().Contains(ds) {
 			return nil, nil, fmt.Errorf("Cannot find DescriptorSet %v", ds)
 		}
@@ -276,7 +280,7 @@ func rebuildVkCmdBindVertexBuffers(
 	d VkCmdBindVertexBuffersArgsʳ) (func(), api.Cmd, error) {
 
 	for i, c := 0, d.Buffers().Len(); i < c; i++ {
-		buf := d.Buffers().Get(uint32(i))
+		buf := d.Buffers().Get(ctx, uint32(i))
 		if !GetState(s).Buffers().Contains(buf) {
 			return nil, nil, fmt.Errorf("Cannot find Buffer %v", buf)
 		}
@@ -305,21 +309,21 @@ func rebuildVkCmdWaitEvents(
 	d VkCmdWaitEventsArgsʳ) (func(), api.Cmd, error) {
 
 	for i, c := 0, d.Events().Len(); i < c; i++ {
-		evt := d.Events().Get(uint32(i))
+		evt := d.Events().Get(ctx, uint32(i))
 		if !GetState(s).Events().Contains(evt) {
 			return nil, nil, fmt.Errorf("Cannot find Event %v", evt)
 		}
 	}
 
 	for i, c := 0, d.BufferMemoryBarriers().Len(); i < c; i++ {
-		buf := d.BufferMemoryBarriers().Get(uint32(i)).Buffer()
+		buf := d.BufferMemoryBarriers().Get(ctx, uint32(i)).Buffer()
 		if !GetState(s).Buffers().Contains(buf) {
 			return nil, nil, fmt.Errorf("Cannot find Buffer %v", buf)
 		}
 	}
 
 	for i, c := 0, d.ImageMemoryBarriers().Len(); i < c; i++ {
-		img := d.ImageMemoryBarriers().Get(uint32(i)).Image()
+		img := d.ImageMemoryBarriers().Get(ctx, uint32(i)).Image()
 		if !GetState(s).Images().Contains(img) {
 			return nil, nil, fmt.Errorf("Cannot find Event %v", img)
 		}
@@ -362,14 +366,14 @@ func rebuildVkCmdPipelineBarrier(
 	imageMemoryBarrierData, imageMemoryBarrierCount := unpackMap(ctx, s, d.ImageMemoryBarriers())
 
 	for i, c := 0, d.BufferMemoryBarriers().Len(); i < c; i++ {
-		buf := d.BufferMemoryBarriers().Get(uint32(i)).Buffer()
+		buf := d.BufferMemoryBarriers().Get(ctx, uint32(i)).Buffer()
 		if !GetState(s).Buffers().Contains(buf) {
 			return nil, nil, fmt.Errorf("Cannot find Buffer %v", buf)
 		}
 	}
 
 	for i, c := 0, d.ImageMemoryBarriers().Len(); i < c; i++ {
-		img := d.ImageMemoryBarriers().Get(uint32(i)).Image()
+		img := d.ImageMemoryBarriers().Get(ctx, uint32(i)).Image()
 		if !GetState(s).Images().Contains(img) {
 			return nil, nil, fmt.Errorf("Cannot find Image %v", img)
 		}
@@ -769,7 +773,7 @@ func rebuildVkCmdExecuteCommands(
 	d VkCmdExecuteCommandsArgsʳ) (func(), api.Cmd, error) {
 
 	for i, c := 0, d.CommandBuffers().Len(); i < c; i++ {
-		buf := d.CommandBuffers().Get(uint32(i))
+		buf := d.CommandBuffers().Get(ctx, uint32(i))
 		if !GetState(s).CommandBuffers().Contains(buf) {
 			return nil, nil, fmt.Errorf("Cannot find CommandBuffer %v", buf)
 		}
@@ -1147,103 +1151,103 @@ func GetCommandArgs(ctx context.Context,
 	cr CommandReferenceʳ,
 	s *State) interface{} {
 
-	cmds := s.CommandBuffers().Get(cr.Buffer()).BufferCommands()
+	cmds := s.CommandBuffers().Get(ctx, cr.Buffer()).BufferCommands()
 
 	switch cr.Type() {
 	case CommandType_cmd_vkCmdBeginRenderPass:
-		return cmds.VkCmdBeginRenderPass().Get(cr.MapIndex())
+		return cmds.VkCmdBeginRenderPass().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdEndRenderPass:
-		return cmds.VkCmdEndRenderPass().Get(cr.MapIndex())
+		return cmds.VkCmdEndRenderPass().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdNextSubpass:
-		return cmds.VkCmdNextSubpass().Get(cr.MapIndex())
+		return cmds.VkCmdNextSubpass().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdBindPipeline:
-		return cmds.VkCmdBindPipeline().Get(cr.MapIndex())
+		return cmds.VkCmdBindPipeline().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdBindDescriptorSets:
-		return cmds.VkCmdBindDescriptorSets().Get(cr.MapIndex())
+		return cmds.VkCmdBindDescriptorSets().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdBindVertexBuffers:
-		return cmds.VkCmdBindVertexBuffers().Get(cr.MapIndex())
+		return cmds.VkCmdBindVertexBuffers().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdBindIndexBuffer:
-		return cmds.VkCmdBindIndexBuffer().Get(cr.MapIndex())
+		return cmds.VkCmdBindIndexBuffer().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdPipelineBarrier:
-		return cmds.VkCmdPipelineBarrier().Get(cr.MapIndex())
+		return cmds.VkCmdPipelineBarrier().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdWaitEvents:
-		return cmds.VkCmdWaitEvents().Get(cr.MapIndex())
+		return cmds.VkCmdWaitEvents().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdBeginQuery:
-		return cmds.VkCmdBeginQuery().Get(cr.MapIndex())
+		return cmds.VkCmdBeginQuery().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdBlitImage:
-		return cmds.VkCmdBlitImage().Get(cr.MapIndex())
+		return cmds.VkCmdBlitImage().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdClearAttachments:
-		return cmds.VkCmdClearAttachments().Get(cr.MapIndex())
+		return cmds.VkCmdClearAttachments().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdClearColorImage:
-		return cmds.VkCmdClearColorImage().Get(cr.MapIndex())
+		return cmds.VkCmdClearColorImage().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdClearDepthStencilImage:
-		return cmds.VkCmdClearDepthStencilImage().Get(cr.MapIndex())
+		return cmds.VkCmdClearDepthStencilImage().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdCopyBuffer:
-		return cmds.VkCmdCopyBuffer().Get(cr.MapIndex())
+		return cmds.VkCmdCopyBuffer().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdCopyBufferToImage:
-		return cmds.VkCmdCopyBufferToImage().Get(cr.MapIndex())
+		return cmds.VkCmdCopyBufferToImage().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdCopyImage:
-		return cmds.VkCmdCopyImage().Get(cr.MapIndex())
+		return cmds.VkCmdCopyImage().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdCopyImageToBuffer:
-		return cmds.VkCmdCopyImageToBuffer().Get(cr.MapIndex())
+		return cmds.VkCmdCopyImageToBuffer().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdCopyQueryPoolResults:
-		return cmds.VkCmdCopyQueryPoolResults().Get(cr.MapIndex())
+		return cmds.VkCmdCopyQueryPoolResults().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdDispatch:
-		return cmds.VkCmdDispatch().Get(cr.MapIndex())
+		return cmds.VkCmdDispatch().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdDispatchIndirect:
-		return cmds.VkCmdDispatchIndirect().Get(cr.MapIndex())
+		return cmds.VkCmdDispatchIndirect().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdDraw:
-		return cmds.VkCmdDraw().Get(cr.MapIndex())
+		return cmds.VkCmdDraw().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdDrawIndexed:
-		return cmds.VkCmdDrawIndexed().Get(cr.MapIndex())
+		return cmds.VkCmdDrawIndexed().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdDrawIndexedIndirect:
-		return cmds.VkCmdDrawIndexedIndirect().Get(cr.MapIndex())
+		return cmds.VkCmdDrawIndexedIndirect().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdDrawIndirect:
-		return cmds.VkCmdDrawIndirect().Get(cr.MapIndex())
+		return cmds.VkCmdDrawIndirect().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdEndQuery:
-		return cmds.VkCmdEndQuery().Get(cr.MapIndex())
+		return cmds.VkCmdEndQuery().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdExecuteCommands:
-		return cmds.VkCmdExecuteCommands().Get(cr.MapIndex())
+		return cmds.VkCmdExecuteCommands().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdFillBuffer:
-		return cmds.VkCmdFillBuffer().Get(cr.MapIndex())
+		return cmds.VkCmdFillBuffer().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdPushConstants:
-		return cmds.VkCmdPushConstants().Get(cr.MapIndex())
+		return cmds.VkCmdPushConstants().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdResetQueryPool:
-		return cmds.VkCmdResetQueryPool().Get(cr.MapIndex())
+		return cmds.VkCmdResetQueryPool().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdResolveImage:
-		return cmds.VkCmdResolveImage().Get(cr.MapIndex())
+		return cmds.VkCmdResolveImage().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdSetBlendConstants:
-		return cmds.VkCmdSetBlendConstants().Get(cr.MapIndex())
+		return cmds.VkCmdSetBlendConstants().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdSetDepthBias:
-		return cmds.VkCmdSetDepthBias().Get(cr.MapIndex())
+		return cmds.VkCmdSetDepthBias().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdSetDepthBounds:
-		return cmds.VkCmdSetDepthBounds().Get(cr.MapIndex())
+		return cmds.VkCmdSetDepthBounds().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdSetEvent:
-		return cmds.VkCmdSetEvent().Get(cr.MapIndex())
+		return cmds.VkCmdSetEvent().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdResetEvent:
-		return cmds.VkCmdResetEvent().Get(cr.MapIndex())
+		return cmds.VkCmdResetEvent().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdSetLineWidth:
-		return cmds.VkCmdSetLineWidth().Get(cr.MapIndex())
+		return cmds.VkCmdSetLineWidth().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdSetScissor:
-		return cmds.VkCmdSetScissor().Get(cr.MapIndex())
+		return cmds.VkCmdSetScissor().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdSetStencilCompareMask:
-		return cmds.VkCmdSetStencilCompareMask().Get(cr.MapIndex())
+		return cmds.VkCmdSetStencilCompareMask().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdSetStencilReference:
-		return cmds.VkCmdSetStencilReference().Get(cr.MapIndex())
+		return cmds.VkCmdSetStencilReference().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdSetStencilWriteMask:
-		return cmds.VkCmdSetStencilWriteMask().Get(cr.MapIndex())
+		return cmds.VkCmdSetStencilWriteMask().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdSetViewport:
-		return cmds.VkCmdSetViewport().Get(cr.MapIndex())
+		return cmds.VkCmdSetViewport().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdUpdateBuffer:
-		return cmds.VkCmdUpdateBuffer().Get(cr.MapIndex())
+		return cmds.VkCmdUpdateBuffer().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdWriteTimestamp:
-		return cmds.VkCmdWriteTimestamp().Get(cr.MapIndex())
+		return cmds.VkCmdWriteTimestamp().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdDebugMarkerBeginEXT:
-		return cmds.VkCmdDebugMarkerBeginEXT().Get(cr.MapIndex())
+		return cmds.VkCmdDebugMarkerBeginEXT().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdDebugMarkerEndEXT:
-		return cmds.VkCmdDebugMarkerEndEXT().Get(cr.MapIndex())
+		return cmds.VkCmdDebugMarkerEndEXT().Get(ctx, cr.MapIndex())
 	case CommandType_cmd_vkCmdDebugMarkerInsertEXT:
-		return cmds.VkCmdDebugMarkerInsertEXT().Get(cr.MapIndex())
+		return cmds.VkCmdDebugMarkerInsertEXT().Get(ctx, cr.MapIndex())
 	default:
 		x := fmt.Sprintf("Should not reach here: %T", cr)
 		panic(x)

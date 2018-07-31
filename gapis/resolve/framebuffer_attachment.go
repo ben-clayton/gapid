@@ -178,7 +178,7 @@ func (c framebufferAttachmentChanges) after(ctx context.Context, i api.SubCmdIdx
 
 	if idx < 0 {
 		log.W(ctx, "No dimension records found after command %d. FB dimension records = %d", i, len(c.changes))
-		return FramebufferAttachmentInfo{}, &service.ErrDataUnavailable{Reason: messages.ErrFramebufferUnavailable()}
+		return FramebufferAttachmentInfo{}, &service.ErrDataUnavailable{Reason: messages.ErrFramebufferUnavailable(ctx)}
 	}
 
 	return c.changes[idx], nil

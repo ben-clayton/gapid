@@ -47,7 +47,7 @@ func Capture(ctx context.Context, p *path.Capture) (*service.Capture, error) {
 func Device(ctx context.Context, p *path.Device) (*device.Instance, error) {
 	device := bind.GetRegistry(ctx).Device(p.ID.ID())
 	if device == nil {
-		return nil, &service.ErrDataUnavailable{Reason: messages.ErrUnknownDevice()}
+		return nil, &service.ErrDataUnavailable{Reason: messages.ErrUnknownDevice(ctx)}
 	}
 	return device.Instance(), nil
 }
@@ -123,7 +123,7 @@ func field(ctx context.Context, s reflect.Value, name string, p path.Node) (refl
 	for {
 		if isNil(s) {
 			return reflect.Value{}, &service.ErrInvalidPath{
-				Reason: messages.ErrNilPointerDereference(),
+				Reason: messages.ErrNilPointerDereference(ctx),
 				Path:   p.Path(),
 			}
 		}
@@ -139,7 +139,7 @@ func field(ctx context.Context, s reflect.Value, name string, p path.Node) (refl
 			f := s.FieldByName(name)
 			if !f.IsValid() {
 				return reflect.Value{}, &service.ErrInvalidPath{
-					Reason: messages.ErrFieldDoesNotExist(typename(s.Type()), name),
+					Reason: messages.ErrFieldDoesNotExist(ctx, typename(s.Type()), name),
 					Path:   p.Path(),
 				}
 			}
@@ -148,7 +148,7 @@ func field(ctx context.Context, s reflect.Value, name string, p path.Node) (refl
 			s = s.Elem()
 		default:
 			return reflect.Value{}, &service.ErrInvalidPath{
-				Reason: messages.ErrFieldDoesNotExist(typename(s.Type()), name),
+				Reason: messages.ErrFieldDoesNotExist(ctx, typename(s.Type()), name),
 				Path:   p.Path(),
 			}
 		}
@@ -167,7 +167,7 @@ func ArrayIndex(ctx context.Context, p *path.ArrayIndex) (interface{}, error) {
 	case box.IsMemorySlice(a.Type()):
 		slice := box.AsMemorySlice(a)
 		if count := slice.Count(); p.Index >= count {
-			return nil, errPathOOB(p.Index, "Index", 0, count-1, p)
+			return nil, errPathOOB(ctx, p.Index, "Index", 0, count-1, p)
 		}
 		return slice.ISlice(p.Index, p.Index+1), nil
 
@@ -175,13 +175,13 @@ func ArrayIndex(ctx context.Context, p *path.ArrayIndex) (interface{}, error) {
 		switch a.Kind() {
 		case reflect.Array, reflect.Slice, reflect.String:
 			if count := uint64(a.Len()); p.Index >= count {
-				return nil, errPathOOB(p.Index, "Index", 0, count-1, p)
+				return nil, errPathOOB(ctx, p.Index, "Index", 0, count-1, p)
 			}
 			return a.Index(int(p.Index)).Interface(), nil
 
 		default:
 			return nil, &service.ErrInvalidPath{
-				Reason: messages.ErrTypeNotArrayIndexable(typename(a.Type())),
+				Reason: messages.ErrTypeNotArrayIndexable(ctx, typename(a.Type())),
 				Path:   p.Path(),
 			}
 		}
@@ -199,7 +199,7 @@ func Slice(ctx context.Context, p *path.Slice) (interface{}, error) {
 	case box.IsMemorySlice(a.Type()):
 		slice := box.AsMemorySlice(a)
 		if count := slice.Count(); p.Start >= count || p.End > count {
-			return nil, errPathSliceOOB(p.Start, p.End, count, p)
+			return nil, errPathSliceOOB(ctx, p.Start, p.End, count, p)
 		}
 		return slice.ISlice(p.Start, p.End), nil
 
@@ -207,13 +207,13 @@ func Slice(ctx context.Context, p *path.Slice) (interface{}, error) {
 		switch a.Kind() {
 		case reflect.Array, reflect.Slice, reflect.String:
 			if int(p.Start) >= a.Len() || int(p.End) > a.Len() {
-				return nil, errPathSliceOOB(p.Start, p.End, uint64(a.Len()), p)
+				return nil, errPathSliceOOB(ctx, p.Start, p.End, uint64(a.Len()), p)
 			}
 			return a.Slice(int(p.Start), int(p.End)).Interface(), nil
 
 		default:
 			return nil, &service.ErrInvalidPath{
-				Reason: messages.ErrTypeNotSliceable(typename(a.Type())),
+				Reason: messages.ErrTypeNotSliceable(ctx, typename(a.Type())),
 				Path:   p.Path(),
 			}
 		}
@@ -230,25 +230,25 @@ func MapIndex(ctx context.Context, p *path.MapIndex) (interface{}, error) {
 	d := dictionary.From(obj)
 	if d == nil {
 		return nil, &service.ErrInvalidPath{
-			Reason: messages.ErrTypeNotMapIndexable(typename(reflect.TypeOf(obj))),
+			Reason: messages.ErrTypeNotMapIndexable(ctx, typename(reflect.TypeOf(obj))),
 			Path:   p.Path(),
 		}
 	}
 
-	key, ok := convert(reflect.ValueOf(p.KeyValue()), d.KeyTy())
+	key, ok := convert(reflect.ValueOf(p.KeyValue(ctx)), d.KeyTy())
 	if !ok {
 		return nil, &service.ErrInvalidPath{
-			Reason: messages.ErrIncorrectMapKeyType(
-				typename(reflect.TypeOf(p.KeyValue())), // got
-				typename(d.KeyTy())),                   // expected
+			Reason: messages.ErrIncorrectMapKeyType(ctx,
+				typename(reflect.TypeOf(p.KeyValue(ctx))), // got
+				typename(d.KeyTy())),                      // expected
 			Path: p.Path(),
 		}
 	}
 
-	val, ok := d.Lookup(key.Interface())
+	val, ok := d.Lookup(ctx, key.Interface())
 	if !ok {
 		return nil, &service.ErrInvalidPath{
-			Reason: messages.ErrMapKeyDoesNotExist(key.Interface()),
+			Reason: messages.ErrMapKeyDoesNotExist(ctx, key.Interface()),
 			Path:   p.Path(),
 		}
 	}
@@ -259,7 +259,7 @@ func MapIndex(ctx context.Context, p *path.MapIndex) (interface{}, error) {
 func memoryLayout(ctx context.Context, p path.Node) (*device.MemoryLayout, error) {
 	cp := path.FindCapture(p)
 	if cp == nil {
-		return nil, errPathNoCapture(p)
+		return nil, errPathNoCapture(ctx, p)
 	}
 
 	c, err := capture.ResolveFromPath(ctx, cp)
@@ -277,7 +277,7 @@ func ResolveService(ctx context.Context, p path.Node) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	return internalToService(v)
+	return internalToService(ctx, v)
 }
 
 // ResolveInternal resolves and returns the object, value or memory at the path

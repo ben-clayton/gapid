@@ -82,9 +82,9 @@ func checkReport(ctx context.Context, c *path.Capture, d *device.Instance, cmds 
 	got := []string{}
 	for _, e := range report.Items {
 		if e.Command != nil {
-			got = append(got, fmt.Sprintf("%s@%d: %s: %v", e.Severity.String(), e.Command.Indices, cmds[e.Command.Indices[0]], report.Msg(e.Message).Text(nil)))
+			got = append(got, fmt.Sprintf("%s@%d: %s: %v", e.Severity.String(), e.Command.Indices, cmds[e.Command.Indices[0]], report.Msg(e.Message).Text(ctx, nil)))
 		} else {
-			got = append(got, fmt.Sprintf("%s /%v", e.Severity.String(), report.Msg(e.Message).Text(nil)))
+			got = append(got, fmt.Sprintf("%s /%v", e.Severity.String(), report.Msg(e.Message).Text(ctx, nil)))
 		}
 	}
 	assert.For(ctx, "got").ThatSlice(got).Equals(expected)
@@ -134,12 +134,12 @@ func checkTextureBuffer(ctx context.Context, c *path.Capture, d *device.Instance
 
 	state := gles.GetState(globalState)
 
-	context, ok := state.Contexts().Lookup(thread)
+	context, ok := state.Contexts().Lookup(ctx, thread)
 	if !assert.For(ctx, "lookup context").That(ok).Equals(true) {
 		return
 	}
 
-	t := context.Objects().Textures().Get(tex)
+	t := context.Objects().Textures().Get(ctx, tex)
 	if !assert.For(ctx, "texture found").That(!t.IsNil()).Equals(true) {
 		return
 	}

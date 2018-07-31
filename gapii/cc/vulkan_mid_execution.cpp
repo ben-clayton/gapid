@@ -423,7 +423,7 @@ void VulkanSpy::serializeGPUBuffers(StateSerializer *serializer) {
       void *pData = stage.GetMappedMemory();
       memory::Observation observation;
       observation.set_base(bind.mmemoryOffset);
-      observation.set_pool(deviceMemory->mData.pool_id());
+      observation.set_pool(deviceMemory->mData.pool());
       serializer->sendData(&observation, true, pData, bind.msize);
     }
   }
@@ -888,7 +888,7 @@ void VulkanSpy::serializeGPUBuffers(StateSerializer *serializer) {
         observation.set_pool(img->mAspects[aspect_bit]
                                  ->mLayers[array_layer]
                                  ->mLevels[mip_level]
-                                 ->mData.pool_id());
+                                 ->mData.pool());
         serializer->sendData(&observation, true, pData + new_offset,
                              e.level_size);
         new_offset = next_offset;

@@ -25,11 +25,11 @@ import (
 func TestToServiceToCmd(t *testing.T) {
 	ctx := log.Testing(t)
 	for n, cmd := range map[string]api.Cmd{"A": test.Cmds.A, "B": test.Cmds.B} {
-		s, err := api.CmdToService(cmd)
+		s, err := api.CmdToService(ctx, cmd)
 		if !assert.For(ctx, "CmdToService(%v)", n).ThatError(err).Succeeded() {
 			continue
 		}
-		g, err := api.ServiceToCmd(test.Cmds.Arena, s)
+		g, err := api.ServiceToCmd(ctx, test.Cmds.Arena, s)
 		if !assert.For(ctx, "ServiceToCmd(%v)", n).ThatError(err).Succeeded() {
 			continue
 		}

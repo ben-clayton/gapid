@@ -16,13 +16,14 @@ package stringtable
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"sort"
 	"strings"
 )
 
 // Text returns a plain-text representation of the message.
-func (m *Msg) Text(tbl *StringTable) string {
+func (m *Msg) Text(ctx context.Context, tbl *StringTable) string {
 	if m == nil {
 		return ""
 	}
@@ -38,7 +39,7 @@ func (m *Msg) Text(tbl *StringTable) string {
 	}
 	args := make([]string, 0, len(m.Arguments))
 	for k, v := range m.Arguments {
-		args = append(args, fmt.Sprintf("%v: %v", k, v.Unpack()))
+		args = append(args, fmt.Sprintf("%v: %v", k, v.Unpack(ctx)))
 	}
 	sort.Strings(args)
 	return fmt.Sprintf("<%v [%v]>", m.Identifier, strings.Join(args, ", "))

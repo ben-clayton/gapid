@@ -80,25 +80,25 @@ func (t *readFramebuffer) Depth(id api.CmdID, idx uint32, res replay.Result) {
 		c := GetState(s)
 		lastQueue := c.LastBoundQueue()
 		if lastQueue.IsNil() {
-			res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage("No previous queue submission")})
+			res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage(ctx, "No previous queue submission")})
 			return
 		}
 
-		lastDrawInfo, ok := c.LastDrawInfos().Lookup(lastQueue.VulkanHandle())
+		lastDrawInfo, ok := c.LastDrawInfos().Lookup(ctx, lastQueue.VulkanHandle())
 		if !ok {
-			res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage("There have been no previous draws")})
+			res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage(ctx, "There have been no previous draws")})
 			return
 		}
 		w, h := lastDrawInfo.Framebuffer().Width(), lastDrawInfo.Framebuffer().Height()
 
-		imageViewDepth := lastDrawInfo.Framebuffer().ImageAttachments().Get(idx)
+		imageViewDepth := lastDrawInfo.Framebuffer().ImageAttachments().Get(ctx, idx)
 		if imageViewDepth.IsNil() {
-			res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage("Invalid depth attachment in the framebuffer, the attachment VkImageView might have been destroyed")})
+			res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage(ctx, "Invalid depth attachment in the framebuffer, the attachment VkImageView might have been destroyed")})
 			return
 		}
 		depthImageObject := imageViewDepth.Image()
 		if depthImageObject.IsNil() {
-			res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage("Invalid depth attachment in the framebuffer, the attachment VkImage might have been destroyed")})
+			res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage(ctx, "Invalid depth attachment in the framebuffer, the attachment VkImage might have been destroyed")})
 			return
 		}
 		cb := CommandBuilder{Thread: cmd.Thread(), Arena: s.Arena}
@@ -124,27 +124,27 @@ func (t *readFramebuffer) Color(id api.CmdID, width, height, bufferIdx uint32, r
 		if GetState(s).LastSubmission() == LastSubmissionType_SUBMIT {
 			lastQueue := c.LastBoundQueue()
 			if lastQueue.IsNil() {
-				res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage("No previous queue submission")})
+				res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage(ctx, "No previous queue submission")})
 				return
 			}
 
-			lastDrawInfo, ok := c.LastDrawInfos().Lookup(lastQueue.VulkanHandle())
+			lastDrawInfo, ok := c.LastDrawInfos().Lookup(ctx, lastQueue.VulkanHandle())
 			if !ok {
-				res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage("There have been no previous draws")})
+				res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage(ctx, "There have been no previous draws")})
 				return
 			}
 			if lastDrawInfo.Framebuffer().IsNil() {
-				res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage("There has been no framebuffer")})
+				res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage(ctx, "There has been no framebuffer")})
 				return
 			}
 
-			imageView, ok := lastDrawInfo.Framebuffer().ImageAttachments().Lookup(bufferIdx)
+			imageView, ok := lastDrawInfo.Framebuffer().ImageAttachments().Lookup(ctx, bufferIdx)
 			if !ok {
-				res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage("There has been no attchment in the framebuffer")})
+				res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage(ctx, "There has been no attchment in the framebuffer")})
 				return
 			}
 			if imageView.IsNil() {
-				res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage("Invalid attachment in the framebuffer, the attachment VkImageView might have been destroyed")})
+				res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage(ctx, "Invalid attachment in the framebuffer, the attachment VkImageView might have been destroyed")})
 				return
 			}
 			// Imageviews that are used in framebuffer attachments must contains
@@ -156,15 +156,15 @@ func (t *readFramebuffer) Color(id api.CmdID, width, height, bufferIdx uint32, r
 			layer := imageView.SubresourceRange().BaseArrayLayer()
 			imageObject := imageView.Image()
 			if imageObject.IsNil() {
-				res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage("Invalid attachment in the framebuffer, the attachment VkImage might have been destroyed")})
+				res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage(ctx, "Invalid attachment in the framebuffer, the attachment VkImage might have been destroyed")})
 				return
 			}
 			w, h, form := lastDrawInfo.Framebuffer().Width(), lastDrawInfo.Framebuffer().Height(), imageView.Fmt()
 			postImageData(ctx, cb, s, imageObject, form, VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT, layer, level, w, h, width, height, nil, out, res)
 		} else {
-			imageObject := GetState(s).LastPresentInfo().PresentImages().Get(bufferIdx)
+			imageObject := GetState(s).LastPresentInfo().PresentImages().Get(ctx, bufferIdx)
 			if imageObject.IsNil() {
-				res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage("Could not find imageObject")})
+				res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage(ctx, "Could not find imageObject")})
 				return
 			}
 			w, h, form := imageObject.Info().Extent().Width(), imageObject.Info().Extent().Height(), imageObject.Info().Fmt()
@@ -231,30 +231,33 @@ func postImageData(ctx context.Context,
 		// source attachment image contains both depth and stencil data.
 		formatOfImgRes, err = getStencilImageFormatFromVulkanFormat(vkFormat)
 	} else {
-		res(nil, &service.ErrDataUnavailable{Reason: messages.ErrFramebufferUnavailable()})
+		res(nil, &service.ErrDataUnavailable{Reason: messages.ErrFramebufferUnavailable(ctx)})
 		return
 	}
 	if err != nil {
-		res(nil, &service.ErrDataUnavailable{Reason: messages.ErrFramebufferUnavailable()})
+		res(nil, &service.ErrDataUnavailable{Reason: messages.ErrFramebufferUnavailable(ctx)})
 		return
 	}
 
-	queue := imageObject.Aspects().Get(aspect).Layers().Get(0).Levels().Get(0).LastBoundQueue()
+	queue := imageObject.Aspects().Get(ctx, aspect).
+		Layers().Get(ctx, 0).
+		Levels().Get(ctx, 0).
+		LastBoundQueue()
 	if queue.IsNil() {
-		res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage("The target image object has not been bound with a vkQueue")})
+		res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage(ctx, "The target image object has not been bound with a vkQueue")})
 		return
 	}
 
 	vkQueue := queue.VulkanHandle()
 	vkDevice := queue.Device()
-	device := GetState(s).Devices().Get(vkDevice)
+	device := GetState(s).Devices().Get(ctx, vkDevice)
 	vkPhysicalDevice := device.PhysicalDevice()
-	physicalDevice := GetState(s).PhysicalDevices().Get(vkPhysicalDevice)
+	physicalDevice := GetState(s).PhysicalDevices().Get(ctx, vkPhysicalDevice)
 
 	requestWidth := reqWidth
 	requestHeight := reqHeight
 
-	if properties, ok := physicalDevice.QueueFamilyProperties().Lookup(queue.Family()); ok {
+	if properties, ok := physicalDevice.QueueFamilyProperties().Lookup(ctx, queue.Family()); ok {
 		if properties.QueueFlags()&VkQueueFlags(VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT) == 0 {
 			if imageObject.Info().Samples() == VkSampleCountFlagBits_VK_SAMPLE_COUNT_1_BIT &&
 				aspect == VkImageAspectFlagBits_VK_IMAGE_ASPECT_COLOR_BIT {
@@ -264,12 +267,12 @@ func postImageData(ctx context.Context,
 				requestWidth = imgWidth
 				requestHeight = imgHeight
 			} else {
-				res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage("Unhandled: Reading a multisampled or depth image on the compute queue")})
+				res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage(ctx, "Unhandled: Reading a multisampled or depth image on the compute queue")})
 				return
 			}
 		}
 	} else {
-		res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage("Not found the properties information of the bound vkQueue")})
+		res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage(ctx, "Not found the properties information of the bound vkQueue")})
 		return
 	}
 
@@ -479,7 +482,7 @@ func postImageData(ctx context.Context,
 	mappedMemoryRangeData := MustAllocData(ctx, s, mappedMemoryRange)
 	at, err := s.Allocator.Alloc(bufferSize, 8)
 	if err != nil {
-		res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage("Device Memory -> Host mapping failed")})
+		res(nil, &service.ErrDataUnavailable{Reason: messages.ErrMessage(ctx, "Device Memory -> Host mapping failed")})
 	}
 	mappedPointer := MustAllocData(ctx, s, at)
 
@@ -589,9 +592,13 @@ func postImageData(ctx context.Context,
 				VkAccessFlagBits_VK_ACCESS_TRANSFER_WRITE_BIT|
 				VkAccessFlagBits_VK_ACCESS_TRANSFER_READ_BIT,
 		),
-		VkAccessFlags(VkAccessFlagBits_VK_ACCESS_TRANSFER_READ_BIT),                        // dstAccessMask
-		imageObject.Aspects().Get(aspect).Layers().Get(layer).Levels().Get(level).Layout(), // oldLayout
-		VkImageLayout_VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,                                 // newLayout
+		VkAccessFlags(VkAccessFlagBits_VK_ACCESS_TRANSFER_READ_BIT), // dstAccessMask
+		imageObject.
+			Aspects().Get(ctx, aspect).
+			Layers().Get(ctx, layer).
+			Levels().Get(ctx, level).
+			Layout(), // oldLayout
+		VkImageLayout_VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, // newLayout
 		0xFFFFFFFF,                 // srcQueueFamilyIndex
 		0xFFFFFFFF,                 // dstQueueFamilyIndex
 		imageObject.VulkanHandle(), // image
@@ -615,8 +622,11 @@ func postImageData(ctx context.Context,
 				VkAccessFlagBits_VK_ACCESS_SHADER_WRITE_BIT|
 				VkAccessFlagBits_VK_ACCESS_TRANSFER_WRITE_BIT|
 				VkAccessFlagBits_VK_ACCESS_TRANSFER_READ_BIT),
-		VkImageLayout_VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,                                 // oldLayout
-		imageObject.Aspects().Get(aspect).Layers().Get(layer).Levels().Get(level).Layout(), // newLayout
+		VkImageLayout_VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, // oldLayout
+		imageObject.Aspects().Get(ctx, aspect).
+			Layers().Get(ctx, layer).
+			Levels().Get(ctx, level).
+			Layout(), // newLayout
 		0xFFFFFFFF,                 // srcQueueFamilyIndex
 		0xFFFFFFFF,                 // dstQueueFamilyIndex
 		imageObject.VulkanHandle(), // image

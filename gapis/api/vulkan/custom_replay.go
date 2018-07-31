@@ -26,210 +26,210 @@ import (
 
 const virtualSwapchainStruct = 0xFFFFFFAA
 
-func (i VkInstance) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkInstance) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkPhysicalDevice) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkPhysicalDevice) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkDevice) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkDevice) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkQueue) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkQueue) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkCommandBuffer) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkCommandBuffer) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkSemaphore) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkSemaphore) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkFence) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkFence) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkDeviceMemory) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkDeviceMemory) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkBuffer) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkBuffer) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkImage) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkImage) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkEvent) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkEvent) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkQueryPool) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkQueryPool) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkBufferView) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkBufferView) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkImageView) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkImageView) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkShaderModule) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkShaderModule) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkPipelineCache) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkPipelineCache) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkPipelineLayout) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkPipelineLayout) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkRenderPass) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkRenderPass) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkPipeline) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkPipeline) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkDescriptorSetLayout) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkDescriptorSetLayout) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkSampler) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkSampler) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkDescriptorPool) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkDescriptorPool) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkDescriptorSet) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkDescriptorSet) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkFramebuffer) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkFramebuffer) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkCommandPool) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkCommandPool) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkSurfaceKHR) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkSurfaceKHR) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkSwapchainKHR) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkSwapchainKHR) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkDisplayKHR) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkDisplayKHR) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkDisplayModeKHR) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkDisplayModeKHR) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
 	return
 }
 
-func (i VkDebugReportCallbackEXT) remap(api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
+func (i VkDebugReportCallbackEXT) remap(context.Context, api.Cmd, *api.GlobalState) (key interface{}, remap bool) {
 	if i != 0 {
 		key, remap = i, true
 	}
@@ -404,10 +404,10 @@ func (a *VkAcquireNextImageKHR) Mutate(ctx context.Context, id api.CmdID, s *api
 	a.PImageIndex().Slice(0, 1, l).Write(ctx, a.PImageIndex().Slice(0, 1, l).MustRead(ctx, a, s, nil), a, s, b)
 	_ = a.Result()
 	if a.Semaphore() != VkSemaphore(0) {
-		GetState(s).Semaphores().Get(a.Semaphore()).SetSignaled(true)
+		GetState(s).Semaphores().Get(ctx, a.Semaphore()).SetSignaled(true)
 	}
 	if a.Fence() != VkFence(0) {
-		GetState(s).Fences().Get(a.Fence()).SetSignaled(true)
+		GetState(s).Fences().Get(ctx, a.Fence()).SetSignaled(true)
 	}
 	return nil
 }
@@ -483,7 +483,7 @@ func (c *VkCreateXlibSurfaceKHR) Mutate(ctx context.Context, id api.CmdID, g *ap
 	handle := hijack.PSurface().MustRead(ctx, hijack, g, nil)
 	hijack.PSurface().MustWrite(ctx, handle, hijack, g, b)
 	surface.SetVulkanHandle(handle)
-	GetState(g).Surfaces().Add(handle, surface)
+	GetState(g).Surfaces().Add(ctx, handle, surface)
 	hijack.Result()
 	return nil
 }
@@ -531,7 +531,7 @@ func (c *VkCreateXcbSurfaceKHR) Mutate(ctx context.Context, id api.CmdID, g *api
 	handle := hijack.PSurface().MustRead(ctx, hijack, g, nil)
 	hijack.PSurface().MustWrite(ctx, handle, hijack, g, b)
 	surface.SetVulkanHandle(handle)
-	GetState(g).Surfaces().Add(handle, surface)
+	GetState(g).Surfaces().Add(ctx, handle, surface)
 	hijack.Result()
 	return nil
 }
@@ -578,7 +578,7 @@ func (c *VkCreateWaylandSurfaceKHR) Mutate(ctx context.Context, id api.CmdID, g 
 	handle := hijack.PSurface().MustRead(ctx, hijack, g, nil)
 	hijack.PSurface().MustWrite(ctx, handle, hijack, g, b)
 	surface.SetVulkanHandle(handle)
-	GetState(g).Surfaces().Add(handle, surface)
+	GetState(g).Surfaces().Add(ctx, handle, surface)
 	hijack.Result()
 	return nil
 }
@@ -625,7 +625,7 @@ func (c *VkCreateMirSurfaceKHR) Mutate(ctx context.Context, id api.CmdID, g *api
 	handle := hijack.PSurface().MustRead(ctx, hijack, g, nil)
 	hijack.PSurface().MustWrite(ctx, handle, hijack, g, b)
 	surface.SetVulkanHandle(handle)
-	GetState(g).Surfaces().Add(handle, surface)
+	GetState(g).Surfaces().Add(ctx, handle, surface)
 	hijack.Result()
 	return nil
 }
@@ -672,7 +672,7 @@ func (c *VkCreateWin32SurfaceKHR) Mutate(ctx context.Context, id api.CmdID, g *a
 	handle := hijack.PSurface().MustRead(ctx, hijack, g, nil)
 	hijack.PSurface().MustWrite(ctx, handle, hijack, g, b)
 	surface.SetVulkanHandle(handle)
-	GetState(g).Surfaces().Add(handle, surface)
+	GetState(g).Surfaces().Add(ctx, handle, surface)
 	hijack.Result()
 	return nil
 }
@@ -719,7 +719,7 @@ func (c *VkCreateAndroidSurfaceKHR) Mutate(ctx context.Context, id api.CmdID, g 
 	handle := hijack.PSurface().MustRead(ctx, hijack, g, nil)
 	hijack.PSurface().MustWrite(ctx, handle, hijack, g, b)
 	surface.SetVulkanHandle(handle)
-	GetState(g).Surfaces().Add(handle, surface)
+	GetState(g).Surfaces().Add(ctx, handle, surface)
 	hijack.Result()
 	return nil
 }
@@ -800,9 +800,9 @@ func (a *VkGetEventStatus) Mutate(ctx context.Context, id api.CmdID, s *api.Glob
 	var wait bool
 	switch a.Result() {
 	case VkResult_VK_EVENT_SET:
-		wait = GetState(s).Events().Get(a.Event()).Signaled() == true
+		wait = GetState(s).Events().Get(ctx, a.Event()).Signaled() == true
 	case VkResult_VK_EVENT_RESET:
-		wait = GetState(s).Events().Get(a.Event()).Signaled() == false
+		wait = GetState(s).Events().Get(ctx, a.Event()).Signaled() == false
 	default:
 		wait = false
 	}
@@ -818,7 +818,7 @@ func (a *ReplayAllocateImageMemory) Mutate(ctx context.Context, id api.CmdID, s 
 	c := GetState(s)
 	arena := s.Arena // TODO: Should this be a seperate temporary arena?
 	memory := a.PMemory().Slice(0, 1, l).MustRead(ctx, a, s, nil)[0]
-	imageObject := c.Images().Get(a.Image())
+	imageObject := c.Images().Get(ctx, a.Image())
 	imageWidth := imageObject.Info().Extent().Width()
 	imageHeight := imageObject.Info().Extent().Height()
 	imageFormat, err := getImageFormatFromVulkanFormat(imageObject.Info().Fmt())
@@ -838,12 +838,12 @@ func (a *ReplayAllocateImageMemory) Mutate(ctx context.Context, id api.CmdID, s 
 		NilMemoryDedicatedAllocationInfoʳ, // DedicatedAllocationKHR
 	)
 
-	c.DeviceMemories().Add(memory, memoryObject)
+	c.DeviceMemories().Add(ctx, memory, memoryObject)
 	a.PMemory().Slice(0, 1, l).Write(ctx, []VkDeviceMemory{memory}, a, s, b)
 	return err
 }
 
-func (i AllocationCallbacks) value(b *builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
+func (i AllocationCallbacks) value(ctx context.Context, b *builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
 	// Return 0 (nullptr) here. We don't have an allocator set up for replay. Since we cannot use the
 	// application's allocator. If we pass in null for all allocator calls, then it will use the default
 	// allocator.

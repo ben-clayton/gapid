@@ -172,7 +172,7 @@ go_library(
         "//core/text:go_default_library",
         "//gapil/bapi:go_default_library",  # keep
         "//gapil/constset:go_default_library",  # keep
-        "//gapil/executor:go_default_library",
+        "//gapil/executor:go_default_library",  # keep
         "//gapis/api:go_default_library",
         "//gapis/api/gles/gles_pb:go_default_library",
         "//gapis/api/transform:go_default_library",
@@ -235,6 +235,7 @@ go_test(
         "//core/memory/arena:go_default_library",
         "//core/os/device:go_default_library",
         "//core/os/device/bind:go_default_library",
+        "//gapil/executor:go_default_library",
         "//gapis/api:go_default_library",
         "//gapis/api/gles:go_default_library",
         "//gapis/api/transform:go_default_library",

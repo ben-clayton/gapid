@@ -67,7 +67,7 @@ func (VulkanContext) API() api.API {
 	return API{}
 }
 
-func (API) Context(s *api.GlobalState, thread uint64) api.Context {
+func (API) Context(ctx context.Context, s *api.GlobalState, thread uint64) api.Context {
 	return VulkanContext{}
 }
 
@@ -105,7 +105,7 @@ func (API) GetFramebufferAttachmentInfo(
 	thread uint64,
 	attachment api.FramebufferAttachment) (info api.FramebufferAttachmentInfo, err error) {
 
-	w, h, form, i, r, err := GetState(state).getFramebufferAttachmentInfo(attachment)
+	w, h, form, i, r, err := GetState(state).getFramebufferAttachmentInfo(ctx, attachment)
 	switch attachment {
 	case api.FramebufferAttachment_Stencil:
 		return api.FramebufferAttachmentInfo{}, fmt.Errorf("Unsupported Stencil")
@@ -130,7 +130,7 @@ func (API) Mesh(ctx context.Context, o interface{}, p *path.Mesh) (*api.Mesh, er
 	case *VkQueueSubmit:
 		return drawCallMesh(ctx, dc, p)
 	}
-	return nil, &service.ErrDataUnavailable{Reason: messages.ErrMeshNotAvailable()}
+	return nil, &service.ErrDataUnavailable{Reason: messages.ErrMeshNotAvailable(ctx)}
 }
 
 type MarkerType int

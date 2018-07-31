@@ -118,7 +118,7 @@ func (verb *reportVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 		if e.Command != nil {
 			where = fmt.Sprintf("%v %v ", e.Command.Indices, commands[e.Command.Indices[0]]) // TODO: Subcommands
 		}
-		msg := report.Msg(e.Message).Text(stringTable)
+		msg := report.Msg(e.Message).Text(ctx, stringTable)
 		fmt.Fprintln(reportWriter, fmt.Sprintf("[%s] %s%s", e.Severity.String(), where, msg))
 	}
 

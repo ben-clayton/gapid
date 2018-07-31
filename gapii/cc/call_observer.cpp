@@ -148,8 +148,12 @@ gapil::String CallObserver::string(const gapil::Slice<char>& slice) {
   return gapil::String(mSpy->arena(), slice.begin(), slice.end());
 }
 
-uint32_t CallObserver::allocate_pool_id() const {
-  return mSpy->allocate_pool_id();
+Pool* CallObserver::create_pool(uint64_t size) {
+  return mSpy->create_pool(size);
 }
+
+void CallObserver::destroy_pool(Pool* pool) { mSpy->destroy_pool(pool); }
+
+Pool* CallObserver::get_pool(uint64_t id) { return mSpy->get_pool(id); }
 
 }  // namespace gapii

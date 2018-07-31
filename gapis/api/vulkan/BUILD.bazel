@@ -157,6 +157,7 @@ go_library(
         "//core/stream/fmts:go_default_library",
         "//gapil/bapi:go_default_library",  # keep
         "//gapil/constset:go_default_library",  # keep
+        "//gapil/executor:go_default_library",  # keep
         "//gapir/client:go_default_library",
         "//gapis/api:go_default_library",
         "//gapis/api/sync:go_default_library",
@@ -211,9 +212,10 @@ go_test(
         "//core/image:go_default_library",
         "//core/log:go_default_library",
         "//core/math/interval:go_default_library",
-        "//core/memory/arena:go_default_library",
         "//core/os/device:go_default_library",
+        "//gapil/executor:go_default_library",
         "//gapis/api:go_default_library",
+        "//gapis/database:go_default_library",
         "//gapis/memory:go_default_library",
     ],
 )

@@ -15,12 +15,13 @@
 package vulkan
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/google/gapid/gapis/api"
 )
 
-func (st *State) getSubmitAttachmentInfo(attachment api.FramebufferAttachment) (w, h uint32, f VkFormat, attachmentIndex uint32, canResize bool, err error) {
+func (st *State) getSubmitAttachmentInfo(ctx context.Context, attachment api.FramebufferAttachment) (w, h uint32, f VkFormat, attachmentIndex uint32, canResize bool, err error) {
 	returnError := func(format_str string, e ...interface{}) (w, h uint32, f VkFormat, attachmentIndex uint32, canResize bool, err error) {
 		return 0, 0, VkFormat_VK_FORMAT_UNDEFINED, 0, true, fmt.Errorf(format_str, e...)
 	}
@@ -30,7 +31,7 @@ func (st *State) getSubmitAttachmentInfo(attachment api.FramebufferAttachment) (
 		return returnError("No previous queue submission")
 	}
 
-	lastDrawInfo, ok := st.LastDrawInfos().Lookup(lastQueue.VulkanHandle())
+	lastDrawInfo, ok := st.LastDrawInfos().Lookup(ctx, lastQueue.VulkanHandle())
 	if !ok {
 		return returnError("There have been no previous draws")
 	}
@@ -45,15 +46,15 @@ func (st *State) getSubmitAttachmentInfo(attachment api.FramebufferAttachment) (
 
 	lastSubpass := lastDrawInfo.LastSubpass()
 
-	subpassDesc := lastDrawInfo.Framebuffer().RenderPass().SubpassDescriptions().Get(lastSubpass)
+	subpassDesc := lastDrawInfo.Framebuffer().RenderPass().SubpassDescriptions().Get(ctx, lastSubpass)
 	switch attachment {
 	case api.FramebufferAttachment_Color0,
 		api.FramebufferAttachment_Color1,
 		api.FramebufferAttachment_Color2,
 		api.FramebufferAttachment_Color3:
 		attachmentIndex := uint32(attachment - api.FramebufferAttachment_Color0)
-		if attRef, ok := subpassDesc.ColorAttachments().Lookup(attachmentIndex); ok {
-			if ca, ok := lastDrawInfo.Framebuffer().ImageAttachments().Lookup(attRef.Attachment()); ok {
+		if attRef, ok := subpassDesc.ColorAttachments().Lookup(ctx, attachmentIndex); ok {
+			if ca, ok := lastDrawInfo.Framebuffer().ImageAttachments().Lookup(ctx, attRef.Attachment()); ok {
 				return ca.Image().Info().Extent().Width(),
 					ca.Image().Info().Extent().Height(),
 					ca.Image().Info().Fmt(),
@@ -64,7 +65,7 @@ func (st *State) getSubmitAttachmentInfo(attachment api.FramebufferAttachment) (
 	case api.FramebufferAttachment_Depth:
 		if !subpassDesc.DepthStencilAttachment().IsNil() && !lastDrawInfo.Framebuffer().IsNil() {
 			attRef := subpassDesc.DepthStencilAttachment()
-			if attachment, ok := lastDrawInfo.Framebuffer().ImageAttachments().Lookup(attRef.Attachment()); ok {
+			if attachment, ok := lastDrawInfo.Framebuffer().ImageAttachments().Lookup(ctx, attRef.Attachment()); ok {
 				depthImg := attachment.Image()
 				return depthImg.Info().Extent().Width(), depthImg.Info().Extent().Height(), depthImg.Info().Fmt(), attRef.Attachment(), true, nil
 			}
@@ -78,7 +79,7 @@ func (st *State) getSubmitAttachmentInfo(attachment api.FramebufferAttachment) (
 	return returnError("%s is not bound", attachment)
 }
 
-func (st *State) getPresentAttachmentInfo(attachment api.FramebufferAttachment) (w, h uint32, f VkFormat, attachmentIndex uint32, canResize bool, err error) {
+func (st *State) getPresentAttachmentInfo(ctx context.Context, attachment api.FramebufferAttachment) (w, h uint32, f VkFormat, attachmentIndex uint32, canResize bool, err error) {
 	returnError := func(format_str string, e ...interface{}) (w, h uint32, f VkFormat, attachmentIndex uint32, canResize bool, err error) {
 		return 0, 0, VkFormat_VK_FORMAT_UNDEFINED, 0, false, fmt.Errorf(format_str, e...)
 	}
@@ -92,14 +93,14 @@ func (st *State) getPresentAttachmentInfo(attachment api.FramebufferAttachment) 
 		if st.LastPresentInfo().PresentImageCount() <= imageIdx {
 			return returnError("Swapchain does not contain image %v", attachment)
 		}
-		colorImg := st.LastPresentInfo().PresentImages().Get(imageIdx)
+		colorImg := st.LastPresentInfo().PresentImages().Get(ctx, imageIdx)
 		if !colorImg.IsNil() {
-			queue := st.Queues().Get(st.LastPresentInfo().Queue())
+			queue := st.Queues().Get(ctx, st.LastPresentInfo().Queue())
 			vkDevice := queue.Device()
-			device := st.Devices().Get(vkDevice)
+			device := st.Devices().Get(ctx, vkDevice)
 			vkPhysicalDevice := device.PhysicalDevice()
-			physicalDevice := st.PhysicalDevices().Get(vkPhysicalDevice)
-			if properties, ok := physicalDevice.QueueFamilyProperties().Lookup(queue.Family()); ok {
+			physicalDevice := st.PhysicalDevices().Get(ctx, vkPhysicalDevice)
+			if properties, ok := physicalDevice.QueueFamilyProperties().Lookup(ctx, queue.Family()); ok {
 				if properties.QueueFlags()&VkQueueFlags(VkQueueFlagBits_VK_QUEUE_GRAPHICS_BIT) != 0 {
 					return colorImg.Info().Extent().Width(), colorImg.Info().Extent().Height(), colorImg.Info().Fmt(), imageIdx, true, nil
 				}
@@ -118,9 +119,9 @@ func (st *State) getPresentAttachmentInfo(attachment api.FramebufferAttachment) 
 	return returnError("Swapchain attachment %v does not exist", attachment)
 }
 
-func (st *State) getFramebufferAttachmentInfo(attachment api.FramebufferAttachment) (uint32, uint32, VkFormat, uint32, bool, error) {
+func (st *State) getFramebufferAttachmentInfo(ctx context.Context, attachment api.FramebufferAttachment) (uint32, uint32, VkFormat, uint32, bool, error) {
 	if st.LastSubmission() == LastSubmissionType_SUBMIT {
-		return st.getSubmitAttachmentInfo(attachment)
+		return st.getSubmitAttachmentInfo(ctx, attachment)
 	}
-	return st.getPresentAttachmentInfo(attachment)
+	return st.getPresentAttachmentInfo(ctx, attachment)
 }

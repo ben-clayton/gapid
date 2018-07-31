@@ -16,6 +16,7 @@
 package dictionary
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/google/gapid/core/data/slice"
@@ -24,18 +25,18 @@ import (
 // I is the interface for a dictionary.
 type I interface {
 	// Get returns the value of the entry with the given key.
-	Get(key interface{}) (val interface{})
+	Get(ctx context.Context, key interface{}) (val interface{})
 	// Add inserts the key-value pair, replacing any existing entry with the
 	// same key.
-	Add(key, val interface{})
+	Add(ctx context.Context, key, val interface{})
 	// Lookup searches for the value of the entry with the given key.
-	Lookup(key interface{}) (val interface{}, found bool)
+	Lookup(ctx context.Context, key interface{}) (val interface{}, found bool)
 	// Contains returns true if the dictionary contains an entry with the given
 	// key.
 	Contains(key interface{}) bool
 	// Remove removes the entry with the given key. If no entry with the given
 	// key exists then this call is a no-op.
-	Remove(key interface{})
+	Remove(ctx context.Context, key interface{})
 	// Len returns the number of entries in the dictionary.
 	Len() int
 	// Keys returns all the entry keys in the map.
@@ -52,18 +53,18 @@ type Entry struct {
 }
 
 // Clear removes all entries from the dictionary d.
-func Clear(d I) {
+func Clear(ctx context.Context, d I) {
 	for _, key := range d.Keys() {
-		d.Remove(key)
+		d.Remove(ctx, key)
 	}
 }
 
 // Entries returns the full list of entries in the dictionary d.
-func Entries(d I) []Entry {
+func Entries(ctx context.Context, d I) []Entry {
 	keys := d.Keys()
 	out := make([]Entry, len(keys))
 	for i, key := range keys {
-		out[i] = Entry{key, d.Get(key)}
+		out[i] = Entry{key, d.Get(ctx, key)}
 	}
 	return out
 }
@@ -87,7 +88,7 @@ func From(o interface{}) I {
 // dict implements I using a reflect.Value of a map.
 type dict struct{ reflect.Value }
 
-func (d dict) Get(key interface{}) (val interface{}) {
+func (d dict) Get(ctx context.Context, key interface{}) (val interface{}) {
 	v := d.Value.MapIndex(reflect.ValueOf(key))
 	if !v.IsValid() {
 		return reflect.New(d.ValTy()).Elem().Interface()
@@ -95,11 +96,11 @@ func (d dict) Get(key interface{}) (val interface{}) {
 	return v.Interface()
 }
 
-func (d dict) Add(key, val interface{}) {
+func (d dict) Add(ctx context.Context, key, val interface{}) {
 	d.Value.SetMapIndex(reflect.ValueOf(key), reflect.ValueOf(val))
 }
 
-func (d dict) Lookup(key interface{}) (val interface{}, ok bool) {
+func (d dict) Lookup(ctx context.Context, key interface{}) (val interface{}, ok bool) {
 	v := d.Value.MapIndex(reflect.ValueOf(key))
 	if !v.IsValid() {
 		return reflect.New(d.ValTy()).Elem().Interface(), false
@@ -111,7 +112,7 @@ func (d dict) Contains(key interface{}) bool {
 	return d.Value.MapIndex(reflect.ValueOf(key)).IsValid()
 }
 
-func (d dict) Remove(key interface{}) {
+func (d dict) Remove(ctx context.Context, key interface{}) {
 	d.Value.SetMapIndex(reflect.ValueOf(key), reflect.Value{})
 }
 

@@ -34,7 +34,7 @@ import (
 // with the object, value or memory at p replaced with v. The path returned is
 // identical to p, but with the base changed to refer to the new capture.
 func Set(ctx context.Context, p *path.Any, v interface{}) (*path.Any, error) {
-	obj, err := database.Build(ctx, &SetResolvable{Path: p, Value: service.NewValue(v)})
+	obj, err := database.Build(ctx, &SetResolvable{Path: p, Value: service.NewValue(ctx, v)})
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func (r *SetResolvable) Resolve(ctx context.Context) (interface{}, error) {
 
 	a := arena.New()
 
-	v, err := serviceToInternal(a, r.Value.Get())
+	v, err := serviceToInternal(ctx, a, r.Value.Get(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +236,7 @@ func change(ctx context.Context, a arena.Arena, p path.Node, val interface{}) (p
 			case nil:
 			case api.ErrParameterNotFound:
 				return nil, &service.ErrInvalidPath{
-					Reason: messages.ErrParameterDoesNotExist(cmd.CmdName(), p.Name),
+					Reason: messages.ErrParameterDoesNotExist(ctx, cmd.CmdName(), p.Name),
 					Path:   p.Path(),
 				}
 			default:
@@ -257,7 +257,7 @@ func change(ctx context.Context, a arena.Arena, p path.Node, val interface{}) (p
 			case nil:
 			case api.ErrResultNotFound:
 				return nil, &service.ErrInvalidPath{
-					Reason: messages.ErrResultDoesNotExist(cmd.CmdName()),
+					Reason: messages.ErrResultDoesNotExist(ctx, cmd.CmdName()),
 					Path:   p.Path(),
 				}
 			default:
@@ -287,7 +287,7 @@ func change(ctx context.Context, a arena.Arena, p path.Node, val interface{}) (p
 			case reflect.String:
 			default:
 				return nil, &service.ErrInvalidPath{
-					Reason: messages.ErrTypeNotArrayIndexable(typename(arr.Type())),
+					Reason: messages.ErrTypeNotArrayIndexable(ctx, typename(arr.Type())),
 					Path:   p.Path(),
 				}
 			}
@@ -297,7 +297,7 @@ func change(ctx context.Context, a arena.Arena, p path.Node, val interface{}) (p
 					p.Parent(), ty, val.Type())
 			}
 			if count := uint64(arr.Len()); p.Index >= count {
-				return nil, errPathOOB(p.Index, "Index", 0, count-1, p)
+				return nil, errPathOOB(ctx, p.Index, "Index", 0, count-1, p)
 			}
 			if err := assign(arr.Index(int(p.Index)), val); err != nil {
 				return nil, err
@@ -314,19 +314,19 @@ func change(ctx context.Context, a arena.Arena, p path.Node, val interface{}) (p
 			d := dictionary.From(obj.Interface())
 			if d == nil {
 				return nil, &service.ErrInvalidPath{
-					Reason: messages.ErrTypeNotMapIndexable(typename(obj.Type())),
+					Reason: messages.ErrTypeNotMapIndexable(ctx, typename(obj.Type())),
 					Path:   p.Path(),
 				}
 			}
 
 			keyTy, valTy := d.KeyTy(), d.ValTy()
 
-			key, ok := convert(reflect.ValueOf(p.KeyValue()), keyTy)
+			key, ok := convert(reflect.ValueOf(p.KeyValue(ctx)), keyTy)
 			if !ok {
 				return nil, &service.ErrInvalidPath{
-					Reason: messages.ErrIncorrectMapKeyType(
-						typename(reflect.TypeOf(p.KeyValue())), // got
-						typename(keyTy)),                       // expected
+					Reason: messages.ErrIncorrectMapKeyType(ctx,
+						typename(reflect.TypeOf(p.KeyValue(ctx))), // got
+						typename(keyTy)),                          // expected
 					Path: p.Path(),
 				}
 			}
@@ -337,7 +337,7 @@ func change(ctx context.Context, a arena.Arena, p path.Node, val interface{}) (p
 					p.Parent(), valTy, val.Type())
 			}
 
-			d.Add(key.Interface(), val.Interface())
+			d.Add(ctx, key.Interface(), val.Interface())
 
 			parent, err := change(ctx, a, p.Parent(), obj.Interface())
 			if err != nil {

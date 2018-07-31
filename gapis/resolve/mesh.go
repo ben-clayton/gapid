@@ -37,7 +37,7 @@ func Mesh(ctx context.Context, p *path.Mesh) (*api.Mesh, error) {
 	case mesh != nil:
 		return mesh, nil
 	default:
-		return nil, &service.ErrDataUnavailable{Reason: messages.ErrMeshNotAvailable()}
+		return nil, &service.ErrDataUnavailable{Reason: messages.ErrMeshNotAvailable(ctx)}
 	}
 }
 
@@ -86,7 +86,7 @@ func meshFor(ctx context.Context, o interface{}, p *path.Mesh) (*api.Mesh, error
 			}
 		}
 
-		return nil, &service.ErrDataUnavailable{Reason: messages.ErrNotADrawCall()}
+		return nil, &service.ErrDataUnavailable{Reason: messages.ErrNotADrawCall(ctx)}
 	}
 	return nil, nil
 }

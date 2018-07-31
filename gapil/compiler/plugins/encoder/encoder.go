@@ -559,10 +559,9 @@ func (e *encoder) encodeValue(s *compiler.S, ptr, buf *codegen.Value, ty semanti
 				e.writeVarint(s, buf, count)
 			})
 
-			s.If(s.Not(pool.IsNull()), func(s *compiler.S) {
-				id := e.PoolID(s, pool)
+			s.If(s.NotEqual(pool, s.Zero(pool.Type())), func(s *compiler.S) {
 				e.writeWireAndTag(s, buf, proto.WireVarint, serialization.SlicePool)
-				e.writeVarint(s, buf, id)
+				e.writeVarint(s, buf, pool)
 			})
 		})
 		s.Call(e.callbacks.sliceEncoded, s.Ctx, ptr)

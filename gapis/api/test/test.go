@@ -33,7 +33,7 @@ func (API) GetFramebufferAttachmentInfo(
 	return api.FramebufferAttachmentInfo{}, nil
 }
 
-func (API) Context(*api.GlobalState, uint64) api.Context { return nil }
+func (API) Context(context.Context, *api.GlobalState, uint64) api.Context { return nil }
 
 // Root returns the path to the root of the state to display. It can vary based
 // on filtering mode. Returning nil, nil indicates there is no state to show at
@@ -52,8 +52,4 @@ func (*State) RebuildState(ctx context.Context, s *api.GlobalState) ([]api.Cmd, 
 
 func (c *State) preMutate(ctx context.Context, s *api.GlobalState, cmd api.Cmd) error {
 	return nil
-}
-
-func (i Remapped) remap(cmd api.Cmd, s *api.GlobalState) (interface{}, bool) {
-	return i, true
 }

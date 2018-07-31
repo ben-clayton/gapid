@@ -52,6 +52,14 @@ func (r *GlobalStateResolvable) Resolve(ctx context.Context) (interface{}, error
 		return nil, err
 	}
 
+	c, err := capture.Resolve(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	env := executor.NewEnv(ctx, c, executor.Config{Execute: true})
+	ctx = executor.PutEnv(ctx, env)
+
 	sd, err := SyncData(ctx, r.Path.After.Capture)
 	if err != nil {
 		return nil, err
@@ -62,13 +70,6 @@ func (r *GlobalStateResolvable) Resolve(ctx context.Context) (interface{}, error
 	}
 
 	defer analytics.SendTiming("resolve", "global-state")(analytics.Count(len(cmds)))
-
-	c, err := capture.Resolve(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	env := executor.NewEnv(ctx, c, executor.Config{})
 
 	err = api.ForeachCmd(ctx, cmds, func(ctx context.Context, id api.CmdID, cmd api.Cmd) error {
 		env.Execute(ctx, cmd, id)
@@ -96,7 +97,7 @@ func state(ctx context.Context, p *path.State) (interface{}, path.Node, api.ID, 
 
 	a := cmd.API()
 	if a == nil {
-		return nil, nil, api.ID{}, &service.ErrDataUnavailable{Reason: messages.ErrStateUnavailable()}
+		return nil, nil, api.ID{}, &service.ErrDataUnavailable{Reason: messages.ErrStateUnavailable(ctx)}
 	}
 
 	g, err := GlobalState(ctx, p.After.GlobalStateAfter())
@@ -106,7 +107,7 @@ func state(ctx context.Context, p *path.State) (interface{}, path.Node, api.ID, 
 
 	state := g.APIs[a.ID()]
 	if state == nil {
-		return nil, nil, api.ID{}, &service.ErrDataUnavailable{Reason: messages.ErrStateUnavailable()}
+		return nil, nil, api.ID{}, &service.ErrDataUnavailable{Reason: messages.ErrStateUnavailable(ctx)}
 	}
 
 	root, err := state.Root(ctx, p)
@@ -114,7 +115,7 @@ func state(ctx context.Context, p *path.State) (interface{}, path.Node, api.ID, 
 		return nil, nil, api.ID{}, err
 	}
 	if root == nil {
-		return nil, nil, api.ID{}, &service.ErrDataUnavailable{Reason: messages.ErrStateUnavailable()}
+		return nil, nil, api.ID{}, &service.ErrDataUnavailable{Reason: messages.ErrStateUnavailable(ctx)}
 	}
 
 	// Transform the State path node to a GlobalState node to prevent the
@@ -122,7 +123,7 @@ func state(ctx context.Context, p *path.State) (interface{}, path.Node, api.ID, 
 	abs := path.Transform(root, func(n path.Node) path.Node {
 		switch n := n.(type) {
 		case *path.State:
-			return APIStateAfter(p.After, a.ID())
+			return APIStateAfter(ctx, p.After, a.ID())
 		default:
 			return n
 		}
@@ -137,7 +138,7 @@ func state(ctx context.Context, p *path.State) (interface{}, path.Node, api.ID, 
 }
 
 // APIStateAfter returns an absolute path to the API state after c.
-func APIStateAfter(c *path.Command, a api.ID) path.Node {
+func APIStateAfter(ctx context.Context, c *path.Command, a api.ID) path.Node {
 	p := &path.GlobalState{After: c}
-	return p.Field("APIs").MapIndex(a)
+	return p.Field("APIs").MapIndex(ctx, a)
 }

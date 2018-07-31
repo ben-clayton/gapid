@@ -14,18 +14,21 @@
 
 package service
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
 func (e *ErrDataUnavailable) Error() string {
-	return fmt.Sprintf("The requested data is unavailable. Reason: %v", e.Reason.Text(nil))
+	return fmt.Sprintf("The requested data is unavailable. Reason: %v", e.Reason.Text(context.Background(), nil))
 }
 
 func (e *ErrInvalidPath) Error() string {
-	return fmt.Sprintf("The path '%v' is invalid. Reason: %v", e.Path, e.Reason.Text(nil))
+	return fmt.Sprintf("The path '%v' is invalid. Reason: %v", e.Path, e.Reason.Text(context.Background(), nil))
 }
 
 func (e *ErrInvalidArgument) Error() string {
-	return fmt.Sprintf("The argument is invalid. Reason: %v", e.Reason.Text(nil))
+	return fmt.Sprintf("The argument is invalid. Reason: %v", e.Reason.Text(context.Background(), nil))
 }
 
 func (e *ErrPathNotFollowable) Error() string {
@@ -37,5 +40,5 @@ func (e *ErrInternal) Error() string {
 }
 
 func (e *ErrUnsupportedVersion) Error() string {
-	return fmt.Sprintf("Unsupported version: %v", e.Reason.Text(nil))
+	return fmt.Sprintf("Unsupported version: %v", e.Reason.Text(context.Background(), nil))
 }

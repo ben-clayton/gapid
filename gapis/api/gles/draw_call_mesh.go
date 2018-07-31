@@ -44,7 +44,7 @@ func drawCallMesh(ctx context.Context, dc drawCall, p *path.Mesh) (*api.Mesh, er
 		return nil, err
 	}
 
-	c := GetContext(s, dc.Thread())
+	c := GetContext(ctx, s, dc.Thread())
 
 	noData := p.GetOptions().GetExcludeData()
 
@@ -77,22 +77,22 @@ func drawCallMesh(ctx context.Context, dc drawCall, p *path.Mesh) (*api.Mesh, er
 	}
 
 	if count == 0 && !noData {
-		return nil, &service.ErrDataUnavailable{Reason: messages.ErrMeshHasNoVertices()}
+		return nil, &service.ErrDataUnavailable{Reason: messages.ErrMeshHasNoVertices(ctx)}
 	}
 
 	program := c.Bound().Program()
 	if program.IsNil() {
-		return nil, &service.ErrDataUnavailable{Reason: messages.ErrNoProgramBound()}
+		return nil, &service.ErrDataUnavailable{Reason: messages.ErrNoProgramBound(ctx)}
 	}
 
 	if program.ActiveResources().IsNil() {
-		return nil, &service.ErrDataUnavailable{Reason: messages.ErrProgramNotLinked()}
+		return nil, &service.ErrDataUnavailable{Reason: messages.ErrProgramNotLinked(ctx)}
 	}
 
 	vb := &vertex.Buffer{}
 	va := c.Bound().VertexArray()
 	for _, attr := range program.ActiveResources().ProgramInputs().All() {
-		vaa := va.VertexAttributeArrays().Get(AttributeLocation(attr.Locations().Get(0)))
+		vaa := va.VertexAttributeArrays().Get(ctx, AttributeLocation(attr.Locations().Get(ctx, 0)))
 		if vaa.IsNil() || vaa.Enabled() == GLboolean_GL_FALSE {
 			continue
 		}

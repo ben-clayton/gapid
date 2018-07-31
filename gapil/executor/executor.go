@@ -48,7 +48,9 @@ type apiExec struct {
 }
 
 // Config is a configuration for an executor.
-type Config struct{}
+type Config struct {
+	Execute bool
+}
 
 // NewEnv returns a new environment for an executor with the given config.
 func NewEnv(ctx context.Context, capture *capture.Capture, cfg Config) *Env {
@@ -71,13 +73,13 @@ func NewEnv(ctx context.Context, capture *capture.Capture, cfg Config) *Env {
 		}
 		settings := compiler.Settings{
 			EmitContext: true,
-			EmitExec:    true,
+			EmitExec:    cfg.Execute,
 		}
 		prog, err := compiler.Compile(sems, mappings, settings)
 		if err != nil {
 			panic(err)
 		}
-		ae.exec = New(prog, true)
+		ae.exec = NewExecutor(prog, true)
 		close(ae.ready)
 	} else {
 		<-ae.ready
@@ -85,8 +87,8 @@ func NewEnv(ctx context.Context, capture *capture.Capture, cfg Config) *Env {
 	return ae.exec.NewEnv(ctx, capture)
 }
 
-// New returns a new and initialized Executor for the given program.
-func New(prog *compiler.Program, optimize bool) *Executor {
+// NewExecutor returns a new and initialized Executor for the given program.
+func NewExecutor(prog *compiler.Program, optimize bool) *Executor {
 	e, err := prog.Module.Executor(optimize)
 	if err != nil {
 		panic(err)

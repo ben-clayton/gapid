@@ -303,7 +303,7 @@ func (c *C) expressionAddr(s *S, target semantic.Expression) *codegen.Value {
 			revPath()
 			m := c.expression(s, n.Map)
 			k := c.expression(s, n.Index)
-			v := s.Call(c.T.Maps[n.Type].Index, m, k, s.Scalar(false)).SetName("map_get")
+			v := s.Call(c.T.Maps[n.Type].Index, m, s.Ctx, k, s.Scalar(false)).SetName("map_get")
 			return v.Index(path...)
 		case *semantic.Unknown:
 			target = n.Inferred
@@ -403,7 +403,7 @@ func (c *C) mapAssign(s *S, n *semantic.MapAssign) {
 	m := c.expression(s, n.To.Map)
 	k := c.expression(s, n.To.Index)
 	v := c.expression(s, n.Value)
-	dst := s.Call(c.T.Maps[ty].Index, m, k, s.Scalar(true))
+	dst := s.Call(c.T.Maps[ty].Index, m, s.Ctx, k, s.Scalar(true))
 	c.reference(s, v, ty.ValueType)
 	c.release(s, dst.Load(), ty.ValueType)
 	dst.Store(v)
@@ -425,7 +425,7 @@ func (c *C) mapRemove(s *S, n *semantic.MapRemove) {
 	ty := n.Type
 	m := c.expression(s, n.Map)
 	k := c.expression(s, n.Key)
-	s.Call(c.T.Maps[ty].Remove, m, k)
+	s.Call(c.T.Maps[ty].Remove, m, s.Ctx, k)
 }
 
 func (c *C) read(s *S, n *semantic.Read) {
@@ -493,8 +493,7 @@ func (c *C) sliceAssign(s *S, n *semantic.SliceAssign) {
 		// This can be overridden with the WriteToApplicationPool setting.
 		chainWrite(func(el *codegen.Value, next func(el *codegen.Value)) {
 			pool := slice.Extract(SlicePool)
-			appPool := s.Zero(c.T.PoolPtr)
-			s.If(s.NotEqual(pool, appPool), func(s *S) {
+			s.If(s.NotEqual(pool, s.Zero(pool.Type())), func(s *S) {
 				next(el) // Actually perform the write.
 			})
 		})

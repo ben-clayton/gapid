@@ -73,43 +73,39 @@ int64_t gapil_encode_backref(context* ctx, void* object) {
   return isnew ? id : -id;
 }
 
-void* resolve_pool_data(context* ctx, pool* pool, uint64_t ptr,
+void* resolve_pool_data(context* ctx, uint64_t pool_id, uint64_t ptr,
                         gapil_data_access access, uint64_t size) {
-  return (pool == nullptr)
-             ? reinterpret_cast<void*>(static_cast<uintptr_t>(ptr))
-             : &pool->buffer[ptr];
-}
-
-pool_t* make_pool(context* ctx, uint64_t size) {
   auto cb = static_cast<gapii::CallObserver*>(ctx);
-  auto arena = reinterpret_cast<core::Arena*>(ctx->arena);
-  auto pool = arena->create<pool_t>();
-  pool->ref_count = 1;
-  pool->id = cb->allocate_pool_id();
-  pool->size = size;
-  pool->buffer = reinterpret_cast<uint8_t*>(arena->allocate(size, 16));
-  pool->arena = ctx->arena;
-  return pool;
+  if (pool_id == GAPIL_APPLICATION_POOL) {
+    return reinterpret_cast<void*>(static_cast<uintptr_t>(ptr));
+  }
+  auto pool = cb->get_pool(pool_id);
+  return &pool->buffer[ptr];
 }
 
-void pool_reference(pool_t* pool) {
+uint64_t make_pool(context* ctx, uint64_t size) {
+  auto cb = static_cast<gapii::CallObserver*>(ctx);
+  return cb->create_pool(size)->id;
+}
+
+void pool_reference(context* ctx, uint64_t pool_id) {
+  auto cb = static_cast<gapii::CallObserver*>(ctx);
+  auto pool = cb->get_pool(pool_id);
   GAPID_ASSERT_MSG(pool->ref_count > 0,
                    "Attempting to reference pool with no references");
   pool->ref_count++;
 }
 
-void pool_release(pool_t* pool) {
+void pool_release(context* ctx, uint64_t pool_id) {
+  auto cb = static_cast<gapii::CallObserver*>(ctx);
+  auto pool = cb->get_pool(pool_id);
   GAPID_ASSERT_MSG(pool->ref_count > 0,
                    "Attempting to reference pool with no references");
   pool->ref_count--;
   if (pool->ref_count == 0) {
-    auto arena = reinterpret_cast<core::Arena*>(pool->arena);
-    arena->free(pool->buffer);
-    arena->free(pool);
+    cb->destroy_pool(pool);
   }
 }
-
-uint64_t pool_id(pool_t* pool) { return pool->id; }
 
 }  // extern "C"
 
@@ -121,7 +117,6 @@ void Spy::register_runtime_callbacks() {
   cb.make_pool = &make_pool;
   cb.pool_reference = &pool_reference;
   cb.pool_release = &pool_release;
-  cb.pool_id = &pool_id;
   gapil_set_runtime_callbacks(&cb);
 }
 

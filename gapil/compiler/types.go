@@ -30,8 +30,7 @@ type Types struct {
 	codegen.Types
 	Ctx             *codegen.Struct                     // context_t
 	CtxPtr          codegen.Type                        // context_t*
-	Pool            codegen.Type                        // pool_t
-	PoolPtr         codegen.Type                        // pool_t*
+	PoolID          codegen.Type                        // uint64_t
 	Sli             codegen.Type                        // slice_t
 	Str             *codegen.Struct                     // string_t
 	StrPtr          codegen.Type                        // string_t*
@@ -67,8 +66,7 @@ func (c *C) declareTypes() {
 	c.T.CtxPtr = c.T.Pointer(c.T.Ctx)
 	c.T.Globals = c.T.DeclareStruct("globals")
 	c.T.GlobalsPtr = c.T.Pointer(c.T.Globals)
-	c.T.Pool = c.T.DeclareStruct("pool")
-	c.T.PoolPtr = c.T.Pointer(c.T.Pool)
+	c.T.PoolID = c.T.DeclareStruct("pool")
 	c.T.Sli = c.T.TypeOf(C.slice{})
 	c.T.Str = c.T.TypeOf(C.string{}).(*codegen.Struct)
 	c.T.StrPtr = c.T.Pointer(c.T.Str)

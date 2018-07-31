@@ -36,71 +36,71 @@ type objectKey struct {
 	mapKey interface{}
 }
 
-func (i BufferId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		key, remap = objectKey{ctx.Objects().Buffers(), i}, true
+func (i BufferId) remap(ctx context.Context, cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
+	c := GetContext(ctx, s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		key, remap = objectKey{c.Objects().Buffers(), i}, true
 	}
 	return
 }
 
-func (i FramebufferId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		key, remap = objectKey{ctx.Objects().Framebuffers(), i}, true
+func (i FramebufferId) remap(ctx context.Context, cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
+	c := GetContext(ctx, s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		key, remap = objectKey{c.Objects().Framebuffers(), i}, true
 	}
 	return
 }
 
-func (i RenderbufferId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		key, remap = objectKey{ctx.Objects().Renderbuffers(), i}, true
+func (i RenderbufferId) remap(ctx context.Context, cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
+	c := GetContext(ctx, s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		key, remap = objectKey{c.Objects().Renderbuffers(), i}, true
 	}
 	return
 }
 
-func (i ProgramId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		key, remap = objectKey{ctx.Objects().Programs(), i}, true
+func (i ProgramId) remap(ctx context.Context, cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
+	c := GetContext(ctx, s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		key, remap = objectKey{c.Objects().Programs(), i}, true
 	}
 	return
 }
 
-func (i ShaderId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		key, remap = objectKey{ctx.Objects().Shaders(), i}, true
+func (i ShaderId) remap(ctx context.Context, cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
+	c := GetContext(ctx, s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		key, remap = objectKey{c.Objects().Shaders(), i}, true
 	}
 	return
 }
 
-func (i TextureId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		if tex := ctx.Objects().Textures().Get(i); !tex.IsNil() {
+func (i TextureId) remap(ctx context.Context, cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
+	c := GetContext(ctx, s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		if tex := c.Objects().Textures().Get(ctx, i); !tex.IsNil() {
 			_, isDeleteCmd := cmd.(*GlDeleteTextures)
 			if eglImage := tex.EGLImage(); !eglImage.IsNil() && !isDeleteCmd {
 				// Ignore this texture and use the data that EGLImage points to.
 				// (unless it is a delete command - we do not want kill the shared data)
-				ctx := GetState(s).EGLContexts().Get(eglImage.Context())
+				c := GetState(s).EGLContexts().Get(ctx, eglImage.Context())
 				isTex2D := eglImage.Target() == EGLenum_EGL_GL_TEXTURE_2D
 				i := TextureId(eglImage.Buffer().Address())
-				if !ctx.IsNil() && isTex2D && ctx.Objects().Textures().Contains(i) {
-					return objectKey{ctx.Objects().Textures(), i}, true
+				if !c.IsNil() && isTex2D && c.Objects().Textures().Contains(i) {
+					return objectKey{c.Objects().Textures(), i}, true
 				}
 				panic(fmt.Errorf("Can not find EGL image target: %v", eglImage))
 			}
 		}
-		key, remap = objectKey{ctx.Objects().Textures(), i}, true
+		key, remap = objectKey{c.Objects().Textures(), i}, true
 	}
 	return
 }
 
-func (i UniformBlockIndex) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	program := ctx.Bound().Program().GetID()
+func (i UniformBlockIndex) remap(ctx context.Context, cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
+	c := GetContext(ctx, s, cmd.Thread())
+	program := c.Bound().Program().GetID()
 	switch cmd := cmd.(type) {
 	case *GlGetActiveUniformBlockName:
 		program = cmd.Program()
@@ -114,64 +114,64 @@ func (i UniformBlockIndex) remap(cmd api.Cmd, s *api.GlobalState) (key interface
 	return struct {
 		p Programʳ
 		i UniformBlockIndex
-	}{ctx.Objects().Programs().Get(program), i}, true
+	}{c.Objects().Programs().Get(ctx, program), i}, true
 }
 
-func (i VertexArrayId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		key, remap = objectKey{ctx.Objects().VertexArrays(), i}, true
+func (i VertexArrayId) remap(ctx context.Context, cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
+	c := GetContext(ctx, s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		key, remap = objectKey{c.Objects().VertexArrays(), i}, true
 	}
 	return
 }
 
-func (i QueryId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		key, remap = objectKey{ctx.Objects().Queries(), i}, true
+func (i QueryId) remap(ctx context.Context, cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
+	c := GetContext(ctx, s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		key, remap = objectKey{c.Objects().Queries(), i}, true
 	}
 	return
 }
 
-func (i GLsync) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && !i.IsNullptr() {
-		key, remap = objectKey{ctx.Objects().SyncObjects(), i}, true
+func (i GLsync) remap(ctx context.Context, cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
+	c := GetContext(ctx, s, cmd.Thread())
+	if !c.IsNil() && !i.IsNullptr() {
+		key, remap = objectKey{c.Objects().SyncObjects(), i}, true
 	}
 	return
 }
 
-func (i GLsync) value(b *builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
+func (i GLsync) value(ctx context.Context, b *builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
 	return value.AbsolutePointer(i)
 }
 
-func (i SamplerId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		key, remap = objectKey{ctx.Objects().Samplers(), i}, true
+func (i SamplerId) remap(ctx context.Context, cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
+	c := GetContext(ctx, s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		key, remap = objectKey{c.Objects().Samplers(), i}, true
 	}
 	return
 }
 
-func (i PipelineId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		key, remap = objectKey{ctx.Objects().Pipelines(), i}, true
+func (i PipelineId) remap(ctx context.Context, cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
+	c := GetContext(ctx, s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		key, remap = objectKey{c.Objects().Pipelines(), i}, true
 	}
 	return
 }
 
-func (i TransformFeedbackId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && i != 0 {
-		key, remap = objectKey{ctx.Objects().TransformFeedbacks(), i}, true
+func (i TransformFeedbackId) remap(ctx context.Context, cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
+	c := GetContext(ctx, s, cmd.Thread())
+	if !c.IsNil() && i != 0 {
+		key, remap = objectKey{c.Objects().TransformFeedbacks(), i}, true
 	}
 	return
 }
 
-func (i UniformLocation) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	program := ctx.Bound().Program().GetID()
+func (i UniformLocation) remap(ctx context.Context, cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
+	c := GetContext(ctx, s, cmd.Thread())
+	program := c.Bound().Program().GetID()
 	switch cmd := cmd.(type) {
 	case *GlGetActiveUniform:
 		program = cmd.Program()
@@ -181,10 +181,10 @@ func (i UniformLocation) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}
 	return struct {
 		p Programʳ
 		l UniformLocation
-	}{ctx.Objects().Programs().Get(program), i}, true
+	}{c.Objects().Programs().Get(ctx, program), i}, true
 }
 
-func (i SrcImageId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
+func (i SrcImageId) remap(ctx context.Context, cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
 	c, ok := cmd.(interface {
 		api.Cmd
 		SrcName() SrcImageId
@@ -193,10 +193,10 @@ func (i SrcImageId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, rem
 	if !ok {
 		panic(fmt.Errorf("Remap of SrcImageId for unhandled command: %v", cmd))
 	}
-	return remapImageID(c, s, GLuint(c.SrcName()), c.SrcTarget())
+	return remapImageID(ctx, c, s, GLuint(c.SrcName()), c.SrcTarget())
 }
 
-func (i DstImageId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
+func (i DstImageId) remap(ctx context.Context, cmd api.Cmd, s *api.GlobalState) (key interface{}, remap bool) {
 	c, ok := cmd.(interface {
 		api.Cmd
 		DstName() DstImageId
@@ -205,51 +205,51 @@ func (i DstImageId) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, rem
 	if !ok {
 		panic(fmt.Errorf("Remap of DstImageId for unhandled command: %v", cmd))
 	}
-	return remapImageID(c, s, GLuint(c.DstName()), c.DstTarget())
+	return remapImageID(ctx, c, s, GLuint(c.DstName()), c.DstTarget())
 }
 
-func remapImageID(cmd api.Cmd, s *api.GlobalState, name GLuint, target GLenum) (key interface{}, remap bool) {
-	ctx := GetContext(s, cmd.Thread())
-	if !ctx.IsNil() && name != 0 {
+func remapImageID(ctx context.Context, cmd api.Cmd, s *api.GlobalState, name GLuint, target GLenum) (key interface{}, remap bool) {
+	c := GetContext(ctx, s, cmd.Thread())
+	if !c.IsNil() && name != 0 {
 		if target == GLenum_GL_RENDERBUFFER {
-			return RenderbufferId(name).remap(cmd, s)
+			return RenderbufferId(name).remap(ctx, cmd, s)
 		}
-		return TextureId(name).remap(cmd, s)
+		return TextureId(name).remap(ctx, cmd, s)
 	}
 	return
 }
 
-func (i IndicesPointer) value(b *builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
-	c := GetContext(s, cmd.Thread())
+func (i IndicesPointer) value(ctx context.Context, b *builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
+	c := GetContext(ctx, s, cmd.Thread())
 	if !c.Bound().VertexArray().ElementArrayBuffer().IsNil() {
 		return value.AbsolutePointer(i)
 	}
 	return value.ObservedPointer(i)
 }
 
-func (i VertexPointer) value(b *builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
-	c := GetContext(s, cmd.Thread())
+func (i VertexPointer) value(ctx context.Context, b *builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
+	c := GetContext(ctx, s, cmd.Thread())
 	if !c.Bound().ArrayBuffer().IsNil() {
 		return value.AbsolutePointer(i)
 	}
 	return value.ObservedPointer(i)
 }
 
-func (i TexturePointer) value(b *builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
-	if i == 0 || !GetContext(s, cmd.Thread()).Bound().PixelUnpackBuffer().IsNil() {
+func (i TexturePointer) value(ctx context.Context, b *builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
+	if i == 0 || !GetContext(ctx, s, cmd.Thread()).Bound().PixelUnpackBuffer().IsNil() {
 		return value.AbsolutePointer(i)
 	}
 	return value.ObservedPointer(i)
 }
 
-func (i BufferDataPointer) value(b *builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
+func (i BufferDataPointer) value(ctx context.Context, b *builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
 	if i == 0 {
 		return value.AbsolutePointer(i)
 	}
 	return value.ObservedPointer(i)
 }
 
-func (i GLeglImageOES) value(b *builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
+func (i GLeglImageOES) value(ctx context.Context, b *builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
 	return value.AbsolutePointer(i)
 }
 
@@ -258,13 +258,13 @@ func (ω *EglCreateContext) Mutate(ctx context.Context, id api.CmdID, s *api.Glo
 	if b == nil || err != nil {
 		return err
 	}
-	ctxID := uint32(GetState(s).EGLContexts().Get(ω.Result()).Identifier())
+	ctxID := uint32(GetState(s).EGLContexts().Get(ctx, ω.Result()).Identifier())
 	cb := CommandBuilder{Thread: ω.Thread(), Arena: s.Arena}
 	return cb.ReplayCreateRenderer(ctxID).Mutate(ctx, id, s, b)
 }
 
 func (ω *EglMakeCurrent) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder) error {
-	prevContext := GetState(s).Contexts().Get(ω.Thread())
+	prevContext := GetState(s).Contexts().Get(ctx, ω.Thread())
 	existed := GetState(s).EGLContexts().Contains(ω.Context())
 	err := ω.mutate(ctx, id, s, nil)
 	if b == nil || err != nil {
@@ -278,7 +278,7 @@ func (ω *EglMakeCurrent) Mutate(ctx context.Context, id api.CmdID, s *api.Globa
 		ctxID := uint32(prevContext.Identifier())
 		return cb.ReplayUnbindRenderer(ctxID).Mutate(ctx, id, s, b)
 	}
-	ctxID := uint32(GetState(s).EGLContexts().Get(ω.Context()).Identifier())
+	ctxID := uint32(GetState(s).EGLContexts().Get(ctx, ω.Context()).Identifier())
 	if !existed {
 		// The eglCreateContext call was missing, so fake it (can happen on Samsung).
 		if err := cb.ReplayCreateRenderer(ctxID).Mutate(ctx, id, s, b); err != nil {
@@ -310,7 +310,7 @@ func (ω *WglCreateContext) Mutate(ctx context.Context, id api.CmdID, s *api.Glo
 	if b == nil || err != nil {
 		return err
 	}
-	ctxID := uint32(GetState(s).WGLContexts().Get(ω.Result()).Identifier())
+	ctxID := uint32(GetState(s).WGLContexts().Get(ctx, ω.Result()).Identifier())
 	cb := CommandBuilder{Thread: ω.Thread(), Arena: s.Arena}
 	return cb.ReplayCreateRenderer(ctxID).Mutate(ctx, id, s, b)
 }
@@ -320,7 +320,7 @@ func (ω *WglCreateContextAttribsARB) Mutate(ctx context.Context, id api.CmdID, 
 	if b == nil || err != nil {
 		return err
 	}
-	ctxID := uint32(GetState(s).WGLContexts().Get(ω.Result()).Identifier())
+	ctxID := uint32(GetState(s).WGLContexts().Get(ctx, ω.Result()).Identifier())
 	cb := CommandBuilder{Thread: ω.Thread(), Arena: s.Arena}
 	return cb.ReplayCreateRenderer(ctxID).Mutate(ctx, id, s, b)
 }
@@ -333,7 +333,7 @@ func (ω *WglMakeCurrent) Mutate(ctx context.Context, id api.CmdID, s *api.Globa
 	if ω.Hglrc() == 0 {
 		return nil
 	}
-	ctxID := uint32(GetState(s).WGLContexts().Get(ω.Hglrc()).Identifier())
+	ctxID := uint32(GetState(s).WGLContexts().Get(ctx, ω.Hglrc()).Identifier())
 	cb := CommandBuilder{Thread: ω.Thread(), Arena: s.Arena}
 	return cb.ReplayBindRenderer(ctxID).Mutate(ctx, id, s, b)
 }
@@ -343,7 +343,7 @@ func (ω *CGLCreateContext) Mutate(ctx context.Context, id api.CmdID, s *api.Glo
 	if b == nil || err != nil {
 		return err
 	}
-	ctxID := uint32(GetState(s).CGLContexts().Get(ω.Ctx().MustRead(ctx, ω, s, b)).Identifier())
+	ctxID := uint32(GetState(s).CGLContexts().Get(ctx, ω.Ctx().MustRead(ctx, ω, s, b)).Identifier())
 	cb := CommandBuilder{Thread: ω.Thread(), Arena: s.Arena}
 	return cb.ReplayCreateRenderer(ctxID).Mutate(ctx, id, s, b)
 }
@@ -356,7 +356,7 @@ func (ω *CGLSetCurrentContext) Mutate(ctx context.Context, id api.CmdID, s *api
 	if ω.Ctx() == 0 {
 		return nil
 	}
-	ctxID := uint32(GetState(s).CGLContexts().Get(ω.Ctx()).Identifier())
+	ctxID := uint32(GetState(s).CGLContexts().Get(ctx, ω.Ctx()).Identifier())
 	cb := CommandBuilder{Thread: ω.Thread(), Arena: s.Arena}
 	return cb.ReplayBindRenderer(ctxID).Mutate(ctx, id, s, b)
 }
@@ -366,7 +366,7 @@ func (ω *GlXCreateContext) Mutate(ctx context.Context, id api.CmdID, s *api.Glo
 	if b == nil || err != nil {
 		return err
 	}
-	ctxID := uint32(GetState(s).GLXContexts().Get(ω.Result()).Identifier())
+	ctxID := uint32(GetState(s).GLXContexts().Get(ctx, ω.Result()).Identifier())
 	cb := CommandBuilder{Thread: ω.Thread(), Arena: s.Arena}
 	return cb.ReplayCreateRenderer(ctxID).Mutate(ctx, id, s, b)
 }
@@ -376,7 +376,7 @@ func (ω *GlXCreateNewContext) Mutate(ctx context.Context, id api.CmdID, s *api.
 	if b == nil || err != nil {
 		return err
 	}
-	ctxID := uint32(GetState(s).GLXContexts().Get(ω.Result()).Identifier())
+	ctxID := uint32(GetState(s).GLXContexts().Get(ctx, ω.Result()).Identifier())
 	cb := CommandBuilder{Thread: ω.Thread(), Arena: s.Arena}
 	return cb.ReplayCreateRenderer(ctxID).Mutate(ctx, id, s, b)
 }
@@ -389,7 +389,7 @@ func (ω *GlXMakeContextCurrent) Mutate(ctx context.Context, id api.CmdID, s *ap
 	if ω.Ctx() == 0 {
 		return nil
 	}
-	ctxID := uint32(GetState(s).GLXContexts().Get(ω.Ctx()).Identifier())
+	ctxID := uint32(GetState(s).GLXContexts().Get(ctx, ω.Ctx()).Identifier())
 	cb := CommandBuilder{Thread: ω.Thread(), Arena: s.Arena}
 	return cb.ReplayBindRenderer(ctxID).Mutate(ctx, id, s, b)
 }
@@ -400,10 +400,10 @@ func bindAttribLocations(ctx context.Context, cmd api.Cmd, id api.CmdID, s *api.
 	if !pi.IsNil() && b != nil && !pi.ActiveResources().IsNil() {
 		cb := CommandBuilder{Thread: cmd.Thread(), Arena: s.Arena}
 		for _, attr := range pi.ActiveResources().ProgramInputs().All() {
-			if int32(attr.Locations().Get(0)) != -1 {
+			if int32(attr.Locations().Get(ctx, 0)) != -1 {
 				tmp := s.AllocDataOrPanic(ctx, attr.Name())
 				defer tmp.Free()
-				cmd := cb.GlBindAttribLocation(pid, AttributeLocation(attr.Locations().Get(0)), tmp.Ptr()).
+				cmd := cb.GlBindAttribLocation(pid, AttributeLocation(attr.Locations().Get(ctx, 0)), tmp.Ptr()).
 					AddRead(tmp.Data())
 				if strings.HasPrefix(attr.Name(), "gl_") {
 					// Active built-in mush have location of -1

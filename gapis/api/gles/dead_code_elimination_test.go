@@ -24,6 +24,7 @@ import (
 	"github.com/google/gapid/core/memory/arena"
 	"github.com/google/gapid/core/os/device"
 	"github.com/google/gapid/core/os/device/bind"
+	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/api/gles"
 	"github.com/google/gapid/gapis/api/transform"
@@ -37,6 +38,7 @@ func TestDeadCommandRemoval(t *testing.T) {
 	ctx := log.Testing(t)
 	ctx = bind.PutRegistry(ctx, bind.NewRegistry())
 	ctx = database.Put(ctx, database.NewInMemory(ctx))
+	ctx = executor.PutEnv(ctx, executor.NewEnv(ctx, nil, executor.Config{}))
 
 	a := arena.New()
 	defer a.Dispose()
@@ -54,10 +56,11 @@ func TestDeadCommandRemoval(t *testing.T) {
 	programUniformsA.SetType(gles.GLenum_GL_FLOAT_VEC4)
 	programUniformsA.SetArraySize(10)
 	programUniformsA.SetLocations(gles.NewU32ːGLintᵐ(a).
-		Add(0, 0).Add(1, 1).Add(2, 2).Add(3, 3).Add(4, 4).
-		Add(5, 5).Add(6, 6).Add(7, 7).Add(8, 8).Add(9, 9))
+		Add(ctx, 0, 0).Add(ctx, 1, 1).Add(ctx, 2, 2).Add(ctx, 3, 3).
+		Add(ctx, 4, 4).Add(ctx, 5, 5).Add(ctx, 6, 6).Add(ctx, 7, 7).
+		Add(ctx, 8, 8).Add(ctx, 9, 9))
 	programResourcesA := gles.MakeActiveProgramResourcesʳ(a)
-	programResourcesA.SetDefaultUniformBlock(gles.NewUniformIndexːProgramResourceʳᵐ(a).Add(0, programUniformsA))
+	programResourcesA.SetDefaultUniformBlock(gles.NewUniformIndexːProgramResourceʳᵐ(a).Add(ctx, 0, programUniformsA))
 	programInfoA := gles.MakeLinkProgramExtra(a)
 	programInfoA.SetLinkStatus(gles.GLboolean_GL_TRUE)
 	programInfoA.SetActiveResources(programResourcesA)
@@ -65,10 +68,10 @@ func TestDeadCommandRemoval(t *testing.T) {
 	programSamplerB := gles.MakeProgramResourceʳ(a)
 	programSamplerB.SetName("sampler")
 	programSamplerB.SetType(gles.GLenum_GL_SAMPLER_CUBE)
-	programSamplerB.SetLocations(gles.NewU32ːGLintᵐ(a).Add(0, 0))
+	programSamplerB.SetLocations(gles.NewU32ːGLintᵐ(a).Add(ctx, 0, 0))
 	programSamplerB.SetArraySize(1)
 	programResourcesB := gles.MakeActiveProgramResourcesʳ(a)
-	programResourcesB.SetDefaultUniformBlock(gles.NewUniformIndexːProgramResourceʳᵐ(a).Add(0, programSamplerB))
+	programResourcesB.SetDefaultUniformBlock(gles.NewUniformIndexːProgramResourceʳᵐ(a).Add(ctx, 0, programSamplerB))
 	programInfoB := gles.MakeLinkProgramExtra(a)
 	programInfoB.SetLinkStatus(gles.GLboolean_GL_TRUE)
 	programInfoB.SetActiveResources(programResourcesB)
@@ -229,10 +232,16 @@ func TestDeadCommandRemoval(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		ctx = capture.Put(ctx, capturePath)
+		ctx := capture.Put(ctx, capturePath)
+
+		c, err := capture.Resolve(ctx)
+		if err != nil {
+			panic(err)
+		}
+
+		ctx = executor.PutEnv(ctx, executor.NewEnv(ctx, c, executor.Config{}))
 
 		// First verify the commands mutate without errors
-		c, _ := capture.Resolve(ctx)
 		s := c.NewState(ctx)
 		err = api.ForeachCmd(ctx, cmds, func(ctx context.Context, id api.CmdID, cmd api.Cmd) error {
 			if err := cmd.Mutate(ctx, id, s, nil); err != nil {

@@ -103,56 +103,56 @@ func TestGet(t *testing.T) {
 		// {sB.Field("Sli").ArrayIndex(0), test.NewBoolˢ(a, 0, 0, 1, 1, 1), nil}, // TODO: How do we test this?
 		// {sB.Field("Sli").ArrayIndex(1), test.NewBoolˢ(a, 0, 1, 1, 1, 1), nil}, // TODO: How do we test this?
 		// {sB.Field("Sli").ArrayIndex(2), test.NewBoolˢ(a, 0, 2, 1, 1, 1), nil}, // TODO: How do we test this?
-		{sB.Field("Ref").Field("Strings").MapIndex("123"), uint32(123), nil},
+		{sB.Field("Ref").Field("Strings").MapIndex(ctx, "123"), uint32(123), nil},
 		{sB.Field("Ref").Field("RefObject").Field("value"), uint32(555), nil},
 		{sB.Field("Ptr"), test.U8ᵖ(0x89abcdef), nil},
-		{sB.Field("Map").MapIndex("cat").Field("Object").Field("value"), uint32(100), nil},
-		{sB.Field("Map").MapIndex("dog").Field("Object").Field("value"), uint32(200), nil},
+		{sB.Field("Map").MapIndex(ctx, "cat").Field("Object").Field("value"), uint32(100), nil},
+		{sB.Field("Map").MapIndex(ctx, "dog").Field("Object").Field("value"), uint32(200), nil},
 
 		// Test invalid paths
 		{p.Command(5), nil, &service.ErrInvalidPath{
-			Reason: messages.ErrValueOutOfBounds(uint64(5), "Index", uint64(0), uint64(2)),
+			Reason: messages.ErrValueOutOfBounds(ctx, uint64(5), "Index", uint64(0), uint64(2)),
 			Path:   p.Command(5).Path(),
 		}},
 		{cA.Parameter("doesnotexist"), nil, &service.ErrInvalidPath{
-			Reason: messages.ErrParameterDoesNotExist("cmdTypeMix", "doesnotexist"),
+			Reason: messages.ErrParameterDoesNotExist(ctx, "cmdTypeMix", "doesnotexist"),
 			Path:   cA.Parameter("doesnotexist").Path(),
 		}},
 		{sB.Field("Ref").Field("doesnotexist"), nil, &service.ErrInvalidPath{
-			Reason: messages.ErrFieldDoesNotExist("Complexʳ", "doesnotexist"),
+			Reason: messages.ErrFieldDoesNotExist(ctx, "Complexʳ", "doesnotexist"),
 			Path:   sB.Field("Ref").Field("doesnotexist").Path(),
 		}},
 		{sA.Field("Ref").Field("Strings"), nil, &service.ErrInvalidPath{
-			Reason: messages.ErrNilPointerDereference(),
+			Reason: messages.ErrNilPointerDereference(ctx),
 			Path:   sA.Field("Ref").Field("Strings").Path(),
 		}},
 		{sB.Field("Sli").ArrayIndex(4), nil, &service.ErrInvalidPath{
-			Reason: messages.ErrValueOutOfBounds(uint64(4), "Index", uint64(0), uint64(2)),
+			Reason: messages.ErrValueOutOfBounds(ctx, uint64(4), "Index", uint64(0), uint64(2)),
 			Path:   sB.Field("Sli").ArrayIndex(4).Path(),
 		}},
 		{sB.Field("Sli").Slice(2, 4), nil, &service.ErrInvalidPath{
-			Reason: messages.ErrSliceOutOfBounds(uint64(2), uint64(4), "Start", "End", uint64(0), uint64(2)),
+			Reason: messages.ErrSliceOutOfBounds(ctx, uint64(2), uint64(4), "Start", "End", uint64(0), uint64(2)),
 			Path:   sB.Field("Sli").Slice(2, 4).Path(),
 		}},
 		{sB.Field("Str").ArrayIndex(4), nil, &service.ErrInvalidPath{
-			Reason: messages.ErrValueOutOfBounds(uint64(4), "Index", uint64(0), uint64(2)),
+			Reason: messages.ErrValueOutOfBounds(ctx, uint64(4), "Index", uint64(0), uint64(2)),
 			Path:   sB.Field("Str").ArrayIndex(4).Path(),
 		}},
 		{sB.Field("Ref").ArrayIndex(4), nil, &service.ErrInvalidPath{
-			Reason: messages.ErrTypeNotArrayIndexable("Complexʳ"),
+			Reason: messages.ErrTypeNotArrayIndexable(ctx, "Complexʳ"),
 			Path:   sB.Field("Ref").ArrayIndex(4).Path(),
 		}},
-		{sB.Field("Ref").MapIndex("foo"), nil, &service.ErrInvalidPath{
-			Reason: messages.ErrTypeNotMapIndexable("Complexʳ"),
-			Path:   sB.Field("Ref").MapIndex("foo").Path(),
+		{sB.Field("Ref").MapIndex(ctx, "foo"), nil, &service.ErrInvalidPath{
+			Reason: messages.ErrTypeNotMapIndexable(ctx, "Complexʳ"),
+			Path:   sB.Field("Ref").MapIndex(ctx, "foo").Path(),
 		}},
-		{sB.Field("Map").MapIndex(10.0), nil, &service.ErrInvalidPath{
-			Reason: messages.ErrIncorrectMapKeyType("float64", "string"),
-			Path:   sB.Field("Map").MapIndex(10.0).Path(),
+		{sB.Field("Map").MapIndex(ctx, 10.0), nil, &service.ErrInvalidPath{
+			Reason: messages.ErrIncorrectMapKeyType(ctx, "float64", "string"),
+			Path:   sB.Field("Map").MapIndex(ctx, 10.0).Path(),
 		}},
-		{sB.Field("Map").MapIndex("rabbit"), nil, &service.ErrInvalidPath{
-			Reason: messages.ErrMapKeyDoesNotExist("rabbit"),
-			Path:   sB.Field("Map").MapIndex("rabbit").Path(),
+		{sB.Field("Map").MapIndex(ctx, "rabbit"), nil, &service.ErrInvalidPath{
+			Reason: messages.ErrMapKeyDoesNotExist(ctx, "rabbit"),
+			Path:   sB.Field("Map").MapIndex(ctx, "rabbit").Path(),
 		}},
 	} {
 		got, err := Get(ctx, test.path.Path())
@@ -211,52 +211,52 @@ func TestSet(t *testing.T) {
 
 		// Test invalid paths
 		{p.Command(5), nil, &service.ErrInvalidPath{
-			Reason: messages.ErrValueOutOfBounds(uint64(5), "Index", uint64(0), uint64(2)),
+			Reason: messages.ErrValueOutOfBounds(ctx, uint64(5), "Index", uint64(0), uint64(2)),
 			Path:   p.Command(5).Path(),
 		}},
 		{cA.Parameter("doesnotexist"), nil, &service.ErrInvalidPath{
-			Reason: messages.ErrParameterDoesNotExist("cmdTypeMix", "doesnotexist"),
+			Reason: messages.ErrParameterDoesNotExist(ctx, "cmdTypeMix", "doesnotexist"),
 			Path:   cA.Parameter("doesnotexist").Path(),
 		}},
 		{sB.Field("Ref").Field("doesnotexist"), nil, &service.ErrInvalidPath{
-			Reason: messages.ErrFieldDoesNotExist("Complexʳ", "doesnotexist"),
+			Reason: messages.ErrFieldDoesNotExist(ctx, "Complexʳ", "doesnotexist"),
 			Path:   sB.Field("Ref").Field("doesnotexist").Path(),
 		}},
 		{sA.Field("Ref").Field("Strings"), nil, &service.ErrInvalidPath{
-			Reason: messages.ErrNilPointerDereference(),
+			Reason: messages.ErrNilPointerDereference(ctx),
 			Path:   sA.Field("Ref").Field("Strings").Path(),
 		}},
 		/* TODO: `<ERR_TYPE_NOT_ARRAY_INDEXABLE [ty: Boolˢ]>`
 		{sB.Field("Sli").ArrayIndex(4), nil, &service.ErrInvalidPath{
-			Reason: messages.ErrValueOutOfBounds(uint64(4), "Index", uint64(0), uint64(2)),
+			Reason: messages.ErrValueOutOfBounds(ctx,uint64(4), "Index", uint64(0), uint64(2)),
 			Path:   sB.Field("Sli").ArrayIndex(4).Path(),
 		}},
 		*/
 		/* TODO: `Unknown path type *path.Slice`
 		{sB.Field("Sli").Slice(2, 4), nil, &service.ErrInvalidPath{
-			Reason: messages.ErrSliceOutOfBounds(uint64(2), uint64(4), "Start", "End", uint64(0), uint64(2)),
+			Reason: messages.ErrSliceOutOfBounds(ctx,uint64(2), uint64(4), "Start", "End", uint64(0), uint64(2)),
 			Path:   sB.Field("Sli").Slice(2, 4).Path(),
 		}},
 		*/
 		{sB.Field("Str").ArrayIndex(4), nil, &service.ErrInvalidPath{
-			Reason: messages.ErrValueOutOfBounds(uint64(4), "Index", uint64(0), uint64(2)),
+			Reason: messages.ErrValueOutOfBounds(ctx, uint64(4), "Index", uint64(0), uint64(2)),
 			Path:   sB.Field("Str").ArrayIndex(4).Path(),
 		}},
 		{sB.Field("Ref").ArrayIndex(4), nil, &service.ErrInvalidPath{
-			Reason: messages.ErrTypeNotArrayIndexable("Complexʳ"),
+			Reason: messages.ErrTypeNotArrayIndexable(ctx, "Complexʳ"),
 			Path:   sB.Field("Ref").ArrayIndex(4).Path(),
 		}},
-		{sB.Field("Ref").MapIndex("foo"), nil, &service.ErrInvalidPath{
-			Reason: messages.ErrTypeNotMapIndexable("Complexʳ"),
-			Path:   sB.Field("Ref").MapIndex("foo").Path(),
+		{sB.Field("Ref").MapIndex(ctx, "foo"), nil, &service.ErrInvalidPath{
+			Reason: messages.ErrTypeNotMapIndexable(ctx, "Complexʳ"),
+			Path:   sB.Field("Ref").MapIndex(ctx, "foo").Path(),
 		}},
-		{sB.Field("Map").MapIndex(10.0), nil, &service.ErrInvalidPath{
-			Reason: messages.ErrIncorrectMapKeyType("float64", "string"),
-			Path:   sB.Field("Map").MapIndex(10.0).Path(),
+		{sB.Field("Map").MapIndex(ctx, 10.0), nil, &service.ErrInvalidPath{
+			Reason: messages.ErrIncorrectMapKeyType(ctx, "float64", "string"),
+			Path:   sB.Field("Map").MapIndex(ctx, 10.0).Path(),
 		}},
 
 		// Test invalid sets
-		{sB.Field("Map").MapIndex("bird"), 10.0, fmt.Errorf(
+		{sB.Field("Map").MapIndex(ctx, "bird"), 10.0, fmt.Errorf(
 			"Map at capture<%v>.commands[2].state<context: <nil>>.Map has value of type test.Complexʳ, got type float64", p.ID.ID())},
 	} {
 		ctx := log.V{"path": test.path, "value": test.val}.Bind(ctx)

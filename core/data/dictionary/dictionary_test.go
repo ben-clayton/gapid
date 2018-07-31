@@ -15,6 +15,7 @@
 package dictionary_test
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -29,12 +30,12 @@ type valTy int
 
 type custom struct{ m *map[keyTy]valTy }
 
-func (g custom) Get(k keyTy) valTy            { return (*g.m)[k] }
-func (g custom) Add(k keyTy, v valTy)         { (*g.m)[k] = v }
-func (g custom) Lookup(k keyTy) (valTy, bool) { v, ok := (*g.m)[k]; return v, ok }
-func (g custom) Contains(k keyTy) bool        { _, ok := (*g.m)[k]; return ok }
-func (g custom) Remove(k keyTy)               { delete((*g.m), k) }
-func (g custom) Len() int                     { return len((*g.m)) }
+func (g custom) Get(ctx context.Context, k keyTy) valTy            { return (*g.m)[k] }
+func (g custom) Add(ctx context.Context, k keyTy, v valTy)         { (*g.m)[k] = v }
+func (g custom) Lookup(ctx context.Context, k keyTy) (valTy, bool) { v, ok := (*g.m)[k]; return v, ok }
+func (g custom) Contains(k keyTy) bool                             { _, ok := (*g.m)[k]; return ok }
+func (g custom) Remove(ctx context.Context, k keyTy)               { delete((*g.m), k) }
+func (g custom) Len() int                                          { return len((*g.m)) }
 func (g custom) Keys() []keyTy {
 	out := make([]keyTy, 0, len(*g.m))
 	for k := range *g.m {
@@ -95,8 +96,8 @@ func TestDictionary(t *testing.T) {
 			continue
 		}
 
-		assert.For(ctx, "d.Get('apple')").That(d.Get(apple)).Equals(one)
-		assert.For(ctx, "d.Get('grape')").That(d.Get(grape)).Equals(three)
+		assert.For(ctx, "d.Get('apple')").That(d.Get(ctx, apple)).Equals(one)
+		assert.For(ctx, "d.Get('grape')").That(d.Get(ctx, grape)).Equals(three)
 		assert.For(ctx, "d.KeyTy()").That(d.KeyTy()).Equals(reflect.TypeOf(apple))
 		assert.For(ctx, "d.ValTy()").That(d.ValTy()).Equals(reflect.TypeOf(one))
 		assert.For(ctx, "d.Len()").That(d.Len()).Equals(5)
@@ -104,31 +105,31 @@ func TestDictionary(t *testing.T) {
 			apple, grape, kiwi, lemon, orange,
 		})
 
-		val, ok := d.Lookup(banana)
+		val, ok := d.Lookup(ctx, banana)
 		assert.For(ctx, "d.Get('banana').val").That(val).Equals(valTy(0))
 		assert.For(ctx, "d.Get('banana').ok").That(ok).Equals(false)
 		assert.For(ctx, "d.Contains('banana')").That(d.Contains(banana)).Equals(false)
 
-		val, ok = d.Lookup(orange)
+		val, ok = d.Lookup(ctx, orange)
 		assert.For(ctx, "d.Get('orange').val").That(val).Equals(two)
 		assert.For(ctx, "d.Get('orange').ok").That(ok).Equals(true)
 		assert.For(ctx, "d.Contains('orange')").That(d.Contains(orange)).Equals(true)
 
-		assert.For(ctx, "len(Entries(d))").That(len(dictionary.Entries(d))).Equals(5)
+		assert.For(ctx, "len(Entries(d))").That(len(dictionary.Entries(ctx, d))).Equals(5)
 
-		for _, e := range dictionary.Entries(d) {
-			assert.For(ctx, "Entries(d)[%v]", e.K).That(d.Get(e.K)).Equals(e.V)
+		for _, e := range dictionary.Entries(ctx, d) {
+			assert.For(ctx, "Entries(d)[%v]", e.K).That(d.Get(ctx, e.K)).Equals(e.V)
 		}
 
 		// Below we start mutating the map.
-		d.Add(kiwi, valTy(40))
-		assert.For(ctx, "d.Add('kiwi')").That(d.Get(kiwi)).Equals(valTy(40))
+		d.Add(ctx, kiwi, valTy(40))
+		assert.For(ctx, "d.Add('kiwi')").That(d.Get(ctx, kiwi)).Equals(valTy(40))
 
-		d.Remove(kiwi)
+		d.Remove(ctx, kiwi)
 		assert.For(ctx, "d.Len() <post-remove>").That(d.Len()).Equals(4)
-		assert.For(ctx, "d.Get('kiwi') <post-remove>").That(d.Get(kiwi)).Equals(valTy(0))
+		assert.For(ctx, "d.Get('kiwi') <post-remove>").That(d.Get(ctx, kiwi)).Equals(valTy(0))
 
-		dictionary.Clear(d)
+		dictionary.Clear(ctx, d)
 		assert.For(ctx, "d.Len() <post-clear>").That(d.Len()).Equals(0)
 	}
 }

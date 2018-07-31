@@ -41,7 +41,7 @@
   // Avoid unused errors.
   var (
     _ = fmt.Formatter(nil)
-    _ = messages.ErrFileCannotBeRead()
+    _ = messages.ErrFileCannotBeRead(nil)
     _ = strings.Reader{}
     _ = stringtable.Msg{}
     _ = ϟmem.Decoder{}
@@ -190,7 +190,7 @@
         {{/* Store the return value into a remapping table, if required */}}
         {{$rty := TypeOf $.Return}}
         {{if (GetAnnotation $rty "replay_remap")}}
-          if key, remap := ϟc.Result().remap(ϟc, ϟg); remap {
+          if key, remap := ϟc.Result().remap(ϟctx, ϟc, ϟg); remap {
           ptr, found := ϟb.Remappings[key]
           if !found {
             ptr = ϟb.AllocateMemory({{Template "Go.SizeOf" $rty}})
@@ -216,7 +216,7 @@
   {{AssertType $.Name "string"}}
 
   {{if (GetAnnotation $.Type "replay_remap")}}
-    if key, remap := {{$.Name}}.remap(ϟc, ϟg); remap {
+    if key, remap := {{$.Name}}.remap(ϟctx, ϟc, ϟg); remap {
       loadRemap(ϟb, key, {{Template "Go.Replay.Type" $.Type}}, {{Template "Go.Replay.Value" "Type" $.Type "Name" $.Name}})
     } else {
       ϟb.Push({{Template "Go.Replay.Value" "Type" $.Type "Name" $.Name}})
@@ -249,7 +249,7 @@
   {{$u := $ | TypeOf | Underlying}}
   {{if IsNumericType $u}}
     {{if not (GetAnnotation $ "replay_custom_value")}}
-      func (c {{Template "Go.Type" $}}) value(ϟb *builder.Builder, ϟc api.Cmd, ϟg *api.GlobalState) value.Value {
+      func (c {{Template "Go.Type" $}}) value(ϟctx context.Context, ϟb *builder.Builder, ϟc api.Cmd, ϟg *api.GlobalState) value.Value {
         {{if IsSize $.To}}
           if ϟg.MemoryLayout.GetPointer().GetSize() == 4 {
             return value.U32(uint32(c))
@@ -275,7 +275,7 @@
   {{AssertType $ "Array" "StaticArray"}}
 
   {{if not (or (Macro "IsInternal" $.ValueType) (IsAny $.ValueType))}}
-    func (arr {{Template "Go.Type" $}}) value(ϟb *builder.Builder, ϟc api.Cmd, ϟg *api.GlobalState) value.Pointer {
+    func (arr {{Template "Go.Type" $}}) value(ϟctx context.Context, ϟb *builder.Builder, ϟc api.Cmd, ϟg *api.GlobalState) value.Pointer {
       if len(arr) > 0 {
         for _, e := range arr.All() {
           {{Template "PushInput" "Type" $.ValueType "Name" "e"}}
@@ -575,7 +575,7 @@
   {{AssertType $ "MapAssign"}}
 
   {{if eq $.Operator "="}}
-    {{Template "Go.Read" $.To.Map}}.Add({{Template "Go.Read" $.To.Index}},{{Template "Go.Read" $.Value}})
+    {{Template "Go.Read" $.To.Map}}.Add(ϟctx, {{Template "Go.Read" $.To.Index}},{{Template "Go.Read" $.Value}})
   {{else}}
     {{Error "Unsupported MapAssign operator %s" $.Operator}}
   {{end}}
@@ -590,7 +590,7 @@
 {{define "MapRemove"}}
   {{AssertType $ "MapRemove"}}
 
-  {{Template "Go.Read" $.Map}}.Remove({{Template "Go.Read" $.Key}})
+  {{Template "Go.Read" $.Map}}.Remove(ϟctx, {{Template "Go.Read" $.Key}})
 {{end}}
 
 

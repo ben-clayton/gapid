@@ -45,8 +45,8 @@ type queueFamilyScratchResources struct {
 // of the given queue. If such a queeuFamilyScratchResources does not exist,
 // it will create one and return it.
 func (sb *stateBuilder) getQueueFamilyScratchResources(queue VkQueue) *queueFamilyScratchResources {
-	dev := sb.s.Queues().Get(queue).Device()
-	family := sb.s.Queues().Get(queue).Family()
+	dev := sb.s.Queues().Get(sb.ctx, queue).Device()
+	family := sb.s.Queues().Get(sb.ctx, queue).Family()
 	if _, ok := sb.scratchResources[dev]; !ok {
 		sb.scratchResources[dev] = map[uint32]*queueFamilyScratchResources{}
 	}
@@ -144,7 +144,7 @@ func (qr *queueFamilyScratchResources) getCommandBuffer(queue VkQueue) VkCommand
 		qr.commandBuffers[queue] = commandBufferID
 	}
 	commandBuffer := qr.commandBuffers[queue]
-	if GetState(sb.newState).CommandBuffers().Get(commandBuffer).Recording() != RecordingState_RECORDING {
+	if GetState(sb.newState).CommandBuffers().Get(qr.sb.ctx, commandBuffer).Recording() != RecordingState_RECORDING {
 		sb.write(sb.cb.VkBeginCommandBuffer(
 			commandBuffer,
 			sb.MustAllocReadData(NewVkCommandBufferBeginInfo(sb.ta,
@@ -176,7 +176,7 @@ func (qr *queueFamilyScratchResources) newDeviceMemory(size uint64) VkDeviceMemo
 	deviceMemory := VkDeviceMemory(newUnusedID(true, func(x uint64) bool {
 		return sb.s.DeviceMemories().Contains(VkDeviceMemory(x)) || GetState(sb.newState).DeviceMemories().Contains(VkDeviceMemory(x))
 	}))
-	memoryTypeIndex := sb.GetScratchBufferMemoryIndex(sb.s.Devices().Get(dev))
+	memoryTypeIndex := sb.GetScratchBufferMemoryIndex(sb.s.Devices().Get(qr.sb.ctx, dev))
 	size = nextMultipleOf(size, 256)
 	sb.write(sb.cb.VkAllocateMemory(
 		dev,
@@ -279,7 +279,7 @@ func (qr *queueFamilyScratchResources) flush() {
 	for q, cb := range qr.commandBuffers {
 		// Do not submit executed commandbuffer, state rebuilding does not reuse
 		// recorded commands in command buffers.
-		if GetState(sb.newState).CommandBuffers().Get(cb).Recording() != RecordingState_RECORDING {
+		if GetState(sb.newState).CommandBuffers().Get(qr.sb.ctx, cb).Recording() != RecordingState_RECORDING {
 			continue
 		}
 		sb.write(sb.cb.VkEndCommandBuffer(
@@ -452,7 +452,7 @@ func (t *scratchTask) newBuffer(subRngs []bufferSubRangeFillInfo, usages ...VkBu
 	for _, u := range usages {
 		usageFlags |= VkBufferUsageFlags(u)
 	}
-	dev := sb.s.Queues().Get(t.queue).Device()
+	dev := sb.s.Queues().Get(t.sb.ctx, t.queue).Device()
 	sb.write(sb.cb.VkCreateBuffer(
 		dev,
 		sb.MustAllocReadData(

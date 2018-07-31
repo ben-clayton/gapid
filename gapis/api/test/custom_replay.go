@@ -22,6 +22,16 @@ package test
 // }
 import "C"
 
+import (
+	"context"
+
+	"github.com/google/gapid/gapis/api"
+)
+
 func init() {
 	C.register_remap_funcs()
+}
+
+func (i Remapped) remap(ctx context.Context, cmd api.Cmd, s *api.GlobalState) (interface{}, bool) {
+	return i, true
 }

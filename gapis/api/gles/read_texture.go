@@ -45,7 +45,7 @@ func (t *readTexture) add(ctx context.Context, r *ReadGPUTextureDataResolveable,
 	id := api.CmdID(r.After)
 	t.Add(id, func(ctx context.Context, out transform.Writer) {
 		s := out.State()
-		c := GetContext(s, r.Thread)
+		c := GetContext(ctx, s, r.Thread)
 
 		if c.IsNil() {
 			err := fmt.Errorf("Attempting to read from texture %v when context does not exist.\n"+
@@ -58,7 +58,7 @@ func (t *readTexture) add(ctx context.Context, r *ReadGPUTextureDataResolveable,
 		dID := id.Derived()
 		cb := CommandBuilder{Thread: r.Thread, Arena: s.Arena}
 
-		tex, ok := c.Objects().Textures().Lookup(TextureId(r.Texture))
+		tex, ok := c.Objects().Textures().Lookup(ctx, TextureId(r.Texture))
 		if !ok {
 			err := fmt.Errorf("Attempting to read from texture %v that does not exist.\n"+
 				"Resolvable: %+v\nTexture: %+v", r.Texture, r, tex)
@@ -66,8 +66,8 @@ func (t *readTexture) add(ctx context.Context, r *ReadGPUTextureDataResolveable,
 			res(nil, err)
 			return
 		}
-		lvl := tex.Levels().Get(GLint(r.Level))
-		layer := lvl.Layers().Get(GLint(r.Layer))
+		lvl := tex.Levels().Get(ctx, GLint(r.Level))
+		layer := lvl.Layers().Get(ctx, GLint(r.Layer))
 		if layer.IsNil() {
 			err := fmt.Errorf("Attempting to read from texture %v (Level: %v/%v, Layer: %v/%v) that does not exist.\n"+
 				"Resolvable: %+v\n"+
@@ -78,7 +78,7 @@ func (t *readTexture) add(ctx context.Context, r *ReadGPUTextureDataResolveable,
 			return
 		}
 
-		tw := newTweaker(out, dID, cb)
+		tw := newTweaker(ctx, out, dID, cb)
 		defer tw.revert(ctx)
 
 		framebufferID := tw.glGenFramebuffer(ctx)

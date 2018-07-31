@@ -47,7 +47,7 @@ func drawCallMesh(ctx context.Context, dc *VkQueueSubmit, p *path.Mesh) (*api.Me
 		return nil, fmt.Errorf("No previous queue submission")
 	}
 
-	lastDrawInfo, ok := c.LastDrawInfos().Lookup(lastQueue.VulkanHandle())
+	lastDrawInfo, ok := c.LastDrawInfos().Lookup(ctx, lastQueue.VulkanHandle())
 	if !ok {
 		return nil, fmt.Errorf("There have been no previous draws")
 	}
@@ -194,7 +194,7 @@ func getIndicesData(ctx context.Context, s *api.GlobalState, thread uint64, boun
 		rawIndicesData := make([]byte, 0, uint64(indexCount)*sizeOfIndex)
 		// In the order of the offsets in the buffer
 		for _, bufOffset := range backingMemoryPieces.Keys() {
-			piece := backingMemoryPieces.Get(bufOffset)
+			piece := backingMemoryPieces.Get(ctx, bufOffset)
 			data, err := piece.DeviceMemory().Data().Slice(
 				uint64(piece.MemoryOffset()),
 				uint64(piece.MemoryOffset()+piece.Size())).Read(ctx, nil, s, nil)
@@ -251,7 +251,7 @@ func getVertexBuffers(ctx context.Context, s *api.GlobalState, thread uint64,
 		return nil, fmt.Errorf("No previous queue submission")
 	}
 
-	lastDrawInfo, ok := c.LastDrawInfos().Lookup(lastQueue.VulkanHandle())
+	lastDrawInfo, ok := c.LastDrawInfos().Lookup(ctx, lastQueue.VulkanHandle())
 	if !ok {
 		return nil, fmt.Errorf("There have been no previous draws")
 	}
@@ -262,12 +262,12 @@ func getVertexBuffers(ctx context.Context, s *api.GlobalState, thread uint64,
 	var err error
 	// For each attribute, get the vertex buffer data
 	for _, attributeIndex := range attributes.Keys() {
-		attribute := attributes.Get(attributeIndex)
+		attribute := attributes.Get(ctx, attributeIndex)
 		if !bindings.Contains(attribute.Binding()) {
 			// TODO(qining): This is an error, should emit error message here.
 			continue
 		}
-		binding := bindings.Get(attribute.Binding())
+		binding := bindings.Get(ctx, attribute.Binding())
 		if !lastDrawInfo.BoundVertexBuffers().Contains(binding.Binding()) {
 			// TODO(qining): This is an error, should emit error message here.
 			continue
@@ -275,7 +275,7 @@ func getVertexBuffers(ctx context.Context, s *api.GlobalState, thread uint64,
 
 		var vertexData []byte
 		if !noData {
-			boundVertexBuffer := lastDrawInfo.BoundVertexBuffers().Get(binding.Binding())
+			boundVertexBuffer := lastDrawInfo.BoundVertexBuffers().Get(ctx, binding.Binding())
 			vertexData, err = getVerticesData(ctx, s, thread, boundVertexBuffer,
 				vertexCount, firstVertex, binding, attribute)
 			if err != nil {
@@ -349,9 +349,9 @@ func getVerticesData(ctx context.Context, s *api.GlobalState, thread uint64,
 	}
 	rawData := make([]byte, 0, fullSize)
 	for _, bo := range backingMemoryPieces.Keys() {
-		ds := uint64(backingMemoryPieces.Get(bo).MemoryOffset())
-		de := uint64(backingMemoryPieces.Get(bo).Size()) + ds
-		data, err := backingMemoryPieces.Get(bo).DeviceMemory().Data().Slice(ds, de).Read(ctx, nil, s, nil)
+		ds := uint64(backingMemoryPieces.Get(ctx, bo).MemoryOffset())
+		de := uint64(backingMemoryPieces.Get(ctx, bo).Size()) + ds
+		data, err := backingMemoryPieces.Get(ctx, bo).DeviceMemory().Data().Slice(ds, de).Read(ctx, nil, s, nil)
 		if err != nil {
 			return nil, err
 		}

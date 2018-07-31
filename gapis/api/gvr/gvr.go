@@ -97,12 +97,12 @@ func (API) GetFramebufferAttachmentInfo(
 	if err != nil {
 		return api.FramebufferAttachmentInfo{}, err
 	}
-	return gles.GetFramebufferAttachmentInfoByID(state, thread, attachment, fb)
+	return gles.GetFramebufferAttachmentInfoByID(ctx, state, thread, attachment, fb)
 }
 
 // Context returns the active context for the given state and thread.
-func (API) Context(s *api.GlobalState, thread uint64) api.Context {
-	return gles.API{}.Context(s, thread)
+func (API) Context(ctx context.Context, s *api.GlobalState, thread uint64) api.Context {
+	return gles.API{}.Context(ctx, s, thread)
 }
 
 // Mesh implements the api.MeshProvider interface.

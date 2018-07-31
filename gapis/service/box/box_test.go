@@ -22,6 +22,7 @@ import (
 	"github.com/google/gapid/core/assert"
 	"github.com/google/gapid/core/data"
 	"github.com/google/gapid/core/data/deep"
+	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/gapis/memory"
 	"github.com/google/gapid/gapis/service/box"
 )
@@ -140,6 +141,7 @@ type DictInContainer struct {
 }
 
 func TestBoxSimpleTypes(t *testing.T) {
+	ctx := log.Testing(t)
 	ty := box.NewType(reflect.TypeOf(StructA{}))
 	got, _ := json.MarshalIndent(ty, "", "  ")
 	expect := `{
@@ -236,20 +238,22 @@ func TestBoxSimpleTypes(t *testing.T) {
     }
   }
 }`
-	assert.For(t, "NewType(structA)").ThatString(got).Equals(expect)
+	assert.For(ctx, "NewType(structA)").ThatString(got).Equals(expect)
 }
 
 func TestBoxUnboxStructB(t *testing.T) {
+	ctx := log.Testing(t)
 	ten := int32(10)
 	val := StructB{Pointer: &ten}
-	boxed := box.NewValue(val)
-	unboxed := boxed.Get()
+	boxed := box.NewValue(ctx, val)
+	unboxed := boxed.Get(ctx)
 	var got StructB
 	reflect.ValueOf(&got).Elem().Set(reflect.ValueOf(unboxed))
-	assert.For(t, "unboxed").That(got).DeepEquals(val)
+	assert.For(ctx, "unboxed").That(got).DeepEquals(val)
 }
 
 func TestBoxUnboxStructA(t *testing.T) {
+	ctx := log.Testing(t)
 	ten := int32(10)
 	val := StructA{
 		Bool:  true,
@@ -263,15 +267,16 @@ func TestBoxUnboxStructA(t *testing.T) {
 		Slice:  []byte{1, 2, 3},
 		Struct: StructB{Pointer: &ten},
 	}
-	boxed := box.NewValue(val)
+	boxed := box.NewValue(ctx, val)
 	var unboxed StructA
-	err := boxed.AssignTo(&unboxed)
-	if assert.For(t, "AssignTo").ThatError(err).Succeeded() {
-		assert.For(t, "unboxed").That(unboxed).DeepEquals(val)
+	err := boxed.AssignTo(ctx, &unboxed)
+	if assert.For(ctx, "AssignTo").ThatError(err).Succeeded() {
+		assert.For(ctx, "unboxed").That(unboxed).DeepEquals(val)
 	}
 }
 
 func TestBoxCyclicType(t *testing.T) {
+	ctx := log.Testing(t)
 	ty := box.NewType(reflect.TypeOf(Cyclic{}))
 	got, _ := json.MarshalIndent(ty, "", "  ")
 	expect := `{
@@ -305,10 +310,11 @@ func TestBoxCyclicType(t *testing.T) {
     }
   }
 }`
-	assert.For(t, "NewType(Struct)").ThatString(got).Equals(expect)
+	assert.For(ctx, "NewType(Struct)").ThatString(got).Equals(expect)
 }
 
 func TestBoxUnboxCyclic(t *testing.T) {
+	ctx := log.Testing(t)
 	val := Cyclic{
 		I: 10,
 		S: &Cyclic{
@@ -318,15 +324,16 @@ func TestBoxUnboxCyclic(t *testing.T) {
 			},
 		},
 	}
-	boxed := box.NewValue(val)
+	boxed := box.NewValue(ctx, val)
 	var unboxed Cyclic
-	err := boxed.AssignTo(&unboxed)
-	if assert.For(t, "AssignTo").ThatError(err).Succeeded() {
-		assert.For(t, "unboxed").That(unboxed).DeepEquals(val)
+	err := boxed.AssignTo(ctx, &unboxed)
+	if assert.For(ctx, "AssignTo").ThatError(err).Succeeded() {
+		assert.For(ctx, "unboxed").That(unboxed).DeepEquals(val)
 	}
 }
 
 func TestBoxMemoryType(t *testing.T) {
+	ctx := log.Testing(t)
 	ty := box.NewType(reflect.TypeOf(Memory{}))
 	got, _ := json.MarshalIndent(ty, "", "  ")
 	expect := `{
@@ -354,23 +361,25 @@ func TestBoxMemoryType(t *testing.T) {
     }
   }
 }`
-	assert.For(t, "NewType(Struct)").ThatString(got).Equals(expect)
+	assert.For(ctx, "NewType(Struct)").ThatString(got).Equals(expect)
 }
 
 func TestBoxUnboxMemory(t *testing.T) {
+	ctx := log.Testing(t)
 	val := Memory{
 		P: memory.BytePtr(1234),
 		S: memory.NewSlice(1234, 1256, 42, 42, 333, reflect.TypeOf(byte(0))),
 	}
-	boxed := box.NewValue(val)
+	boxed := box.NewValue(ctx, val)
 	var unboxed Memory
-	err := boxed.AssignTo(&unboxed)
-	if assert.For(t, "AssignTo").ThatError(err).Succeeded() {
-		assert.For(t, "unboxed").That(unboxed).DeepEquals(val)
+	err := boxed.AssignTo(ctx, &unboxed)
+	if assert.For(ctx, "AssignTo").ThatError(err).Succeeded() {
+		assert.For(ctx, "unboxed").That(unboxed).DeepEquals(val)
 	}
 }
 
 func TestBoxUnboxDictionaryInContainer(t *testing.T) {
+	ctx := log.Testing(t)
 	val := DictInContainer{
 		Struct: StringːString{map[string]string{"cat": "meow", "dog": "woof"}},
 		Slice: []StringːString{
@@ -388,10 +397,10 @@ func TestBoxUnboxDictionaryInContainer(t *testing.T) {
 			},
 		},
 	}
-	boxed := box.NewValue(val)
+	boxed := box.NewValue(ctx, val)
 	var unboxed DictInContainer
-	err := boxed.AssignTo(&unboxed)
-	if assert.For(t, "AssignTo").ThatError(err).Succeeded() {
-		assert.For(t, "unboxed").That(unboxed).DeepEquals(val)
+	err := boxed.AssignTo(ctx, &unboxed)
+	if assert.For(ctx, "AssignTo").ThatError(err).Succeeded() {
+		assert.For(ctx, "unboxed").That(unboxed).DeepEquals(val)
 	}
 }

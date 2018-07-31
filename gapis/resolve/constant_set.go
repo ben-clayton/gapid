@@ -34,7 +34,7 @@ func ConstantSet(ctx context.Context, p *path.ConstantSet) (*service.ConstantSet
 	cs := api.ConstantSets()
 
 	if count := uint32(len(cs.Sets)); p.Index >= count {
-		return nil, errPathOOB(uint64(p.Index), "Index", 0, uint64(count)-1, p)
+		return nil, errPathOOB(ctx, uint64(p.Index), "Index", 0, uint64(count)-1, p)
 	}
 
 	set := cs.Sets[p.Index]

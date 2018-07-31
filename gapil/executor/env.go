@@ -33,12 +33,6 @@ import (
 //
 // #include <string.h>
 //
-// typedef struct pool_t {
-//   uint64_t ref_count;
-//   uint64_t pool_id;
-//   uint64_t env_id;
-// } pool;
-//
 // typedef context* (TCreateContext) (arena*);
 // typedef void     (TDestroyContext) (context*);
 // typedef uint32_t (TFunc) (void* ctx);
@@ -50,12 +44,11 @@ import (
 // // Implemented below.
 // extern void apply_reads(context*);
 // extern void apply_writes(context*);
-// extern void* resolve_pool_data(context*, pool*, uint64_t, gapil_data_access, uint64_t);
+// extern void* resolve_pool_data(context*, uint64_t, uint64_t, gapil_data_access, uint64_t);
 // extern void store_in_database(context*, void*, uint64_t, uint8_t*);
-// extern pool* make_pool(context*, uint64_t);
-// extern void pool_reference(pool*);
-// extern void pool_release(pool*);
-// extern uint64_t pool_id(pool*);
+// extern uint64_t make_pool(context*, uint64_t);
+// extern void pool_reference(context*, uint64_t);
+// extern void pool_release(context*, uint64_t);
 //
 // static void set_callbacks() {
 //   gapil_runtime_callbacks callbacks = {
@@ -66,7 +59,6 @@ import (
 //     .make_pool         = &make_pool,
 //     .pool_reference    = &pool_reference,
 //     .pool_release      = &pool_release,
-//     .pool_id           = &pool_id,
 //   };
 //   gapil_set_runtime_callbacks(&callbacks);
 // }
@@ -136,6 +128,20 @@ func EnvFromNative(c unsafe.Pointer) *Env {
 
 // NewEnv creates a new execution environment for the given capture.
 func (e *Executor) NewEnv(ctx context.Context, c *capture.Capture) *Env {
+	a := arena.New()
+
+	if c == nil {
+		// No capture specified - create a temporary one.
+		p, err := capture.New(ctx, a, "temporary-capture", nil, nil)
+		if err != nil {
+			panic(err)
+		}
+		c, err = capture.ResolveFromPath(ctx, p)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	var id envID
 	var env *Env
 
@@ -153,14 +159,16 @@ func (e *Executor) NewEnv(ctx context.Context, c *capture.Capture) *Env {
 		envs[id] = env
 	}()
 
-	// Create the context and initialize the globals.
-	env.Arena = arena.New()
+	env.Arena = a
 	env.State = c.NewState(ctx)
+	env.bufferArena = arena.New()
+
+	// Create the context and initialize the globals.
 	env.goCtx = ctx
 	env.cCtx = C.create_context((*C.TCreateContext)(e.createContext), (*C.arena)(env.Arena.Pointer))
-	env.cCtx.id = (C.uint32_t)(id)
 	env.goCtx = nil
-	env.bufferArena = arena.New()
+
+	env.cCtx.id = (C.uint32_t)(id)
 
 	// Prime the state objects.
 	globalsBase := uintptr(unsafe.Pointer(env.cCtx.globals))
@@ -243,14 +251,10 @@ func apply_writes(c *C.context) {
 }
 
 //export resolve_pool_data
-func resolve_pool_data(c *C.context, pool *C.pool, ptr C.uint64_t, access C.gapil_data_access, size C.uint64_t) unsafe.Pointer {
+func resolve_pool_data(c *C.context, pool C.uint64_t, ptr C.uint64_t, access C.gapil_data_access, size C.uint64_t) unsafe.Pointer {
 	env := EnvFromNative((unsafe.Pointer)(c))
 	ctx := env.goCtx
-	id := memory.ApplicationPool
-	if pool != nil {
-		id = memory.PoolID(pool.pool_id)
-	}
-	p := env.State.Memory.MustGet(id)
+	p := env.State.Memory.MustGet(memory.PoolID(pool))
 	switch access {
 	case C.GAPIL_READ:
 		buf := env.bufferArena.Allocate(int(size), 1) // TODO: Free these!
@@ -286,37 +290,18 @@ func store_in_database(c *C.context, ptr unsafe.Pointer, size C.uint64_t, idOut 
 }
 
 //export make_pool
-func make_pool(c *C.context, size C.uint64_t) *C.pool {
+func make_pool(c *C.context, size C.uint64_t) C.uint64_t {
 	env := EnvFromNative((unsafe.Pointer)(c))
 	id, _ := env.State.Memory.New()
-	pool := (*C.pool)(env.Arena.Allocate(int(unsafe.Sizeof(C.pool{})), int(unsafe.Alignof(C.pool{}))))
-	pool.ref_count = 1
-	pool.pool_id = C.uint64_t(id)
-	pool.env_id = C.uint64_t(env.id)
-	return pool
+	return C.uint64_t(id)
 }
 
 //export pool_reference
-func pool_reference(pool *C.pool) {
-	if pool.ref_count == 0 {
-		panic("Attempting to reference pool with no references")
-	}
-	pool.ref_count++
+func pool_reference(c *C.context, pool C.uint64_t) {
+	// TODO: Refcounting
 }
 
 //export pool_release
-func pool_release(pool *C.pool) {
-	if pool.ref_count == 0 {
-		panic("Attempting to release pool with no references")
-	}
-	pool.ref_count--
-	if pool.ref_count == 0 {
-		env := envFromID(envID(pool.env_id))
-		env.Arena.Free(unsafe.Pointer(pool))
-	}
-}
-
-//export pool_id
-func pool_id(pool *C.pool) C.uint64_t {
-	return pool.pool_id
+func pool_release(c *C.context, pool C.uint64_t) {
+	// TODO: Refcounting
 }

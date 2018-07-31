@@ -15,6 +15,8 @@
 package resolve
 
 import (
+	"context"
+
 	"github.com/google/gapid/core/data/id"
 	"github.com/google/gapid/core/memory/arena"
 	"github.com/google/gapid/gapis/api"
@@ -23,10 +25,10 @@ import (
 	"github.com/google/gapid/gapis/service/path"
 )
 
-func internalToService(v interface{}) (interface{}, error) {
+func internalToService(ctx context.Context, v interface{}) (interface{}, error) {
 	switch v := v.(type) {
 	case api.Cmd:
-		return api.CmdToService(v)
+		return api.CmdToService(ctx, v)
 	case []*api.ContextInfo:
 		out := &service.Contexts{List: make([]*path.Context, len(v))}
 		for i, c := range v {
@@ -44,12 +46,12 @@ func internalToService(v interface{}) (interface{}, error) {
 	}
 }
 
-func serviceToInternal(a arena.Arena, v interface{}) (interface{}, error) {
+func serviceToInternal(ctx context.Context, a arena.Arena, v interface{}) (interface{}, error) {
 	switch v := v.(type) {
 	case *api.Command:
-		return api.ServiceToCmd(a, v)
+		return api.ServiceToCmd(ctx, a, v)
 	case *box.Value:
-		return v.Get(), nil
+		return v.Get(ctx), nil
 	default:
 		return v, nil
 	}

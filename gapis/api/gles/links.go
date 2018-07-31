@@ -36,11 +36,11 @@ func objects(ctx context.Context, p path.Node) (*path.Field, Contextʳ, error) {
 			return nil, NilContextʳ, err
 		}
 		state := stateObj.(*State)
-		context, ok := state.Contexts().Lookup(thread)
+		context, ok := state.Contexts().Lookup(ctx, thread)
 		if !ok {
 			return nil, NilContextʳ, nil
 		}
-		return state.objectsRoot(cmdPath, thread), context, nil
+		return state.objectsRoot(ctx, cmdPath, thread), context, nil
 	}
 	return nil, NilContextʳ, nil
 }
@@ -57,9 +57,9 @@ func (o AttributeLocation) Link(ctx context.Context, p path.Node) (path.Node, er
 	}
 	return i.
 		Field("VertexArrays").
-		MapIndex(c.Bound().VertexArray().GetID()).
+		MapIndex(ctx, c.Bound().VertexArray().GetID()).
 		Field("VertexAttributeArrays").
-		MapIndex(o), nil
+		MapIndex(ctx, o), nil
 }
 
 // Link returns the link to the buffer object in the state block.
@@ -69,7 +69,7 @@ func (o BufferId) Link(ctx context.Context, p path.Node) (path.Node, error) {
 	if i == nil || !c.Objects().Buffers().Contains(o) {
 		return nil, err
 	}
-	return i.Field("Buffers").MapIndex(o), nil
+	return i.Field("Buffers").MapIndex(ctx, o), nil
 }
 
 // Link returns the link to the framebuffer object in the state block.
@@ -79,7 +79,7 @@ func (o FramebufferId) Link(ctx context.Context, p path.Node) (path.Node, error)
 	if i == nil || !c.Objects().Framebuffers().Contains(o) {
 		return nil, err
 	}
-	return i.Field("Framebuffers").MapIndex(o), nil
+	return i.Field("Framebuffers").MapIndex(ctx, o), nil
 }
 
 // Link returns the link to the program in the state block.
@@ -89,7 +89,7 @@ func (o ProgramId) Link(ctx context.Context, p path.Node) (path.Node, error) {
 	if i == nil || !c.Objects().Programs().Contains(o) {
 		return nil, err
 	}
-	return i.Field("Programs").MapIndex(o), nil
+	return i.Field("Programs").MapIndex(ctx, o), nil
 }
 
 // Link returns the link to the query object in the state block.
@@ -99,7 +99,7 @@ func (o QueryId) Link(ctx context.Context, p path.Node) (path.Node, error) {
 	if i == nil || !c.Objects().Queries().Contains(o) {
 		return nil, err
 	}
-	return i.Field("Queries").MapIndex(o), nil
+	return i.Field("Queries").MapIndex(ctx, o), nil
 }
 
 // Link returns the link to the renderbuffer object in the state block.
@@ -109,7 +109,7 @@ func (o RenderbufferId) Link(ctx context.Context, p path.Node) (path.Node, error
 	if i == nil || !c.Objects().Renderbuffers().Contains(o) {
 		return nil, err
 	}
-	return i.Field("Renderbuffers").MapIndex(o), nil
+	return i.Field("Renderbuffers").MapIndex(ctx, o), nil
 }
 
 // Link returns the link to the shader object in the state block.
@@ -119,7 +119,7 @@ func (o ShaderId) Link(ctx context.Context, p path.Node) (path.Node, error) {
 	if i == nil || !c.Objects().Shaders().Contains(o) {
 		return nil, err
 	}
-	return i.Field("Shaders").MapIndex(o), nil
+	return i.Field("Shaders").MapIndex(ctx, o), nil
 }
 
 // Link returns the link to the texture object in the state block.
@@ -129,7 +129,7 @@ func (o TextureId) Link(ctx context.Context, p path.Node) (path.Node, error) {
 	if i == nil || !c.Objects().Textures().Contains(o) {
 		return nil, err
 	}
-	return i.Field("Textures").MapIndex(o), nil
+	return i.Field("Textures").MapIndex(ctx, o), nil
 }
 
 // Link returns the link to the uniform in the state block.
@@ -155,17 +155,17 @@ func (o UniformIndex) Link(ctx context.Context, p path.Node) (path.Node, error) 
 		program = c.Bound().Program().GetID()
 	}
 
-	prog, ok := c.Objects().Programs().Lookup(program)
+	prog, ok := c.Objects().Programs().Lookup(ctx, program)
 	if !ok || prog.ActiveResources().IsNil() || !prog.ActiveResources().Uniforms().Contains(uint32(o)) {
 		return nil, nil
 	}
 
 	return i.
 		Field("Programs").
-		MapIndex(program).
+		MapIndex(ctx, program).
 		Field("ActiveResources").
 		Field("Uniforms").
-		MapIndex(o), nil
+		MapIndex(ctx, o), nil
 }
 
 // Link returns the link to the uniform in the state block.
@@ -191,16 +191,16 @@ func (o UniformLocation) Link(ctx context.Context, p path.Node) (path.Node, erro
 		program = c.Bound().Program().GetID()
 	}
 
-	prog, ok := c.Objects().Programs().Lookup(program)
+	prog, ok := c.Objects().Programs().Lookup(ctx, program)
 	if !ok || !prog.UniformLocations().Contains(o) {
 		return nil, nil
 	}
 
 	return i.
 		Field("Programs").
-		MapIndex(program).
+		MapIndex(ctx, program).
 		Field("UniformLocations").
-		MapIndex(o), nil
+		MapIndex(ctx, o), nil
 }
 
 // Link returns the link to the vertex array in the state block.
@@ -210,7 +210,7 @@ func (o VertexArrayId) Link(ctx context.Context, p path.Node) (path.Node, error)
 	if i == nil || !c.Objects().VertexArrays().Contains(o) {
 		return nil, err
 	}
-	return i.Field("VertexArrays").MapIndex(o), nil
+	return i.Field("VertexArrays").MapIndex(ctx, o), nil
 }
 
 // Link returns the link to the transform feedback in the state block.
@@ -220,5 +220,5 @@ func (o TransformFeedbackId) Link(ctx context.Context, p path.Node) (path.Node, 
 	if i == nil || !c.Objects().TransformFeedbacks().Contains(o) {
 		return nil, err
 	}
-	return i.Field("TransformFeedbacks").MapIndex(o), nil
+	return i.Field("TransformFeedbacks").MapIndex(ctx, o), nil
 }

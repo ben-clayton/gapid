@@ -164,7 +164,7 @@ func (r *replayer) OnRead(s *compiler.S, slice *codegen.Value, ty *semantic.Slic
 		// We do not wish to overwrite the replayed command's output with the
 		// observed data.
 
-		s.If(isAppPool(slice), func(s *compiler.S) {
+		s.If(r.isAppPool(s, slice), func(s *compiler.S) {
 			slicePtr := s.LocalInit("sliceptr", slice)
 			slice, ns := r.observed(s, slice, ty)
 			dst := slice.Extract(compiler.SliceBase).Cast(r.T.Pointer(r.T.Replay(ty.To)))
@@ -226,7 +226,7 @@ func (r *replayer) read(s *compiler.S, dst, src *codegen.Value, ty semantic.Type
 func (r *replayer) OnWrite(s *compiler.S, slice *codegen.Value, ty *semantic.Slice) {
 	r.reserve(s, slice, ty)
 
-	s.If(isAppPool(slice), func(s *compiler.S) {
+	s.If(r.isAppPool(s, slice), func(s *compiler.S) {
 		if isRemapped(ty.To) {
 			count := slice.Extract(compiler.SliceCount)
 			slicePtr := s.LocalInit("slicePtr", slice)
@@ -300,7 +300,7 @@ func (r *replayer) emitLabel(s *compiler.S) {
 }
 
 func (r *replayer) reserve(s *compiler.S, slice *codegen.Value, ty *semantic.Slice) {
-	s.If(isAppPool(slice), func(s *compiler.S) {
+	s.If(r.isAppPool(s, slice), func(s *compiler.S) {
 		slice, ns := r.observed(s, slice, ty)
 		slicePtr := s.LocalInit("sliceptr", slice)
 		dataPtr := s.Ctx.Index(0, data)
@@ -397,8 +397,9 @@ func (r *replayer) observedPtr(s *compiler.S, addr *codegen.Value, ty semantic.T
 	return r.asmObservedPtr(s, addr, ns)
 }
 
-func isAppPool(slice *codegen.Value) *codegen.Value {
-	return slice.Extract(compiler.SlicePool).IsNull()
+func (r *replayer) isAppPool(s *compiler.S, slice *codegen.Value) *codegen.Value {
+	poolID := slice.Extract(compiler.SlicePool)
+	return s.Equal(poolID, s.Zero(poolID.Type()))
 }
 
 func (r *replayer) isInferredExpression() bool {

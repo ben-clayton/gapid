@@ -13,12 +13,19 @@
 # limitations under the License.
 
 load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
-load("//tools/build:rules.bzl", "api_library", "apic_compile", "apic_template", "cc_copts")
+load("//tools/build:rules.bzl", "api_library", "apic_binary", "apic_compile", "apic_template", "cc_copts", "embed")
+
+filegroup(
+    name = "api_files",
+    srcs = glob(["*.api"]),
+    visibility = ["//visibility:public"],
+)
 
 api_library(
     name = "api",
     api = "cloner.api",
     apiname = "test",
+    includes = [":api_files"],
     visibility = ["//visibility:public"],
 )
 
@@ -34,8 +41,20 @@ apic_template(
     api = ":api",
     templates = [
         "//gapis/api/templates:api",
+        "//gapis/api/templates:definition",
     ],
     visibility = ["//visibility:public"],
+)
+
+apic_binary(
+    name = "api_binary",
+    api = ":api",
+)
+
+embed(
+    name = "embed",
+    srcs = [":api_binary"],
+    package = "test",
 )
 
 # Needed because apic_compile, can't (yet) return a cc provider.
@@ -50,6 +69,7 @@ apic_template(
     api = ":api",
     templates = [
         "//gapis/api/templates:ctypes_h",
+        "//gapis/api/templates:definition",
     ],
 )
 
@@ -64,6 +84,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "shims.go",
+        ":embed",  # keep
         ":generated",  # keep
     ],
     cdeps = [
@@ -85,7 +106,9 @@ go_library(
         "//core/math/u64:go_default_library",  # keep
         "//core/memory/arena:go_default_library",  # keep
         "//core/os/device:go_default_library",  # keep
+        "//gapil/bapi:go_default_library",  # keep
         "//gapil/constset:go_default_library",
+        "//gapil/executor:go_default_library",  # keep
         "//gapis/api:go_default_library",
         "//gapis/memory:go_default_library",  # keep
         "//gapis/replay:go_default_library",  # keep
@@ -105,6 +128,9 @@ go_test(
         "//core/assert:go_default_library",
         "//core/log:go_default_library",
         "//core/memory/arena:go_default_library",
+        "//gapil/executor:go_default_library",
+        "//gapis/capture:go_default_library",
+        "//gapis/database:go_default_library",
         "//gapis/memory:go_default_library",
     ],
 )

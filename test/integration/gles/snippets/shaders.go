@@ -57,9 +57,9 @@ func (b *Builder) AddUniformSampler(ctx context.Context, prog gles.ProgramId, na
 	uniform.SetType(gles.GLenum_GL_SAMPLER_2D)
 	uniform.SetName(name)
 	uniform.SetArraySize(1)
-	uniform.Locations().Add(0, gles.GLint(index))
+	uniform.Locations().Add(ctx, 0, gles.GLint(index))
 
-	resources.DefaultUniformBlock().Add(gles.UniformIndex(index), uniform)
+	resources.DefaultUniformBlock().Add(ctx, gles.UniformIndex(index), uniform)
 
 	location := gles.UniformLocation(index)
 	b.Add(gles.GetUniformLocation(ctx, b.state, b.CB, prog, name, location))
@@ -77,9 +77,9 @@ func (b *Builder) AddAttributeVec3(ctx context.Context, prog gles.ProgramId, nam
 	attribute.SetType(gles.GLenum_GL_FLOAT_VEC3)
 	attribute.SetName(name)
 	attribute.SetArraySize(1)
-	attribute.Locations().Add(0, gles.GLint(index))
+	attribute.Locations().Add(ctx, 0, gles.GLint(index))
 
-	resources.ProgramInputs().Add(uint32(index), attribute)
+	resources.ProgramInputs().Add(ctx, uint32(index), attribute)
 
 	location := gles.AttributeLocation(index)
 	b.Add(gles.GetAttribLocation(ctx, b.state, b.CB, prog, name, location))

@@ -90,13 +90,13 @@ func (c *client) Get(ctx context.Context, p *path.Any) (interface{}, error) {
 	if err := res.GetError(); err != nil {
 		return nil, err.Get()
 	}
-	return res.GetValue().Get(), nil
+	return res.GetValue().Get(ctx), nil
 }
 
 func (c *client) Set(ctx context.Context, p *path.Any, v interface{}) (*path.Any, error) {
 	res, err := c.client.Set(ctx, &service.SetRequest{
 		Path:  p,
-		Value: service.NewValue(v),
+		Value: service.NewValue(ctx, v),
 	})
 	if err != nil {
 		return nil, err

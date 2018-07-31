@@ -25,17 +25,21 @@ import (
 	"github.com/google/gapid/core/data/protoconv"
 	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/core/memory/arena"
+	"github.com/google/gapid/gapil/executor"
+	"github.com/google/gapid/gapis/database"
 )
 
 func TestReferences(t *testing.T) {
 	ctx := log.Testing(t)
+	ctx = database.Put(ctx, database.NewInMemory(ctx))
+	ctx = executor.PutEnv(ctx, executor.NewEnv(ctx, nil, executor.Config{}))
 	assert := assert.To(t)
 
 	a := arena.New()
 	defer a.Dispose()
 
 	ctx = arena.Put(ctx, a)
-	complex := BuildComplex(a)
+	complex := BuildComplex(ctx)
 
 	// complex -> protoA -> decoded -> protoB
 
@@ -53,8 +57,8 @@ func TestReferences(t *testing.T) {
 
 	assert.For("Object ref").That(decoded.RefObjectAlias()).Equals(decoded.RefObject())
 	assert.For("Map ref").That(decoded.EntriesAlias()).Equals(decoded.Entries())
-	assert.For("NestedRefs[6]").That(decoded.NestedRefs().Get(6).Ref()).Equals(decoded.RefObject())
-	assert.For("NestedRefs[7]").That(decoded.NestedRefs().Get(7).Ref()).Equals(decoded.RefObject())
+	assert.For("NestedRefs[6]").That(decoded.NestedRefs().Get(ctx, 6).Ref()).Equals(decoded.RefObject())
+	assert.For("NestedRefs[7]").That(decoded.NestedRefs().Get(ctx, 7).Ref()).Equals(decoded.RefObject())
 
 	protoB, err := protoconv.ToProto(ctx, decoded)
 	if !assert.For("ToProtoB").ThatError(err).Succeeded() {
@@ -64,38 +68,42 @@ func TestReferences(t *testing.T) {
 	assert.For("Protos").TestDeepEqual(protoA, protoB)
 
 	// Test that all decoded references see changes to their referenced objects.
-	decoded.RefObject().SetValue(55)               // was 42
-	decoded.Entries().Add(4, NewTestObject(a, 33)) // was 50
+	decoded.RefObject().SetValue(55)                    // was 42
+	decoded.Entries().Add(ctx, 4, NewTestObject(a, 33)) // was 50
 	assert.For("Object ref").That(decoded.RefObjectAlias()).Equals(decoded.RefObject())
 	assert.For("Map ref").That(decoded.EntriesAlias()).Equals(decoded.Entries())
-	assert.For("RefEntries").That(decoded.RefEntries().Get(0)).Equals(decoded.RefObject())
-	assert.For("NestedRefs[6]").That(decoded.NestedRefs().Get(6).Ref()).Equals(decoded.RefObject())
-	assert.For("NestedRefs[7]").That(decoded.NestedRefs().Get(7).Ref()).Equals(decoded.RefObject())
+	assert.For("RefEntries").That(decoded.RefEntries().Get(ctx, 0)).Equals(decoded.RefObject())
+	assert.For("NestedRefs[6]").That(decoded.NestedRefs().Get(ctx, 6).Ref()).Equals(decoded.RefObject())
+	assert.For("NestedRefs[7]").That(decoded.NestedRefs().Get(ctx, 7).Ref()).Equals(decoded.RefObject())
 }
 
 func TestEquals(t *testing.T) {
 	ctx := log.Testing(t)
+	ctx = database.Put(ctx, database.NewInMemory(ctx))
+	ctx = executor.PutEnv(ctx, executor.NewEnv(ctx, nil, executor.Config{}))
 
 	a := arena.New()
 	defer a.Dispose()
 
 	ctx = arena.Put(ctx, a)
-	complex := BuildComplex(a)
+	complex := BuildComplex(ctx)
 
 	check(ctx, complex, complex, "equals")
 }
 
 func TestCloneReferences(t *testing.T) {
 	ctx := log.Testing(t)
+	ctx = database.Put(ctx, database.NewInMemory(ctx))
+	ctx = executor.PutEnv(ctx, executor.NewEnv(ctx, nil, executor.Config{}))
 	assert := assert.To(t)
 
 	a := arena.New()
 	defer a.Dispose()
 
 	ctx = arena.Put(ctx, a)
-	complex := BuildComplex(a)
+	complex := BuildComplex(ctx)
 
-	cloned := complex.Clone(a)
+	cloned := complex.Clone(ctx)
 	check(ctx, cloned.Data(), complex.Data(), "Data")
 	check(ctx, cloned.Object(), complex.Object(), "Object")
 	check(ctx, cloned.ObjectArray(), complex.ObjectArray(), "ObjectArray")
@@ -111,7 +119,7 @@ func TestCloneReferences(t *testing.T) {
 	assert.For("RefEntries.Len").That(cloned.RefEntries().Len()).Equals(complex.RefEntries().Len())
 	for _, k := range complex.RefEntries().Keys() {
 		check(ctx, cloned.RefEntries().Contains(k), true, "RefEntries[%d]", k)
-		e, a := complex.RefEntries().Get(k), cloned.RefEntries().Get(k)
+		e, a := complex.RefEntries().Get(ctx, k), cloned.RefEntries().Get(ctx, k)
 		if e.IsNil() {
 			check(ctx, a.IsNil(), true, "RefEntries[%d]", k)
 		} else {
@@ -135,7 +143,7 @@ func TestCloneReferences(t *testing.T) {
 	check(ctx, cloned.NestedRefs().Len(), complex.NestedRefs().Len(), "NestedRefs.Len")
 	for _, k := range complex.NestedRefs().Keys() {
 		check(ctx, cloned.NestedRefs().Contains(k), true, "NestedRefs[%d]", k)
-		e, a := complex.NestedRefs().Get(k), cloned.NestedRefs().Get(k)
+		e, a := complex.NestedRefs().Get(ctx, k), cloned.NestedRefs().Get(ctx, k)
 		check(ctx, a.IsNil(), e.IsNil(), "NestedRefs[%d]", k)
 		if !e.IsNil() {
 			check(ctx, a.Ref().IsNil(), e.Ref().IsNil(), "NestedRefs[%d].ref", k)
@@ -146,13 +154,13 @@ func TestCloneReferences(t *testing.T) {
 	}
 
 	// Test that all cloned references see changes to their referenced objects.
-	cloned.RefObject().SetValue(55)               // was 42
-	cloned.Entries().Add(4, NewTestObject(a, 33)) // was 50
+	cloned.RefObject().SetValue(55)                    // was 42
+	cloned.Entries().Add(ctx, 4, NewTestObject(a, 33)) // was 50
 	check(ctx, cloned.RefObjectAlias(), cloned.RefObject(), "Object ref")
 	check(ctx, cloned.EntriesAlias(), cloned.Entries(), "Map ref")
-	check(ctx, cloned.RefEntries().Get(0), cloned.RefObject(), "RefEntries")
-	check(ctx, cloned.NestedRefs().Get(6).Ref(), cloned.RefObject(), "NestedRefs[6]")
-	check(ctx, cloned.NestedRefs().Get(7).Ref(), cloned.RefObject(), "NestedRefs[7]")
+	check(ctx, cloned.RefEntries().Get(ctx, 0), cloned.RefObject(), "RefEntries")
+	check(ctx, cloned.NestedRefs().Get(ctx, 6).Ref(), cloned.RefObject(), "NestedRefs[6]")
+	check(ctx, cloned.NestedRefs().Get(ctx, 7).Ref(), cloned.RefObject(), "NestedRefs[7]")
 }
 
 func check(ctx context.Context, got, expected interface{}, name string, fmt ...interface{}) bool {
@@ -165,8 +173,8 @@ func check(ctx context.Context, got, expected interface{}, name string, fmt ...i
 		}
 
 		for _, k := range e.Keys() {
-			e := e.Get(k)
-			g, ok := g.Lookup(k)
+			e := e.Get(ctx, k)
+			g, ok := g.Lookup(ctx, k)
 			if !assert.For(ctx, "%v.Contains(%v)", name, k).That(ok).Equals(true) {
 				return false
 			}
@@ -176,7 +184,7 @@ func check(ctx context.Context, got, expected interface{}, name string, fmt ...i
 		}
 
 		for _, k := range g.Keys() {
-			_, ok := e.Lookup(k)
+			_, ok := e.Lookup(ctx, k)
 			if !assert.For(ctx, "%v.Missing(%v)", name, k).That(ok).Equals(true) {
 				return false
 			}

@@ -34,7 +34,7 @@ func wireframe(ctx context.Context, framebuffer FramebufferId) transform.Transfo
 	return transform.Transform("Wireframe", func(ctx context.Context, id api.CmdID, cmd api.Cmd, out transform.Writer) {
 		if dc, ok := cmd.(drawCall); ok {
 			s := out.State()
-			c := GetContext(s, cmd.Thread())
+			c := GetContext(ctx, s, cmd.Thread())
 
 			fb := c.Bound().DrawFramebuffer()
 			if fb.IsNil() {
@@ -50,7 +50,7 @@ func wireframe(ctx context.Context, framebuffer FramebufferId) transform.Transfo
 			dID := id.Derived()
 			cb := CommandBuilder{Thread: cmd.Thread(), Arena: s.Arena}
 
-			t := newTweaker(out, dID, cb)
+			t := newTweaker(ctx, out, dID, cb)
 			defer t.revert(ctx)
 
 			t.glEnable(ctx, GLenum_GL_LINE_SMOOTH)
@@ -79,7 +79,7 @@ func wireframeOverlay(ctx context.Context, i api.CmdID) transform.Transformer {
 
 				dID := id.Derived()
 				cb := CommandBuilder{Thread: cmd.Thread(), Arena: s.Arena}
-				t := newTweaker(out, dID, cb)
+				t := newTweaker(ctx, out, dID, cb)
 				t.glEnable(ctx, GLenum_GL_POLYGON_OFFSET_LINE)
 				t.glPolygonOffset(ctx, -1, -1)
 				t.glEnable(ctx, GLenum_GL_BLEND)
@@ -102,7 +102,7 @@ func wireframeOverlay(ctx context.Context, i api.CmdID) transform.Transformer {
 }
 
 func drawWireframe(ctx context.Context, i api.CmdID, dc drawCall, s *api.GlobalState, out transform.Writer) error {
-	c := GetContext(s, dc.Thread())
+	c := GetContext(ctx, s, dc.Thread())
 	cb := CommandBuilder{Thread: dc.Thread(), Arena: s.Arena}
 	dID := i.Derived()
 

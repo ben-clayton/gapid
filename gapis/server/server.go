@@ -133,7 +133,7 @@ func (s *server) CheckForUpdates(ctx context.Context, includePrereleases bool) (
 	}
 	if mostRecent == nil {
 		return nil, &service.ErrDataUnavailable{
-			Reason:    messages.NoNewBuildsAvailable(),
+			Reason:    messages.NoNewBuildsAvailable(ctx),
 			Transient: true,
 		}
 	}

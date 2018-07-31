@@ -68,14 +68,6 @@ const (
 	SliceCount = "count"
 )
 
-// Field names for the pool_t runtime type.
-const (
-	PoolRefCount = "ref_count"
-	PoolID       = "id"
-	PoolSize     = "size"
-	PoolBuffer   = "buffer"
-)
-
 // Field names for the map_t runtime type.
 const (
 	MapRefCount = "ref_count"

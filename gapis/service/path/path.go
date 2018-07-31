@@ -15,6 +15,7 @@
 package path
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"reflect"
@@ -503,8 +504,8 @@ func NewArrayIndex(idx uint64, a Node) *ArrayIndex {
 }
 
 // NewMapIndex returns a new MapIndex path.
-func NewMapIndex(k interface{}, m Node) *MapIndex {
-	if v := box.NewValue(k); v != nil {
+func NewMapIndex(ctx context.Context, k interface{}, m Node) *MapIndex {
+	if v := box.NewValue(ctx, k); v != nil {
 		out := &MapIndex{Key: &MapIndex_Box{v}}
 		out.SetParent(m)
 		return out
@@ -699,29 +700,33 @@ func (n *State) Tree() *StateTree {
 	return &StateTree{State: n}
 }
 
-func (n *GlobalState) Field(name string) *Field       { return NewField(name, n) }
-func (n *State) Field(name string) *Field             { return NewField(name, n) }
-func (n *Parameter) ArrayIndex(i uint64) *ArrayIndex  { return NewArrayIndex(i, n) }
-func (n *Parameter) Field(name string) *Field         { return NewField(name, n) }
-func (n *Parameter) MapIndex(k interface{}) *MapIndex { return NewMapIndex(k, n) }
-func (n *Parameter) Slice(s, e uint64) *Slice         { return NewSlice(s, e, n) }
-func (n *Field) ArrayIndex(i uint64) *ArrayIndex      { return NewArrayIndex(i, n) }
-func (n *Field) Field(name string) *Field             { return NewField(name, n) }
-func (n *Field) MapIndex(k interface{}) *MapIndex     { return NewMapIndex(k, n) }
-func (n *Field) Slice(s, e uint64) *Slice             { return NewSlice(s, e, n) }
-func (n *MapIndex) ArrayIndex(i uint64) *ArrayIndex   { return NewArrayIndex(i, n) }
-func (n *MapIndex) Field(name string) *Field          { return NewField(name, n) }
-func (n *MapIndex) MapIndex(k interface{}) *MapIndex  { return NewMapIndex(k, n) }
-func (n *MapIndex) Slice(s, e uint64) *Slice          { return NewSlice(s, e, n) }
-func (n *Slice) ArrayIndex(i uint64) *ArrayIndex      { return NewArrayIndex(i, n) }
-func (n *Slice) Slice(s, e uint64) *Slice             { return NewSlice(s, e, n) }
+func (n *GlobalState) Field(name string) *Field      { return NewField(name, n) }
+func (n *State) Field(name string) *Field            { return NewField(name, n) }
+func (n *Parameter) ArrayIndex(i uint64) *ArrayIndex { return NewArrayIndex(i, n) }
+func (n *Parameter) Field(name string) *Field        { return NewField(name, n) }
+func (n *Parameter) MapIndex(ctx context.Context, k interface{}) *MapIndex {
+	return NewMapIndex(ctx, k, n)
+}
+func (n *Parameter) Slice(s, e uint64) *Slice                          { return NewSlice(s, e, n) }
+func (n *Field) ArrayIndex(i uint64) *ArrayIndex                       { return NewArrayIndex(i, n) }
+func (n *Field) Field(name string) *Field                              { return NewField(name, n) }
+func (n *Field) MapIndex(ctx context.Context, k interface{}) *MapIndex { return NewMapIndex(ctx, k, n) }
+func (n *Field) Slice(s, e uint64) *Slice                              { return NewSlice(s, e, n) }
+func (n *MapIndex) ArrayIndex(i uint64) *ArrayIndex                    { return NewArrayIndex(i, n) }
+func (n *MapIndex) Field(name string) *Field                           { return NewField(name, n) }
+func (n *MapIndex) MapIndex(ctx context.Context, k interface{}) *MapIndex {
+	return NewMapIndex(ctx, k, n)
+}
+func (n *MapIndex) Slice(s, e uint64) *Slice     { return NewSlice(s, e, n) }
+func (n *Slice) ArrayIndex(i uint64) *ArrayIndex { return NewArrayIndex(i, n) }
+func (n *Slice) Slice(s, e uint64) *Slice        { return NewSlice(s, e, n) }
 
-func (n *MapIndex) KeyValue() interface{} {
+func (n *MapIndex) KeyValue(ctx context.Context) interface{} {
 	switch k := protoutil.OneOf(n.Key).(type) {
 	case nil:
 		return nil
 	case *box.Value:
-		return k.Get()
+		return k.Get(ctx)
 	default:
 		panic(fmt.Errorf("Unsupport MapIndex key type %T", k))
 	}
