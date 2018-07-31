@@ -19,13 +19,15 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/google/gapid/core/codegen"
+	"github.com/google/gapid/core/log"
+	"github.com/google/gapid/core/os/device"
 	"github.com/google/gapid/gapil/compiler"
 	"github.com/google/gapid/gapil/semantic"
 	"github.com/google/gapid/gapis/api"
-	"github.com/google/gapid/gapis/capture"
 )
 
 // Executor is used to create execution environments for a compiled program.
@@ -49,11 +51,13 @@ type apiExec struct {
 
 // Config is a configuration for an executor.
 type Config struct {
-	Execute bool
+	CaptureABI *device.ABI
+	Execute    bool
+	Plugins    []compiler.Plugin
 }
 
 // NewEnv returns a new environment for an executor with the given config.
-func NewEnv(ctx context.Context, capture *capture.Capture, cfg Config) *Env {
+func NewEnv(ctx context.Context, abi *device.ABI, cfg Config) *Env {
 	key := fmt.Sprintf("%v", cfg)
 	obj, existing := cache.LoadOrStore(key, &apiExec{ready: make(chan struct{})})
 	ae := obj.(*apiExec)
@@ -72,9 +76,16 @@ func NewEnv(ctx context.Context, capture *capture.Capture, cfg Config) *Env {
 			}
 		}
 		settings := compiler.Settings{
+			CaptureABI:  abi,
 			EmitContext: true,
 			EmitExec:    cfg.Execute,
+			Plugins:     cfg.Plugins,
 		}
+
+		log.I(ctx, "Compiling APIs with given settings: %+v", settings)
+		start := time.Now()
+		defer func() { log.I(ctx, "Compile finished in %v", time.Since(start)) }()
+
 		prog, err := compiler.Compile(sems, mappings, settings)
 		if err != nil {
 			panic(err)
@@ -84,7 +95,7 @@ func NewEnv(ctx context.Context, capture *capture.Capture, cfg Config) *Env {
 	} else {
 		<-ae.ready
 	}
-	return ae.exec.NewEnv(ctx, capture)
+	return ae.exec.NewEnv(ctx)
 }
 
 // NewExecutor returns a new and initialized Executor for the given program.

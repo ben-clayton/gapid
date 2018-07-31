@@ -24,7 +24,6 @@ import (
 	"github.com/google/gapid/core/memory/arena"
 	"github.com/google/gapid/gapil/compiler"
 	"github.com/google/gapid/gapis/api"
-	"github.com/google/gapid/gapis/capture"
 	"github.com/google/gapid/gapis/database"
 	"github.com/google/gapid/gapis/memory"
 )
@@ -72,7 +71,7 @@ func init() {
 // Env is the go execution environment.
 type Env struct {
 	// Arena is the memory arena used by this execution environment.
-	Arena arena.Arena
+	Arena arena.Arena // TODO: Remove - already stored as State.Arena.
 
 	// Executor is the parent executor.
 	Executor *Executor
@@ -127,21 +126,7 @@ func EnvFromNative(c unsafe.Pointer) *Env {
 }
 
 // NewEnv creates a new execution environment for the given capture.
-func (e *Executor) NewEnv(ctx context.Context, c *capture.Capture) *Env {
-	a := arena.New()
-
-	if c == nil {
-		// No capture specified - create a temporary one.
-		p, err := capture.New(ctx, a, "temporary-capture", nil, nil)
-		if err != nil {
-			panic(err)
-		}
-		c, err = capture.ResolveFromPath(ctx, p)
-		if err != nil {
-			panic(err)
-		}
-	}
-
+func (e *Executor) NewEnv(ctx context.Context) *Env {
 	var id envID
 	var env *Env
 
@@ -159,22 +144,27 @@ func (e *Executor) NewEnv(ctx context.Context, c *capture.Capture) *Env {
 		envs[id] = env
 	}()
 
-	env.Arena = a
-	env.State = c.NewState(ctx)
+	env.Arena = arena.New()
+	env.State = &api.GlobalState{
+		Arena:  env.Arena,
+		APIs:   map[api.ID]api.State{},
+		Memory: memory.NewPools(),
+	}
 	env.bufferArena = arena.New()
 
 	// Create the context and initialize the globals.
 	env.goCtx = ctx
 	env.cCtx = C.create_context((*C.TCreateContext)(e.createContext), (*C.arena)(env.Arena.Pointer))
+	env.cCtx.id = (C.uint32_t)(id)
 	env.goCtx = nil
 
-	env.cCtx.id = (C.uint32_t)(id)
-
 	// Prime the state objects.
-	globalsBase := uintptr(unsafe.Pointer(env.cCtx.globals))
-	for api, offset := range e.globalsAPIOffset {
-		addr := globalsBase + offset
-		env.State.APIs[api.ID()] = api.State(env.Arena, unsafe.Pointer(addr))
+	if env.cCtx.globals != nil {
+		globalsBase := uintptr(unsafe.Pointer(env.cCtx.globals))
+		for api, offset := range e.globalsAPIOffset {
+			addr := globalsBase + offset
+			env.State.APIs[api.ID()] = api.State(env.Arena, unsafe.Pointer(addr))
+		}
 	}
 
 	return env

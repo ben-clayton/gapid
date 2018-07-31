@@ -17,6 +17,7 @@ package resolve
 import (
 	"context"
 
+	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/capture"
 	"github.com/google/gapid/gapis/extensions"
@@ -26,10 +27,16 @@ import (
 
 // Events resolves and returns the event list from the path p.
 func Events(ctx context.Context, p *path.Events) (*service.Events, context.Context, error) {
-	c, err := capture.ResolveFromPath(ctx, p.Capture)
+	ctx = capture.Put(ctx, p.Capture)
+
+	c, err := capture.Resolve(ctx)
 	if err != nil {
 		return nil, ctx, err
 	}
+
+	env := c.NewEnv(ctx, executor.Config{Execute: true})
+	defer env.Dispose()
+	ctx = executor.PutEnv(ctx, env)
 
 	sd, err := SyncData(ctx, p.Capture)
 	if err != nil {

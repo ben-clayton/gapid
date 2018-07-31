@@ -23,6 +23,7 @@ import (
 	"github.com/google/gapid/core/data/dictionary"
 	"github.com/google/gapid/core/data/id"
 	"github.com/google/gapid/core/math/u64"
+	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/database"
 	"github.com/google/gapid/gapis/memory"
@@ -98,7 +99,13 @@ func StateTreeNode(ctx context.Context, p *path.StateTreeNode) (*service.StateTr
 	if err != nil {
 		return nil, ctx, err
 	}
-	n, err := stateTreeNode(ctx, boxed.(*stateTree), p)
+	tree := boxed.(*stateTree)
+
+	env := executor.NewEnv(ctx, nil, executor.Config{})
+	defer env.Dispose()
+	ctx = executor.PutEnv(ctx, env)
+
+	n, err := stateTreeNode(ctx, tree, p)
 	return n, ctx, err
 }
 
@@ -109,7 +116,13 @@ func StateTreeNodeForPath(ctx context.Context, p *path.StateTreeNodeForPath) (*p
 	if err != nil {
 		return nil, ctx, err
 	}
-	indices, err := stateTreeNodePath(ctx, boxed.(*stateTree), p.Member.Node())
+	tree := boxed.(*stateTree)
+
+	env := executor.NewEnv(ctx, nil, executor.Config{})
+	defer env.Dispose()
+	ctx = executor.PutEnv(ctx, env)
+
+	indices, err := stateTreeNodePath(ctx, tree, p.Member.Node())
 	if err != nil {
 		return nil, ctx, err
 	}

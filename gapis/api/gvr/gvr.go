@@ -151,8 +151,8 @@ func (API) RecoverMidExecutionCommand(ctx context.Context, c *path.Capture, i in
 // MutateSubcommands mutates the given Cmd and calls callbacks for subcommands
 // called before and after executing each subcommand callback.
 func (API) MutateSubcommands(ctx context.Context, id api.CmdID, cmd api.Cmd, s *api.GlobalState,
-	preSubCmdCallback func(*api.GlobalState, api.SubCmdIdx, api.Cmd),
-	postSubCmdCallback func(*api.GlobalState, api.SubCmdIdx, api.Cmd)) error {
+	preSubCmdCallback func(context.Context, *api.GlobalState, api.SubCmdIdx, api.Cmd),
+	postSubCmdCallback func(context.Context, *api.GlobalState, api.SubCmdIdx, api.Cmd)) error {
 
 	return nil
 }

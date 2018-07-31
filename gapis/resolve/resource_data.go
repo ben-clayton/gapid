@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/gapid/core/data/id"
 	"github.com/google/gapid/core/log"
+	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/api/sync"
 	"github.com/google/gapid/gapis/capture"
@@ -74,7 +75,13 @@ func buildResources(ctx context.Context, p *path.Command) (*ResolvedResources, e
 	if err != nil {
 		return nil, err
 	}
-	state := capture.NewUninitializedState(ctx, ranges)
+
+	env := capture.NewCustomEnv(ctx, ranges, false, executor.Config{Execute: true})
+	defer env.Dispose()
+	ctx = executor.PutEnv(ctx, env)
+
+	state := env.State
+
 	var currentCmdIndex uint64
 	var currentCmdResourceCount int
 	idMap := api.ResourceMap{}

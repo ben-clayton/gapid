@@ -318,7 +318,7 @@ func newEnv(ctx context.Context) (context.Context, arena.Arena) {
 		panic(err)
 	}
 
-	env := executor.NewEnv(ctx, c, executor.Config{})
+	env := c.NewEnv(ctx, executor.Config{})
 
 	ctx = executor.PutEnv(ctx, env)
 

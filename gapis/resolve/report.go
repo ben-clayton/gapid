@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/gapid/core/app/analytics"
 	"github.com/google/gapid/core/log"
+	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/capture"
 	"github.com/google/gapid/gapis/database"
@@ -57,6 +58,10 @@ func (r *ReportResolvable) Resolve(ctx context.Context) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	env := c.NewEnv(ctx, executor.Config{Execute: true})
+	defer env.Dispose()
+	ctx = executor.PutEnv(ctx, env)
 
 	defer analytics.SendTiming("resolve", "report")(analytics.Size(len(c.Commands)))
 

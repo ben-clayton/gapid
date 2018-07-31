@@ -23,6 +23,7 @@ import (
 	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/core/os/device"
 	"github.com/google/gapid/core/os/device/bind"
+	exec "github.com/google/gapid/gapil/executor"
 	gapir "github.com/google/gapid/gapir/client"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/capture"
@@ -114,6 +115,7 @@ func (m *Manager) execute(
 	}
 
 	ctx = capture.Put(ctx, capturePath)
+	ctx = exec.PutEnv(ctx, c.NewEnv(ctx, exec.Config{}))
 	ctx = log.V{
 		"capture": captureID,
 		"device":  d.Instance().GetName(),

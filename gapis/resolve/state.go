@@ -42,7 +42,7 @@ func GlobalState(ctx context.Context, p *path.GlobalState) (*api.GlobalState, co
 		return nil, ctx, err
 	}
 
-	env := executor.NewEnv(ctx, c, executor.Config{Execute: true})
+	env := c.NewEnv(ctx, executor.Config{Execute: true})
 	ctx = executor.PutEnv(ctx, env)
 
 	sd, err := SyncData(ctx, p.After.Capture)

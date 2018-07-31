@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/gapid/core/data/id"
 	"github.com/google/gapid/core/log"
+	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/capture"
 	"github.com/google/gapid/gapis/database"
@@ -45,6 +46,10 @@ func (r *ResourcesResolvable) Resolve(ctx context.Context) (interface{}, error) 
 	if err != nil {
 		return nil, err
 	}
+
+	env := c.NewEnv(ctx, executor.Config{Execute: true})
+	defer env.Dispose()
+	ctx = executor.PutEnv(ctx, env)
 
 	resources := []trackedResource{}
 	seen := map[api.Resource]int{}

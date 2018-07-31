@@ -66,7 +66,7 @@ func TestGlVertexAttribPointerCompatTest(t *testing.T) {
 		panic(err)
 	}
 
-	ctx = executor.PutEnv(ctx, executor.NewEnv(ctx, c, executor.Config{}))
+	ctx = executor.PutEnv(ctx, c.NewEnv(ctx, executor.Config{}))
 
 	ctx = gles.PutUnusedIDMap(ctx)
 

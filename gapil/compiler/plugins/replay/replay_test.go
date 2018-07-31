@@ -31,7 +31,6 @@ import (
 	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapil/semantic"
 	"github.com/google/gapid/gapis/api"
-	"github.com/google/gapid/gapis/capture"
 	"github.com/google/gapid/gapis/database"
 	"github.com/google/gapid/gapis/replay/opcode"
 	"github.com/google/gapid/gapis/replay/protocol"
@@ -338,14 +337,8 @@ func (t test) run(ctx context.Context) (succeeded bool) {
 		return false
 	}
 
-	c := &capture.Capture{
-		Header: &capture.Header{
-			ABI: program.Settings.CaptureABI,
-		},
-	}
-
 	exec := executor.NewExecutor(program, false)
-	env := exec.NewEnv(ctx, c)
+	env := exec.NewEnv(ctx)
 	defer env.Dispose()
 
 	for i, f := range a.Functions {

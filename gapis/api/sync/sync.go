@@ -23,6 +23,7 @@ package sync
 import (
 	"context"
 
+	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/api/transform"
 	"github.com/google/gapid/gapis/capture"
@@ -53,8 +54,8 @@ type SynchronizedAPI interface {
 	// attached to that Cmd. preSubCmdCallback and postSubCmdCallback will be
 	// called before and after executing each subcommand callback.
 	MutateSubcommands(ctx context.Context, id api.CmdID, cmd api.Cmd, s *api.GlobalState,
-		preSubCmdCallback func(*api.GlobalState, api.SubCmdIdx, api.Cmd),
-		postSubCmdCallback func(*api.GlobalState, api.SubCmdIdx, api.Cmd)) error
+		preSubCmdCallback func(context.Context, *api.GlobalState, api.SubCmdIdx, api.Cmd),
+		postSubCmdCallback func(context.Context, *api.GlobalState, api.SubCmdIdx, api.Cmd)) error
 
 	// FlattenSubcommandIdx returns the flatten command id for the subcommand
 	// specified by the given SubCmdIdx. If flattening succeeded, the flatten
@@ -91,6 +92,10 @@ func MutationCmdsFor(ctx context.Context, c *path.Capture, data *Data, cmds []ap
 	if err != nil {
 		return nil, err
 	}
+
+	env := rc.NewEnv(ctx, executor.Config{Execute: true})
+	defer env.Dispose()
+	ctx = executor.PutEnv(ctx, env)
 
 	fullCommand := api.SubCmdIdx{uint64(id)}
 	fullCommand = append(fullCommand, subindex...)
@@ -142,9 +147,9 @@ func MutationCmdsFor(ctx context.Context, c *path.Capture, data *Data, cmds []ap
 // pre-subcommand callback and the post-subcommand callback will be called
 // before and after calling each subcommand callback function.
 func MutateWithSubcommands(ctx context.Context, c *path.Capture, cmds []api.Cmd,
-	postCmdCb func(*api.GlobalState, api.SubCmdIdx, api.Cmd),
-	preSubCmdCb func(*api.GlobalState, api.SubCmdIdx, api.Cmd),
-	postSubCmdCb func(*api.GlobalState, api.SubCmdIdx, api.Cmd)) error {
+	postCmdCb func(context.Context, *api.GlobalState, api.SubCmdIdx, api.Cmd),
+	preSubCmdCb func(context.Context, *api.GlobalState, api.SubCmdIdx, api.Cmd),
+	postSubCmdCb func(context.Context, *api.GlobalState, api.SubCmdIdx, api.Cmd)) error {
 	// This is where we want to handle sub-states
 	// This involves transforming the tree for the given Indices, and
 	//   then mutating that.
@@ -152,15 +157,18 @@ func MutateWithSubcommands(ctx context.Context, c *path.Capture, cmds []api.Cmd,
 	if err != nil {
 		return err
 	}
-	s := rc.NewState(ctx)
+
+	env := rc.NewEnv(ctx, executor.Config{Execute: true})
+	defer env.Dispose()
+	ctx = executor.PutEnv(ctx, env)
 
 	return api.ForeachCmd(ctx, cmds, func(ctx context.Context, id api.CmdID, cmd api.Cmd) error {
 		if sync, ok := cmd.API().(SynchronizedAPI); ok {
-			sync.MutateSubcommands(ctx, id, cmd, s, preSubCmdCb, postSubCmdCb)
+			sync.MutateSubcommands(ctx, id, cmd, env.State, preSubCmdCb, postSubCmdCb)
 		} else {
-			cmd.Mutate(ctx, id, s, nil)
+			cmd.Mutate(ctx, id, env.State, nil)
 		}
-		postCmdCb(s, api.SubCmdIdx{uint64(id)}, cmd)
+		postCmdCb(ctx, env.State, api.SubCmdIdx{uint64(id)}, cmd)
 		return nil
 	})
 }

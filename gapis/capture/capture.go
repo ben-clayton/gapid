@@ -29,6 +29,7 @@ import (
 	"github.com/google/gapid/core/math/interval"
 	"github.com/google/gapid/core/memory/arena"
 	"github.com/google/gapid/core/os/device/host"
+	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/database"
 	"github.com/google/gapid/gapis/memory"
@@ -162,6 +163,46 @@ func (c *Capture) NewState(ctx context.Context) *api.GlobalState {
 		}
 	}
 	return s
+}
+
+// NewEnv returns a new, default-initialized Env object built for the capture.
+func (c *Capture) NewEnv(ctx context.Context, cfg executor.Config) *executor.Env {
+	return c.NewCustomEnv(ctx, interval.U64RangeList{}, true, cfg)
+}
+
+func (c *Capture) NewCustomEnv(
+	ctx context.Context,
+	reserved interval.U64RangeList,
+	buildInitialState bool,
+	cfg executor.Config) *executor.Env {
+
+	freeList := memory.InvertMemoryRanges(c.Observed)
+	for _, r := range reserved {
+		interval.Remove(&freeList, r.Span())
+	}
+	interval.Remove(&freeList, interval.U64Span{Start: 0, End: value.FirstValidAddress})
+
+	env := executor.NewEnv(ctx, c.Header.ABI, cfg)
+	env.State.MemoryLayout = c.Header.ABI.MemoryLayout
+	env.State.Arena = arena.New()
+	env.State.Memory = memory.NewPools()
+	env.State.Allocator = memory.NewBasicAllocator(freeList)
+	if buildInitialState && c.InitialState != nil {
+		for _, m := range c.InitialState.Memory {
+			pool, _ := env.State.Memory.Get(memory.PoolID(m.Pool))
+			if pool == nil {
+				pool = env.State.Memory.NewAt(memory.PoolID(m.Pool))
+			}
+			pool.Write(m.Range.Base, memory.Resource(m.ID, m.Range.Size))
+		}
+		for k, v := range c.InitialState.APIs {
+			env.State.APIs[k.ID()] = v.Clone(ctx)
+		}
+		for _, v := range env.State.APIs {
+			v.SetupInitialState(ctx, env.State)
+		}
+	}
+	return env
 }
 
 // BuildInitialCommands returns a set of commands which will setup the initial state.
@@ -311,6 +352,10 @@ func fromProto(ctx context.Context, r *Record) (out *Capture, err error) {
 
 	// Bind the arena used to for all allocations for this capture.
 	ctx = arena.Put(ctx, a)
+
+	env := executor.NewEnv(ctx, nil, executor.Config{})
+	// defer env.Dispose() // TODO
+	ctx = executor.PutEnv(ctx, env)
 
 	d := newDecoder(a)
 

@@ -101,13 +101,31 @@ func gles_GetLinkProgramExtra(
 }
 
 //export gles_GetValidateProgramExtra
-func gles_GetValidateProgramExtra(ctx *C.context, c, p unsafe.Pointer, out *unsafe.Pointer) {
-	panic("gles_GetValidateProgramExtra not implemented")
+func gles_GetValidateProgramExtra(
+	ctx *C.context,
+	context *C.Context__R,
+	program *C.Program__R,
+	out **C.ValidateProgramExtra__R) {
+
+	e := externsFromNative(ctx)
+	*out = e.GetValidateProgramExtra(
+		Contextʳ{context},
+		Programʳ{program},
+	).c
 }
 
 //export gles_GetValidateProgramPipelineExtra
-func gles_GetValidateProgramPipelineExtra(ctx *C.context, c, p, out *unsafe.Pointer) {
-	panic("gles_GetValidateProgramPipelineExtra not implemented")
+func gles_GetValidateProgramPipelineExtra(
+	ctx *C.context,
+	context *C.Context__R,
+	pipeline *C.Pipeline__R,
+	out **C.ValidateProgramPipelineExtra__R) {
+
+	e := externsFromNative(ctx)
+	*out = e.GetValidateProgramPipelineExtra(
+		Contextʳ{context},
+		Pipelineʳ{pipeline},
+	).c
 }
 
 //export gles_IndexLimits
@@ -120,31 +138,39 @@ func gles_IndexLimits(ctx *C.context, s *C.slice, indexSize int32, out *C.u32Lim
 }
 
 //export gles_ReadGPUTextureData
-func gles_ReadGPUTextureData(ctx *C.context, t unsafe.Pointer, level int32, layer int32, out *unsafe.Pointer) {
-	panic("gles_ReadGPUTextureData not implemented")
+func gles_ReadGPUTextureData(ctx *C.context, texture *C.Texture__R, level, layer GLint, out *C.slice) {
+	e := externsFromNative(ctx)
+	*out = *e.ReadGPUTextureData(
+		Textureʳ{texture},
+		level,
+		layer,
+	).c
 }
 
 //export gles_addTag
 func gles_addTag(ctx *C.context, _ uint32, _ uint8) {
-	panic("gles_addTag not implemented")
+	// TODO: panic("gles_addTag not implemented")
 }
 
 //export gles_mapMemory
-func gles_mapMemory(ctx *C.context, s unsafe.Pointer) {
-	panic("gles_mapMemory not implemented")
+func gles_mapMemory(ctx *C.context, slice *C.slice) {
+	e := externsFromNative(ctx)
+	e.mapMemory(U8ˢ{slice})
 }
 
 //export gles_newMsg
-func gles_newMsg(ctx *C.context, _ uint32, _ uint8, out *uint32) {
-	panic("gles_newMsg not implemented")
+func gles_newMsg(ctx *C.context, severity Severity, _ uint8, out *uint32) {
+	// TODO: panic("gles_newMsg not implemented")
 }
 
 //export gles_onGlError
 func gles_onGlError(ctx *C.context, err GLenum) {
-	panic("gles_onGlError not implemented")
+	e := externsFromNative(ctx)
+	e.onGlError(err)
 }
 
 //export gles_unmapMemory
-func gles_unmapMemory(ctx *C.context, s unsafe.Pointer) {
-	panic("gles_unmapMemory not implemented")
+func gles_unmapMemory(ctx *C.context, slice *C.slice) {
+	e := externsFromNative(ctx)
+	e.unmapMemory(U8ˢ{slice})
 }

@@ -24,11 +24,9 @@ import (
 	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/core/memory/arena"
 	"github.com/google/gapid/core/os/device"
-	"github.com/google/gapid/gapil"
 	"github.com/google/gapid/gapil/compiler"
 	"github.com/google/gapid/gapil/compiler/plugins/replay"
 	"github.com/google/gapid/gapil/executor"
-	"github.com/google/gapid/gapil/semantic"
 	"github.com/google/gapid/gapir/client"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/capture"
@@ -60,29 +58,10 @@ func (test test) check(ctx context.Context, ca, ra *device.MemoryLayout) {
 		return
 	}
 
-	processor := gapil.NewProcessor()
-	a, errs := processor.Resolve("test.api")
-	if !assert.For(ctx, "Resolve").ThatSlice(errs).IsEmpty() {
-		return
-	}
-
-	settings := compiler.Settings{
-		CaptureABI: &device.ABI{
-			MemoryLayout: ca,
-		},
-		EmitExec: true,
-		Plugins: []compiler.Plugin{
-			replay.Plugin(ra),
-		},
-	}
-
-	program, err := compiler.Compile([]*semantic.API{a}, processor.Mappings, settings)
-	if !assert.For(ctx, "Compile").ThatError(err).Succeeded() {
-		return
-	}
-
-	exec := executor.NewExecutor(program, false)
-	env := exec.NewEnv(ctx, c)
+	env := c.NewEnv(ctx, executor.Config{
+		Execute: true,
+		Plugins: []compiler.Plugin{replay.Plugin(ra)},
+	})
 	defer env.Dispose()
 
 	for i, c := range test.cmds {

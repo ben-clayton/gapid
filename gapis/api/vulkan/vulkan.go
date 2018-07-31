@@ -666,17 +666,18 @@ func (API) GetTerminator(ctx context.Context, c *path.Capture) (transform.Termin
 }
 
 func (API) MutateSubcommands(ctx context.Context, id api.CmdID, cmd api.Cmd,
-	s *api.GlobalState, preSubCmdCb func(*api.GlobalState, api.SubCmdIdx, api.Cmd),
-	postSubCmdCb func(*api.GlobalState, api.SubCmdIdx, api.Cmd)) error {
+	s *api.GlobalState,
+	preSubCmdCb func(context.Context, *api.GlobalState, api.SubCmdIdx, api.Cmd),
+	postSubCmdCb func(context.Context, *api.GlobalState, api.SubCmdIdx, api.Cmd)) error {
 	c := GetState(s)
 	if postSubCmdCb != nil {
 		c.PostSubcommand = func(interface{}) {
-			postSubCmdCb(s, append(api.SubCmdIdx{uint64(id)}, c.SubCmdIdx...), cmd)
+			postSubCmdCb(ctx, s, append(api.SubCmdIdx{uint64(id)}, c.SubCmdIdx...), cmd)
 		}
 	}
 	if preSubCmdCb != nil {
 		c.PreSubcommand = func(interface{}) {
-			preSubCmdCb(s, append(api.SubCmdIdx{uint64(id)}, c.SubCmdIdx...), cmd)
+			preSubCmdCb(ctx, s, append(api.SubCmdIdx{uint64(id)}, c.SubCmdIdx...), cmd)
 		}
 	}
 	if err := cmd.Mutate(ctx, id, s, nil); err != nil && err == context.Canceled {

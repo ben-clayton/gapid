@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/gapid/core/app/analytics"
 	"github.com/google/gapid/core/math/interval"
+	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/api/sync"
 	"github.com/google/gapid/gapis/capture"
@@ -56,6 +57,16 @@ func Memory(ctx context.Context, p *path.Memory) (*service.Memory, context.Conte
 	if err != nil {
 		return nil, ctx, err
 	}
+
+	c, err := capture.Resolve(ctx)
+	if err != nil {
+		return nil, ctx, err
+	}
+
+	env := c.NewEnv(ctx, executor.Config{Execute: true})
+	defer env.Dispose()
+	ctx = executor.PutEnv(ctx, env)
+
 	err = api.ForeachCmd(ctx, cmds[:len(cmds)-1], func(ctx context.Context, id api.CmdID, cmd api.Cmd) error {
 		cmd.Mutate(ctx, id, s, nil)
 		return nil

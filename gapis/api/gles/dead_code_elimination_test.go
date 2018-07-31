@@ -35,10 +35,12 @@ import (
 )
 
 func TestDeadCommandRemoval(t *testing.T) {
+	abi := device.WindowsX86_64
+
 	ctx := log.Testing(t)
 	ctx = bind.PutRegistry(ctx, bind.NewRegistry())
 	ctx = database.Put(ctx, database.NewInMemory(ctx))
-	ctx = executor.PutEnv(ctx, executor.NewEnv(ctx, nil, executor.Config{}))
+	ctx = executor.PutEnv(ctx, executor.NewEnv(ctx, abi, executor.Config{}))
 
 	a := arena.New()
 	defer a.Dispose()
@@ -227,7 +229,7 @@ func TestDeadCommandRemoval(t *testing.T) {
 	for name, testCmds := range tests {
 		cmds := append(prologue, testCmds...)
 
-		h := &capture.Header{ABI: device.WindowsX86_64}
+		h := &capture.Header{ABI: abi}
 		capturePath, err := capture.New(ctx, a, name, h, cmds)
 		if err != nil {
 			panic(err)
@@ -239,7 +241,7 @@ func TestDeadCommandRemoval(t *testing.T) {
 			panic(err)
 		}
 
-		ctx = executor.PutEnv(ctx, executor.NewEnv(ctx, c, executor.Config{}))
+		ctx = executor.PutEnv(ctx, c.NewEnv(ctx, executor.Config{}))
 
 		// First verify the commands mutate without errors
 		s := c.NewState(ctx)

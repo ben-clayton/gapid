@@ -130,9 +130,9 @@
   {{else if IsMap         $}}Map_{{Template "C.Mangle" $.KeyType}}_{{Template "C.Mangle" $.ValueType}}
   {{else if IsVoid        $}}void
   {{else if IsBool        $}}bool
-  {{else if IsInt         $}}int
-  {{else if IsUint        $}}uint
-  {{else if IsSize        $}}uint
+  {{else if IsInt         $}}long
+  {{else if IsUint        $}}ulong
+  {{else if IsSize        $}}ulong
   {{else if IsChar        $}}char
   {{else if IsU8          $}}uchar
   {{else if IsS8          $}}schar

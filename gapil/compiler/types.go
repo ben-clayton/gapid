@@ -213,8 +213,8 @@ func (c *C) buildTypes() {
 	// Build storage types for the capture's memory layout.
 	c.T.CaptureTypes = c.StorageTypes(c.Settings.CaptureABI.MemoryLayout, "S_")
 
-	// Build conversion functions between target and capture types.
-	if c.Settings.CaptureABI != c.T.targetABI {
+	if !c.Settings.CaptureABI.SameAs(c.T.targetABI) {
+		// Declare conversion functions between target and capture types.
 		for _, api := range c.APIs {
 			for _, t := range api.Classes {
 				if !semantic.IsStorageType(t) {
@@ -228,7 +228,23 @@ func (c *C) buildTypes() {
 					Inline()
 
 				c.T.captureToTarget[t] = copyToTarget
-				c.Build(copyToTarget, func(s *S) {
+
+				copyToCapture := c.M.Function(c.T.Void, "T_"+t.Name()+"_copy_to_capture", c.T.CtxPtr, targetTypePtr, captureTypePtr).
+					LinkOnceODR().
+					Inline()
+
+				c.T.targetToCapture[t] = copyToCapture
+			}
+		}
+
+		// Build conversion functions between target and capture types.
+		for _, api := range c.APIs {
+			for _, t := range api.Classes {
+				if !semantic.IsStorageType(t) {
+					continue
+				}
+
+				c.Build(c.T.captureToTarget[t], func(s *S) {
 					src := s.Parameter(1).SetName("src")
 					dst := s.Parameter(2).SetName("dst")
 					for _, f := range t.Fields {
@@ -237,12 +253,7 @@ func (c *C) buildTypes() {
 					}
 				})
 
-				copyToCapture := c.M.Function(c.T.Void, "T_"+t.Name()+"_copy_to_capture", c.T.CtxPtr, targetTypePtr, captureTypePtr).
-					LinkOnceODR().
-					Inline()
-
-				c.T.targetToCapture[t] = copyToCapture
-				c.Build(copyToCapture, func(s *S) {
+				c.Build(c.T.targetToCapture[t], func(s *S) {
 					src := s.Parameter(1).SetName("src")
 					dst := s.Parameter(2).SetName("dst")
 					for _, f := range t.Fields {
@@ -266,9 +277,9 @@ func (t *Types) Target(ty semantic.Type) codegen.Type {
 	case *semantic.Builtin:
 		switch ty {
 		case semantic.IntType:
-			return t.Int
-		case semantic.SizeType:
-			return t.Size
+			return t.Int64
+		case semantic.UintType, semantic.SizeType:
+			return t.Uint64
 		}
 	case *semantic.StaticArray:
 		return t.Array(t.Target(ty.ValueType), int(ty.Size))

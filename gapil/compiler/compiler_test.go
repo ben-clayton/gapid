@@ -21,7 +21,6 @@ import (
 
 	"github.com/google/gapid/core/assert"
 	"github.com/google/gapid/core/log"
-	"github.com/google/gapid/core/math/interval"
 	"github.com/google/gapid/core/os/device"
 	"github.com/google/gapid/core/text/parse"
 	"github.com/google/gapid/gapil"
@@ -30,7 +29,6 @@ import (
 	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapil/semantic"
 	"github.com/google/gapid/gapis/api"
-	"github.com/google/gapid/gapis/capture"
 	"github.com/google/gapid/gapis/database"
 	"github.com/google/gapid/gapis/memory"
 )
@@ -53,11 +51,6 @@ func TestExecutor(t *testing.T) {
 	// represent addresses in the ARM abi
 	ptrA := uint64(0x0000000004030000)
 
-	c := &capture.Capture{
-		Observed: interval.U64RangeList{
-			{First: ptrA, Count: 0x10000},
-		},
-	}
 	u32Data := [1024]uint32{}
 	for i := range u32Data {
 		u32Data[i] = uint32(i)
@@ -1598,8 +1591,7 @@ cmd void Read(PodStruct* input) {
 			settings: compiler.Settings{
 				CaptureABI: device.AndroidARMv7a,
 			},
-		},
-		{
+		}, { /////////////////////////////////////////////////////
 			name: "CaptureMemoryLayout.Slice.Struct",
 			src: `
 class PodStruct {
@@ -1643,8 +1635,7 @@ cmd void Read(PodStruct* input) {
 			settings: compiler.Settings{
 				CaptureABI: device.AndroidARMv7a,
 			},
-		},
-		{
+		}, { /////////////////////////////////////////////////////
 			name: "CaptureMemoryLayout.StructWithStruct",
 			src: `
 class SizeStruct {
@@ -1681,8 +1672,7 @@ cmd void Read(StructInStruct* input) {
 			settings: compiler.Settings{
 				CaptureABI: device.AndroidARMv7a,
 			},
-		},
-		{
+		}, { /////////////////////////////////////////////////////
 			name: "CaptureMemoryLayout.Slice.StructWithStruct",
 			src: `
 class SizeStruct {
@@ -1730,8 +1720,7 @@ cmd void Read(StructInStruct* input) {
 			settings: compiler.Settings{
 				CaptureABI: device.AndroidARMv7a,
 			},
-		},
-		{
+		}, { /////////////////////////////////////////////////////
 			name: "CaptureMemoryLayout.Write.Struct",
 			src: `
 class PodStruct {
@@ -1739,11 +1728,16 @@ class PodStruct {
 	void* b
 	u16 c
 	u64 d
-	size  e
+	size e
+	int[4] f
 }
 
 cmd void Write(PodStruct* input, void* ptr) {
 	p := PodStruct(0x00010203, ptr, 0x0a0b, 0xbadf00dbadf00d00, as!size(0x31323334))
+	p.f[0] = as!int(1)
+	p.f[1] = as!int(2)
+	p.f[2] = as!int(3)
+	p.f[3] = as!int(4)
 	input[0] = p
 }
 `,
@@ -1755,14 +1749,14 @@ cmd void Write(PodStruct* input, void* ptr) {
 				buffers: buffers{
 					ptrA:      D(uint32(0x00010203), uint32(0xdeadbeef), uint16(0x0a0b)),
 					ptrA + 16: D(uint64(0xbadf00dbadf00d00), uint32(0x31323334)),
+					ptrA + 28: D(uint32(1), uint32(2), uint32(3), uint32(4)),
 				},
 			},
 			settings: compiler.Settings{
 				CaptureABI:             device.AndroidARMv7a,
 				WriteToApplicationPool: true,
 			},
-		},
-		{
+		}, { /////////////////////////////////////////////////////
 			name: "CaptureMemoryLayout.WriteSlice.Struct",
 			src: `
 class PodStruct {
@@ -1795,8 +1789,7 @@ cmd void Write(PodStruct* input, void* ptr) {
 				CaptureABI:             device.AndroidARMv7a,
 				WriteToApplicationPool: true,
 			},
-		},
-		{
+		}, { /////////////////////////////////////////////////////
 			name: "CaptureMemoryLayout.Write.StructWithStruct",
 			src: `
 class SizeStruct {
@@ -1828,8 +1821,7 @@ cmd void Read(StructInStruct* input) {
 				CaptureABI:             device.AndroidARMv7a,
 				WriteToApplicationPool: true,
 			},
-		},
-		{
+		}, { /////////////////////////////////////////////////////
 			name: "CaptureMemoryLayout.Write.Slice.StructWithStruct",
 			src: `
 class SizeStruct {
@@ -1865,8 +1857,7 @@ cmd void Read(StructInStruct* input) {
 				CaptureABI:             device.AndroidARMv7a,
 				WriteToApplicationPool: true,
 			},
-		},
-		{
+		}, { /////////////////////////////////////////////////////
 			name: "CaptureMemoryLayout.StructWithPointer",
 			src: `
 class SizeStruct {
@@ -1901,7 +1892,7 @@ cmd void Read(StructInStruct* input) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			test.run(log.SubTest(ctx, t), c)
+			test.run(log.SubTest(ctx, t))
 		})
 	}
 }
@@ -1935,7 +1926,7 @@ type test struct {
 	settings compiler.Settings
 }
 
-func (t test) run(ctx context.Context, c *capture.Capture) (succeeded bool) {
+func (t test) run(ctx context.Context) (succeeded bool) {
 	defer func() {
 		if r := recover(); r != nil {
 			panic(fmt.Errorf("Panic in test '%v':\n%v", t.name, r))
@@ -1958,10 +1949,8 @@ func (t test) run(ctx context.Context, c *capture.Capture) (succeeded bool) {
 		return false
 	}
 
-	c.Header = &capture.Header{ABI: program.Settings.CaptureABI}
-
-	exec := executor.NewExecutor(program, false)
-	env := exec.NewEnv(ctx, c)
+	exec := executor.NewExecutor(program, true)
+	env := exec.NewEnv(ctx)
 	defer env.Dispose()
 
 	if t.dump {

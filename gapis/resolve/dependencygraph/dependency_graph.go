@@ -182,9 +182,9 @@ func (r *DependencyGraphResolvable) Resolve(ctx context.Context) (interface{}, e
 		},
 	}
 
-	env := executor.NewEnv(ctx, c, executor.Config{})
+	env := c.NewCustomEnv(ctx, ranges, false, executor.Config{Execute: true})
 	ctx = executor.PutEnv(ctx, env)
-	s := c.NewUninitializedState(ctx, ranges) // TODO
+	s := env.State
 
 	dependencyGraphBuildCounter.Time(func() {
 		api.ForeachCmd(ctx, cmds, func(ctx context.Context, index api.CmdID, cmd api.Cmd) error {
