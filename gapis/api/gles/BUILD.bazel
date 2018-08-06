@@ -102,6 +102,7 @@ go_library(
         "doc.go",
         "draw_call.go",
         "draw_call_mesh.go",
+        "externs.c",
         "externs.go",
         "externs_binding.go",
         "extras.go",

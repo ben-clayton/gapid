@@ -128,15 +128,6 @@ func gles_GetValidateProgramPipelineExtra(
 	).c
 }
 
-//export gles_IndexLimits
-func gles_IndexLimits(ctx *C.context, s *C.slice, indexSize int32, out *C.u32Limits) {
-	e := externsFromNative(ctx)
-	*out = *e.IndexLimits(
-		U8ˢ{s},
-		indexSize,
-	).c
-}
-
 //export gles_ReadGPUTextureData
 func gles_ReadGPUTextureData(ctx *C.context, texture *C.Texture__R, level, layer GLint, out *C.slice) {
 	e := externsFromNative(ctx)
