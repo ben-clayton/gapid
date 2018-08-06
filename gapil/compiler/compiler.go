@@ -384,9 +384,10 @@ func (c *C) Log(s *S, severity log.Severity, msg string, args ...interface{}) {
 	if ctx == nil {
 		ctx = s.Zero(c.T.CtxPtr)
 	}
+
 	loc := c.SourceLocation()
 	fullArgs := []*codegen.Value{
-		s.Scalar(uint8(severity)),
+		s.Scalar(5 - uint8(severity)), // core/log/severity.go is in reverse order to log.h! :(
 		s.Scalar(loc.File),
 		s.Scalar(uint32(loc.Line)),
 		s.Scalar(msg),

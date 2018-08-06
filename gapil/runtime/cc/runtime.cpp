@@ -59,8 +59,6 @@ void gapil_set_runtime_callbacks(gapil_runtime_callbacks* cbs) {
 
 void gapil_logf(uint8_t severity, uint8_t* file, uint32_t line, uint8_t* fmt,
                 ...) {
-  // core/log/severity.go is in reverse order to log.h! :(
-  severity = 5 - severity;
   if (GAPID_SHOULD_LOG(severity)) {
     va_list args;
     va_start(args, fmt);

@@ -39,6 +39,14 @@ typedef struct string_t string;
 #define GAPIL_MIN_MAP_SIZE 16
 #define GAPIL_MAP_MAX_CAPACITY 0.8f
 
+// Must match values in core/cc/log.h
+#define GAPIL_LOG_LEVEL_FATAL 0
+#define GAPIL_LOG_LEVEL_ERROR 1
+#define GAPIL_LOG_LEVEL_WARNING 2
+#define GAPIL_LOG_LEVEL_INFO 3
+#define GAPIL_LOG_LEVEL_DEBUG 4
+#define GAPIL_LOG_LEVEL_VERBOSE 5
+
 // context contains information about the environment in which a function is
 // executing.
 typedef struct context_t {
