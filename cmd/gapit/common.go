@@ -65,7 +65,7 @@ func getGapis(ctx context.Context, gapisFlags GapisFlags, gapirFlags GapirFlags)
 		args = append(args, "--gapir-args", gapirFlags.Args)
 	}
 	if gapisFlags.Profile != "" {
-		args = append(args, "-cpuprofile", gapisFlags.Profile)
+		args = append(args, "--profile-cpu", gapisFlags.Profile)
 	}
 	args = append(args, "--idle-timeout", "1m")
 
