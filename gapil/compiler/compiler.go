@@ -290,6 +290,7 @@ func (c *C) Build(f *codegen.Function, do func(*S)) {
 				})
 				s.Globals = s.Ctx.Index(0, ContextGlobals).Load().SetName("globals")
 				s.Arena = s.Ctx.Index(0, ContextArena).Load().SetName("arena")
+				s.CurrentThread = s.Ctx.Index(0, ContextThread).Load().SetName("thread")
 				s.Location = s.Ctx.Index(0, ContextLocation)
 				break
 			}

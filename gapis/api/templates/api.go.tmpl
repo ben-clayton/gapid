@@ -1285,6 +1285,7 @@ import (»
 
   type {{$name}} struct {
     c *C.{{$.Name}}
+    thread uint64
     caller ϟapi.CmdID
     extras ϟapi.CmdExtras
     arena arena.Arena
@@ -1293,9 +1294,9 @@ import (»
   // Arena returns the memory arena used to allocate this command.
   func (ϟc *{{$name}}) Arena() arena.Arena { return ϟc.arena }
 
-  func (ϟc *{{$name}}) Thread() uint64 { return uint64(ϟc.c.thread_id) }
+  func (ϟc *{{$name}}) Thread() uint64 { return uint64(ϟc.thread) }
 
-  func (ϟc *{{$name}}) SetThread(v uint64) { ϟc.c.thread_id = C.uint64_t(v) }
+  func (ϟc *{{$name}}) SetThread(v uint64) { ϟc.thread = v }
 
 	func (ϟc *{{$name}}) ExecData() unsafe.Pointer { return (unsafe.Pointer)(ϟc.c) }
 
@@ -1396,6 +1397,7 @@ import (»
     ϟcc := (*C.context)(ϟenv.CContext())
     return &{{$name}}{
       c:      C.{{$.Name}}__clone(ϟc.c, ϟcc, ϟt),
+      thread: ϟc.thread,
       caller: ϟc.caller,
       extras: ϟc.extras,
       arena:  ϟenv.Arena,
@@ -1436,10 +1438,10 @@ import (»
         ) *{{$name}} {
         out := &{{$name}}{
           c:      {{Template "Allocate" "Arena" "cb.Arena" "Type" (print "C." $c.Name)}},
+          thread: cb.Thread,
           caller: ϟapi.CmdNoID,
           arena:  cb.Arena,
         }
-        out.SetThread(cb.Thread)
         {{range $p := $c.FullParameters}}
           {{if $p | TypeOf | Underlying | IsPointer}}
             out.Set{{GoPublicName $p.Name}}({{Template "Go.Type" $p}}({{$p.Name | GoPrivateName}}.Address()))

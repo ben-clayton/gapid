@@ -160,8 +160,6 @@ func (c *cloner) implementClones() {
 			c.C.Build(f, func(s *compiler.S) {
 				this, tracker := s.Parameter(0), s.Parameter(2)
 				clone := c.Alloc(s, s.Scalar(1), params)
-				thread := semantic.BuiltinThreadGlobal.Name()
-				c.cloneTo(s, semantic.Uint64Type, clone.Index(0, thread), this.Index(0, thread).Load(), tracker)
 				for _, p := range cmd.FullParameters {
 					c.cloneTo(s, p.Type, clone.Index(0, p.Name()), this.Index(0, p.Name()).Load(), tracker)
 				}

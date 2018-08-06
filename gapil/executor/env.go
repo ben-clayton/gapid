@@ -179,6 +179,7 @@ func (e *Env) Execute(ctx context.Context, cmd api.Cmd, id api.CmdID) error {
 	}
 
 	e.cmd = cmd
+	e.cCtx.thread = (C.uint64_t)(cmd.Thread())
 	e.cCtx.cmd_id = (C.uint64_t)(id)
 	res := e.call(ctx, fptr, cmd.ExecData())
 	e.cmd = nil

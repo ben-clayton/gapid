@@ -114,7 +114,6 @@ func (c *C) declareTypes() {
 		// Declare all the command parameter structs.
 		for _, f := range api.Functions {
 			fields := make([]codegen.Field, 0, len(f.FullParameters)+1)
-			fields = append(fields, codegen.Field{Name: semantic.BuiltinThreadGlobal.Name(), Type: c.T.Uint64})
 			for _, p := range f.FullParameters {
 				fields = append(fields, codegen.Field{Name: p.Name(), Type: c.T.Target(p.Type)})
 			}

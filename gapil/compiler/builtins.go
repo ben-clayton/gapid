@@ -55,6 +55,7 @@ const (
 	ContextLocation  = "location"
 	ContextGlobals   = "globals"
 	ContextArena     = "arena"
+	ContextThread    = "thread"
 	ContextCmdID     = "cmd_id"
 	ContextArguments = "arguments"
 )

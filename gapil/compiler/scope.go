@@ -40,6 +40,9 @@ type S struct {
 	// Parameters is the current function's parameters.
 	Parameters map[*semantic.Parameter]*codegen.Value
 
+	// The identifier of the currently executing thread.
+	CurrentThread *codegen.Value
+
 	parent      *S
 	locals      map[*semantic.Local]*codegen.Value
 	locationIdx int
@@ -53,14 +56,15 @@ func (s *S) enter(f func(*S)) {
 	}
 
 	child := &S{
-		Builder:    s.Builder,
-		Parameters: s.Parameters,
-		parent:     s,
-		locals:     locals,
-		Ctx:        s.Ctx,
-		Location:   s.Location,
-		Globals:    s.Globals,
-		Arena:      s.Arena,
+		Builder:       s.Builder,
+		Ctx:           s.Ctx,
+		Location:      s.Location,
+		Globals:       s.Globals,
+		Arena:         s.Arena,
+		Parameters:    s.Parameters,
+		CurrentThread: s.CurrentThread,
+		parent:        s,
+		locals:        locals,
 	}
 
 	f(child)

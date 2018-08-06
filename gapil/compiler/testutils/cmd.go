@@ -15,13 +15,10 @@
 package testutils
 
 import (
-	"bytes"
 	"context"
 	"unsafe"
 
-	"github.com/google/gapid/core/data/endian"
 	"github.com/google/gapid/core/data/id"
-	"github.com/google/gapid/core/os/device"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/memory"
 	"github.com/google/gapid/gapis/replay/builder"
@@ -30,11 +27,10 @@ import (
 // Cmd is a custom implementation of the api.Cmd interface that simplifies
 // testing compiler generated commands.
 type Cmd struct {
-	N    string  // Command name
-	D    []byte  // Encoded command used by the compiler generated execute function
-	E    *Extras // Command extras
-	T    uint64  // Command thread
-	data []byte
+	N string  // Command name
+	D []byte  // Encoded command used by the compiler generated execute function
+	E *Extras // Command extras
+	T uint64  // Command thread
 }
 
 var _ api.Cmd = &Cmd{}
@@ -44,11 +40,10 @@ func (c *Cmd) API() api.API { return nil }
 
 // ExecData stubs the api.Cmd interface.
 func (c *Cmd) ExecData() unsafe.Pointer {
-	b := bytes.Buffer{}
-	endian.Writer(&b, device.LittleEndian).Uint64(c.T)
-	b.Write(c.D)
-	c.data = b.Bytes()
-	return (unsafe.Pointer)(&c.data[0])
+	if len(c.D) == 0 {
+		return nil
+	}
+	return (unsafe.Pointer)(&c.D[0])
 }
 
 // Caller stubs the api.Cmd interface.

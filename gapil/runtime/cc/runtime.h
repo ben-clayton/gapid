@@ -47,6 +47,7 @@ typedef struct context_t {
   uint64_t cmd_id;    // the current command identifier.
   globals* globals;   // a pointer to the global state.
   arena* arena;       // the memory arena used for allocations.
+  uint64_t thread;    // the identifier of the currently executing thread.
   void* arguments;    // the arguments to the currently executing command.
   // additional data used by compiler plugins goes here.
 } context;

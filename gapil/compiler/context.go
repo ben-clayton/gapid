@@ -57,6 +57,7 @@ func (c *C) buildContextFuncs() {
 
 		s.Ctx.Index(0, ContextLocation).Store(s.Scalar(uint32(0xffffffff)))
 		s.Ctx.Index(0, ContextArena).Store(s.Arena)
+		s.Ctx.Index(0, ContextThread).Store(s.Scalar(uint64(0)))
 
 		// Initialize custom plugin context fields
 		for _, f := range c.T.customCtxFields {

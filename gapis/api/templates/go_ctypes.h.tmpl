@@ -238,7 +238,6 @@
   {{end}}
 
   typedef struct {{$.Name}} {
-    uint64_t thread_id;
     {{range $p := $.FullParameters}}
       {{Template "C.Type" $p}} {{$p.Name | CFieldName}};
     {{end}}
