@@ -21,6 +21,7 @@ import (
 	"unsafe"
 
 	"github.com/google/gapid/core/data/slice"
+	"github.com/google/gapid/core/math/u64"
 	"github.com/google/gapid/core/memory/arena"
 	"github.com/google/gapid/gapil/compiler"
 	"github.com/google/gapid/gapis/api"
@@ -44,6 +45,7 @@ import (
 // extern void apply_reads(context*);
 // extern void apply_writes(context*);
 // extern void* resolve_pool_data(context*, uint64_t, uint64_t, gapil_data_access, uint64_t);
+// extern void copy_slice(context* ctx, slice* dst, slice* src);
 // extern void store_in_database(context*, void*, uint64_t, uint8_t*);
 // extern uint64_t make_pool(context*, uint64_t);
 // extern void pool_reference(context*, uint64_t);
@@ -54,6 +56,7 @@ import (
 //     .apply_reads       = &apply_reads,
 //     .apply_writes      = &apply_writes,
 //     .resolve_pool_data = &resolve_pool_data,
+//     .copy_slice        = &copy_slice,
 //     .store_in_database = &store_in_database,
 //     .make_pool         = &make_pool,
 //     .pool_reference    = &pool_reference,
@@ -265,6 +268,15 @@ func resolve_pool_data(c *C.context, pool C.uint64_t, ptr C.uint64_t, access C.g
 	default:
 		panic(fmt.Errorf("Unexpected access: %v", access))
 	}
+}
+
+//export copy_slice
+func copy_slice(c *C.context, dst, src *C.slice) {
+	env := EnvFromNative((unsafe.Pointer)(c))
+	pDst := env.State.Memory.MustGet(memory.PoolID(dst.pool))
+	pSrc := env.State.Memory.MustGet(memory.PoolID(src.pool))
+	size := u64.Min(uint64(dst.size), uint64(src.size))
+	pDst.Write(uint64(dst.base), pSrc.Slice(memory.Range{Base: uint64(src.base), Size: size}))
 }
 
 //export store_in_database

@@ -145,24 +145,6 @@ void* gapil_slice_data(context* ctx, slice* sli, gapil_data_access access) {
   return ptr;
 }
 
-void gapil_copy_slice(context* ctx, slice* dst, slice* src) {
-  DEBUG_PRINT(
-      "gapil_copy_slice(ctx: %p,\n"
-      "    dst: " SLICE_FMT
-      ",\n"
-      "    src: " SLICE_FMT ")",
-      ctx, SLICE_ARGS(dst), SLICE_ARGS(src));
-
-  uint64_t size = std::min(dst->size, src->size);
-
-  auto dstPtr =
-      gapil_resolve_pool_data(ctx, dst->pool, dst->base, GAPIL_WRITE, size);
-  auto srcPtr =
-      gapil_resolve_pool_data(ctx, src->pool, src->base, GAPIL_READ, size);
-
-  memcpy(dstPtr, srcPtr, size);
-}
-
 void gapil_cstring_to_slice(context* ctx, uint64_t ptr, slice* out) {
   DEBUG_PRINT("gapil_cstring_to_slice(ptr: 0x%" PRIx64 ")", ptr);
 
@@ -299,6 +281,18 @@ void* gapil_resolve_pool_data(context* ctx, uint64_t pool_id, uint64_t ptr,
               ctx, pool, ptr, access, size);
   GAPID_ASSERT(runtime_callbacks.resolve_pool_data != nullptr);
   return runtime_callbacks.resolve_pool_data(ctx, pool_id, ptr, access, size);
+}
+
+void gapil_copy_slice(context* ctx, slice* dst, slice* src) {
+  DEBUG_PRINT(
+      "gapil_copy_slice(ctx: %p,\n"
+      "    dst: " SLICE_FMT
+      ",\n"
+      "    src: " SLICE_FMT ")",
+      ctx, SLICE_ARGS(dst), SLICE_ARGS(src));
+
+  GAPID_ASSERT(runtime_callbacks.copy_slice != nullptr);
+  return runtime_callbacks.copy_slice(ctx, dst, src);
 }
 
 void gapil_store_in_database(context* ctx, void* ptr, uint64_t size,

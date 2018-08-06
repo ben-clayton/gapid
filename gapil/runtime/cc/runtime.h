@@ -128,6 +128,9 @@ typedef struct gapil_runtime_callbacks_t {
   void* (*resolve_pool_data)(context*, uint64_t pool_id, uint64_t ptr,
                              gapil_data_access, uint64_t size);
 
+  // copies N bytes of data from src to dst, where N is min(dst.size, src.size).
+  void (*copy_slice)(context*, slice* dst, slice* src);
+
   // stores the buffer at ptr of the given size into the database.
   // Writes the 20-byte database identifier of the stored data to id.
   void (*store_in_database)(context* ctx, void* ptr, uint64_t size,

@@ -83,6 +83,15 @@ void* resolve_pool_data(context* ctx, uint64_t pool_id, uint64_t ptr,
   return &pool->buffer[ptr];
 }
 
+void copy_slice(context* ctx, slice* dst, slice* src) {
+  uint64_t size = std::min(dst->size, src->size);
+
+  auto dstPtr = resolve_pool_data(ctx, dst->pool, dst->base, GAPIL_WRITE, size);
+  auto srcPtr = resolve_pool_data(ctx, src->pool, src->base, GAPIL_READ, size);
+
+  memcpy(dstPtr, srcPtr, size);
+}
+
 uint64_t make_pool(context* ctx, uint64_t size) {
   auto cb = static_cast<gapii::CallObserver*>(ctx);
   return cb->create_pool(size)->id;
@@ -114,6 +123,7 @@ namespace gapii {
 void Spy::register_runtime_callbacks() {
   gapil_runtime_callbacks cb = {0};
   cb.resolve_pool_data = &resolve_pool_data;
+  cb.copy_slice = &copy_slice;
   cb.make_pool = &make_pool;
   cb.pool_reference = &pool_reference;
   cb.pool_release = &pool_release;

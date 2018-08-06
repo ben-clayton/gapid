@@ -33,6 +33,7 @@ go_library(
         "//core/context/keys:go_default_library",
         "//core/data/slice:go_default_library",
         "//core/log:go_default_library",
+        "//core/math/u64:go_default_library",
         "//core/memory/arena:go_default_library",
         "//core/os/device:go_default_library",
         "//gapil/compiler:go_default_library",
