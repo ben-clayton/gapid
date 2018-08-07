@@ -60,7 +60,7 @@ func (t *Task) String() string {
 
 	parent := ""
 	if t.parent != nil {
-		parent = t.parent.name
+		parent = fmt.Sprint(t.parent)
 	}
 	if parent != "" {
 		return fmt.Sprintf("%v → %v", parent, t.name)

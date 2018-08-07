@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/google/gapid/core/app/analytics"
+	"github.com/google/gapid/core/app/status"
 	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapis/api"
@@ -52,6 +53,9 @@ func (r *ReportResolvable) newReportItem(s log.Severity, c uint64, m *stringtabl
 
 // Resolve implements the database.Resolver interface.
 func (r *ReportResolvable) Resolve(ctx context.Context) (interface{}, error) {
+	ctx = status.Start(ctx, "Resolve")
+	defer status.Finish(ctx)
+
 	ctx = capture.Put(ctx, r.Path.Capture)
 
 	c, err := capture.Resolve(ctx)

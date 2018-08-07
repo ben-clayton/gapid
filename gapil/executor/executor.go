@@ -19,11 +19,10 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 	"unsafe"
 
+	"github.com/google/gapid/core/app/status"
 	"github.com/google/gapid/core/codegen"
-	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/core/os/device"
 	"github.com/google/gapid/gapil/compiler"
 	"github.com/google/gapid/gapil/semantic"
@@ -54,15 +53,24 @@ type Config struct {
 	CaptureABI *device.ABI
 	Execute    bool
 	Plugins    []compiler.Plugin
+
+	// APIs to compile for. If empty, then all registered APIs will be compiled.
+	APIs []api.API
 }
 
 // NewEnv returns a new environment for an executor with the given config.
 func NewEnv(ctx context.Context, abi *device.ABI, cfg Config) *Env {
+	ctx = status.Start(ctx, "NewEnv")
+	defer status.Finish(ctx)
+
 	key := fmt.Sprintf("%v", cfg)
 	obj, existing := cache.LoadOrStore(key, &apiExec{ready: make(chan struct{})})
 	ae := obj.(*apiExec)
 	if !existing {
-		apis := api.All()
+		apis := cfg.APIs
+		if len(apis) == 0 {
+			apis = api.All()
+		}
 		sems := make([]*semantic.API, len(apis))
 		mappings := &semantic.Mappings{}
 		for i, api := range apis {
@@ -82,15 +90,11 @@ func NewEnv(ctx context.Context, abi *device.ABI, cfg Config) *Env {
 			Plugins:     cfg.Plugins,
 		}
 
-		log.I(ctx, "Compiling APIs with given settings: %+v", settings)
-		start := time.Now()
-		defer func() { log.I(ctx, "Compile finished in %v", time.Since(start)) }()
-
 		prog, err := compiler.Compile(sems, mappings, settings)
 		if err != nil {
 			panic(err)
 		}
-		ae.exec = NewExecutor(prog, true)
+		ae.exec = NewExecutor(ctx, prog, true)
 		close(ae.ready)
 	} else {
 		<-ae.ready
@@ -99,7 +103,10 @@ func NewEnv(ctx context.Context, abi *device.ABI, cfg Config) *Env {
 }
 
 // NewExecutor returns a new and initialized Executor for the given program.
-func NewExecutor(prog *compiler.Program, optimize bool) *Executor {
+func NewExecutor(ctx context.Context, prog *compiler.Program, optimize bool) *Executor {
+	ctx = status.Start(ctx, "NewExecutor")
+	defer status.Finish(ctx)
+
 	e, err := prog.Module.Executor(optimize)
 	if err != nil {
 		panic(err)
