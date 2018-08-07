@@ -143,32 +143,6 @@ void* gapil_slice_data(context* ctx, slice* sli, gapil_data_access access) {
   return ptr;
 }
 
-void gapil_cstring_to_slice(context* ctx, uint64_t ptr, slice* out) {
-  DEBUG_PRINT("gapil_cstring_to_slice(ptr: 0x%" PRIx64 ")", ptr);
-
-  uint64_t pool_id = 0;  // Application pool
-
-  const uint64_t CHUNK_SIZE = 64;
-
-  uint64_t len = 0;
-  while (true) {
-    auto data = reinterpret_cast<char*>(gapil_resolve_pool_data(
-        ctx, pool_id, ptr + len, GAPIL_READ, CHUNK_SIZE));
-    for (uint64_t i = 0; i < CHUNK_SIZE; i++, len++) {
-      if (data[i] == 0) {
-        len++;  // Include null-terminator in the slice.
-
-        out->pool = pool_id;
-        out->root = ptr;
-        out->base = ptr;
-        out->size = len;
-        out->count = len;
-        return;
-      }
-    }
-  }
-}
-
 string* gapil_make_string(arena* a, uint64_t length, void* data) {
   Arena* arena = reinterpret_cast<Arena*>(a);
 
@@ -291,6 +265,13 @@ void gapil_copy_slice(context* ctx, slice* dst, slice* src) {
 
   GAPID_ASSERT(runtime_callbacks.copy_slice != nullptr);
   return runtime_callbacks.copy_slice(ctx, dst, src);
+}
+
+void gapil_cstring_to_slice(context* ctx, uint64_t ptr, slice* out) {
+  DEBUG_PRINT("gapil_cstring_to_slice(ptr: 0x%" PRIx64 ")", ptr);
+
+  GAPID_ASSERT(runtime_callbacks.cstring_to_slice != nullptr);
+  return runtime_callbacks.cstring_to_slice(ctx, ptr, out);
 }
 
 void gapil_store_in_database(context* ctx, void* ptr, uint64_t size,

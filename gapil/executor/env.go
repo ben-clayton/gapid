@@ -31,7 +31,7 @@ import (
 
 // #include "gapil/runtime/cc/runtime.h"
 //
-// #include <string.h>
+// #include <string.h> // memset
 //
 // typedef context* (TCreateContext) (arena*);
 // typedef void     (TDestroyContext) (context*);
@@ -46,6 +46,7 @@ import (
 // extern void apply_writes(context*);
 // extern void* resolve_pool_data(context*, uint64_t, uint64_t, gapil_data_access, uint64_t);
 // extern void copy_slice(context* ctx, slice* dst, slice* src);
+// extern void cstring_to_slice(context* ctx, uint64_t ptr, slice* out);
 // extern void store_in_database(context*, void*, uint64_t, uint8_t*);
 // extern uint64_t make_pool(context*, uint64_t);
 // extern void pool_reference(context*, uint64_t);
@@ -57,6 +58,7 @@ import (
 //     .apply_writes      = &apply_writes,
 //     .resolve_pool_data = &resolve_pool_data,
 //     .copy_slice        = &copy_slice,
+//     .cstring_to_slice  = &cstring_to_slice,
 //     .store_in_database = &store_in_database,
 //     .make_pool         = &make_pool,
 //     .pool_reference    = &pool_reference,
@@ -215,6 +217,33 @@ func (e *Env) Globals() []byte {
 	return slice.Bytes((unsafe.Pointer)(e.cCtx.globals), e.Executor.globalsSize)
 }
 
+func (e *Env) readPoolData(pool memory.PoolID, ptr, size uint64) unsafe.Pointer {
+	ctx := e.goCtx
+	p := e.State.Memory.MustGet(pool)
+
+	rng := memory.Range{Base: ptr, Size: size}
+	sli := p.Slice(rng)
+
+	switch sli := sli.(type) {
+	case memory.Native:
+		return sli.Data()
+	default:
+		buf := e.bufferArena.Allocate(int(size), 1) // TODO: Free these!
+		C.memset(buf, 0, C.size_t(size))            // TODO: Fix Get() to zero gaps
+		if err := sli.Get(ctx, 0, slice.Bytes(buf, size)); err != nil {
+			panic(err)
+		}
+		return buf
+	}
+}
+
+func (e *Env) writePoolData(pool memory.PoolID, ptr, size uint64) unsafe.Pointer {
+	native := memory.NewNative(e.bufferArena, size)
+	p := e.State.Memory.MustGet(pool)
+	p.Write(ptr, native)
+	return native.Data()
+}
+
 func (e *Env) call(ctx context.Context, fptr, args unsafe.Pointer) error {
 	e.goCtx = ctx
 	e.cCtx.arguments = args
@@ -224,12 +253,25 @@ func (e *Env) call(ctx context.Context, fptr, args unsafe.Pointer) error {
 	return err.Err()
 }
 
+func (e *Env) applyObservations(l []api.CmdObservation) {
+	ctx := e.goCtx
+	for _, o := range l {
+		data, err := database.Resolve(ctx, o.ID)
+		if err != nil {
+			panic(err)
+		}
+		native := memory.NewNative(e.bufferArena, o.Range.Size)
+		copy(native.Sli(), data.([]byte))
+		e.State.Memory.ApplicationPool().Write(o.Range.Base, native)
+	}
+}
+
 //export apply_reads
 func apply_reads(c *C.context) {
 	e := env(c)
 	if extras := e.cmd.Extras(); extras != nil {
 		if o := extras.Observations(); o != nil {
-			o.ApplyReads(e.State.Memory.ApplicationPool())
+			e.applyObservations(o.Reads)
 		}
 	}
 }
@@ -239,7 +281,7 @@ func apply_writes(c *C.context) {
 	e := env(c)
 	if extras := e.cmd.Extras(); extras != nil {
 		if o := extras.Observations(); o != nil {
-			o.ApplyWrites(e.State.Memory.ApplicationPool())
+			e.applyObservations(o.Writes)
 		}
 	}
 }
@@ -247,24 +289,11 @@ func apply_writes(c *C.context) {
 //export resolve_pool_data
 func resolve_pool_data(c *C.context, pool C.uint64_t, ptr C.uint64_t, access C.gapil_data_access, size C.uint64_t) unsafe.Pointer {
 	env := EnvFromNative((unsafe.Pointer)(c))
-	ctx := env.goCtx
-	p := env.State.Memory.MustGet(memory.PoolID(pool))
 	switch access {
 	case C.GAPIL_READ:
-		buf := env.bufferArena.Allocate(int(size), 1) // TODO: Free these!
-		C.memset(buf, 0, C.size_t(size))
-		rng := memory.Range{Base: uint64(ptr), Size: uint64(size)}
-		sli := p.Slice(rng)
-		if err := sli.Get(ctx, 0, slice.Bytes(buf, uint64(size))); err != nil {
-			panic(err)
-		}
-		return buf
+		return env.readPoolData(memory.PoolID(pool), uint64(ptr), uint64(size))
 	case C.GAPIL_WRITE:
-		buf := env.bufferArena.Allocate(int(size), 1) // TODO: Free these!
-		C.memset(buf, 0, C.size_t(size))
-		blob := memory.Blob(slice.Bytes(buf, uint64(size)))
-		p.Write(uint64(ptr), blob)
-		return buf
+		return env.writePoolData(memory.PoolID(pool), uint64(ptr), uint64(size))
 	default:
 		panic(fmt.Errorf("Unexpected access: %v", access))
 	}
@@ -277,6 +306,24 @@ func copy_slice(c *C.context, dst, src *C.slice) {
 	pSrc := env.State.Memory.MustGet(memory.PoolID(src.pool))
 	size := u64.Min(uint64(dst.size), uint64(src.size))
 	pDst.Write(uint64(dst.base), pSrc.Slice(memory.Range{Base: uint64(src.base), Size: size}))
+}
+
+//export cstring_to_slice
+func cstring_to_slice(c *C.context, ptr C.uint64_t, out *C.slice) {
+	env := EnvFromNative((unsafe.Pointer)(c))
+	pool := env.State.Memory.ApplicationPool()
+	size, err := pool.Strlen(env.goCtx, uint64(ptr))
+	if err != nil {
+		panic(err)
+	}
+
+	size++ // Include null terminator
+
+	out.pool = C.uint64_t(memory.ApplicationPool)
+	out.root = C.uint64_t(ptr)
+	out.base = C.uint64_t(ptr)
+	out.size = C.uint64_t(size)
+	out.count = C.uint64_t(size)
 }
 
 //export store_in_database

@@ -139,6 +139,10 @@ typedef struct gapil_runtime_callbacks_t {
   // copies N bytes of data from src to dst, where N is min(dst.size, src.size).
   void (*copy_slice)(context*, slice* dst, slice* src);
 
+  // outputs a slice spanning the bytes of the null-terminated string starting
+  // at ptr. The slice includes the null-terminator byte.
+  void (*cstring_to_slice)(context*, uint64_t ptr, slice* out);
+
   // stores the buffer at ptr of the given size into the database.
   // Writes the 20-byte database identifier of the stored data to id.
   void (*store_in_database)(context* ctx, void* ptr, uint64_t size,

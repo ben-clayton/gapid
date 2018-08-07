@@ -92,6 +92,21 @@ void copy_slice(context* ctx, slice* dst, slice* src) {
   memcpy(dstPtr, srcPtr, size);
 }
 
+void cstring_to_slice(context* ctx, uint64_t ptr, slice* out) {
+  auto data = reinterpret_cast<char*>(
+      resolve_pool_data(ctx, GAPIL_APPLICATION_POOL, ptr, GAPIL_READ, 0));
+
+  auto len = strlen(data);
+
+  len++;  // Include null-terminator in the slice.
+
+  out->pool = GAPIL_APPLICATION_POOL;
+  out->root = ptr;
+  out->base = ptr;
+  out->size = len;
+  out->count = len;
+}
+
 uint64_t make_pool(context* ctx, uint64_t size) {
   auto cb = static_cast<gapii::CallObserver*>(ctx);
   return cb->create_pool(size)->id;
