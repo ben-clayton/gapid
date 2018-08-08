@@ -15,6 +15,9 @@
 package gles
 
 // #include "gapis/api/gles/ctypes.h"
+//
+// // Implemented in externs.c
+// extern void externIndexLimits(context*, IndexLimits_args*, IndexLimits_res*);
 import "C"
 
 import (
@@ -23,8 +26,27 @@ import (
 	"github.com/google/gapid/gapil/executor"
 )
 
-func externsFromNative(ctx *C.context) *externs {
-	env := executor.EnvFromNative(unsafe.Pointer(ctx))
+func init() {
+	executor.RegisterGoExtern("gles.GetAndroidNativeBufferExtra", externGetAndroidNativeBufferExtra)
+	executor.RegisterGoExtern("gles.GetCompileShaderExtra", externGetCompileShaderExtra)
+	executor.RegisterGoExtern("gles.GetEGLDynamicContextState", externGetEGLDynamicContextState)
+	executor.RegisterGoExtern("gles.GetEGLImageData", externGetEGLImageData)
+	executor.RegisterGoExtern("gles.GetEGLStaticContextState", externGetEGLStaticContextState)
+	executor.RegisterGoExtern("gles.GetLinkProgramExtra", externGetLinkProgramExtra)
+	executor.RegisterGoExtern("gles.GetValidateProgramExtra", externGetValidateProgramExtra)
+	executor.RegisterGoExtern("gles.GetValidateProgramPipelineExtra", externGetValidateProgramPipelineExtra)
+	executor.RegisterGoExtern("gles.ReadGPUTextureData", externReadGPUTextureData)
+	executor.RegisterGoExtern("gles.addTag", externAddTag)
+	executor.RegisterGoExtern("gles.mapMemory", externMapMemory)
+	executor.RegisterGoExtern("gles.newMsg", externNewMsg)
+	executor.RegisterGoExtern("gles.onGlError", externOnGlError)
+	executor.RegisterGoExtern("gles.unmapMemory", externUnmapMemory)
+
+	executor.RegisterCExtern("gles.IndexLimits", C.externIndexLimits)
+	//executor.RegisterGoExtern("gles.IndexLimits", externIndexLimits)
+}
+
+func externsFromEnv(env *executor.Env) *externs {
 	return &externs{
 		ctx:   env.Context(),
 		cmd:   env.Cmd(),
@@ -34,134 +56,135 @@ func externsFromNative(ctx *C.context) *externs {
 	}
 }
 
-//export gles_GetAndroidNativeBufferExtra
-func gles_GetAndroidNativeBufferExtra(ctx *C.context, buffer uint64, out *unsafe.Pointer) {
-	panic("gles_GetAndroidNativeBufferExtra not implemented")
+func externGetAndroidNativeBufferExtra(env *executor.Env, args, out unsafe.Pointer) {
+	// e := externsFromEnv(env)
+	// a := (*C.GetAndroidNativeBufferExtra_args)(args)
+	// o := (*C.GetAndroidNativeBufferExtra_res)(out)
+	panic("externGetAndroidNativeBufferExtra not implemented")
 }
 
-//export gles_GetCompileShaderExtra
-func gles_GetCompileShaderExtra(
-	ctx *C.context,
-	context *C.Context__R,
-	shader *C.Shader__R,
-	extra *C.BinaryExtra__R,
-	out **C.CompileShaderExtra__R) {
-
-	e := externsFromNative(ctx)
-	*out = e.GetCompileShaderExtra(
-		Contextʳ{context},
-		Shaderʳ{shader},
-		BinaryExtraʳ{extra},
+func externGetCompileShaderExtra(env *executor.Env, args, out unsafe.Pointer) {
+	e := externsFromEnv(env)
+	a := (*C.GetCompileShaderExtra_args)(args)
+	o := (*C.GetCompileShaderExtra_res)(out)
+	*o = e.GetCompileShaderExtra(
+		Contextʳ{a.ctx},
+		Shaderʳ{a.p},
+		BinaryExtraʳ{a.binary},
 	).c
 }
 
-//export gles_GetEGLDynamicContextState
-func gles_GetEGLDynamicContextState(
-	ctx *C.context,
-	display EGLDisplay,
-	surface EGLSurface,
-	context EGLContext,
-	out **C.DynamicContextState__R) {
+func externGetEGLDynamicContextState(env *executor.Env, args, out unsafe.Pointer) {
+	e := externsFromEnv(env)
+	a := (*C.GetEGLDynamicContextState_args)(args)
+	o := (*C.GetEGLDynamicContextState_res)(out)
 
-	e := externsFromNative(ctx)
-	*out = e.GetEGLDynamicContextState(display, surface, context).c
+	*o = e.GetEGLDynamicContextState(EGLDisplay(a.display), EGLSurface(a.surface), EGLContext(a.context)).c
 }
 
-//export gles_GetEGLImageData
-func gles_GetEGLImageData(ctx *C.context, img EGLImageKHR, width, height GLsizei) {
-	e := externsFromNative(ctx)
-	e.GetEGLImageData(img, width, height)
+func externGetEGLImageData(env *executor.Env, args, out unsafe.Pointer) {
+	e := externsFromEnv(env)
+	a := (*C.GetEGLImageData_args)(args)
+
+	e.GetEGLImageData(EGLImageKHR(a.img), GLsizei(a.width), GLsizei(a.height))
 }
 
-//export gles_GetEGLStaticContextState
-func gles_GetEGLStaticContextState(
-	ctx *C.context,
-	display EGLDisplay,
-	context EGLContext,
-	out **C.StaticContextState__R) {
+func externGetEGLStaticContextState(env *executor.Env, args, out unsafe.Pointer) {
+	e := externsFromEnv(env)
+	a := (*C.GetEGLStaticContextState_args)(args)
+	o := (*C.GetEGLStaticContextState_res)(out)
 
-	e := externsFromNative(ctx)
-	*out = e.GetEGLStaticContextState(display, context).c
-}
-
-//export gles_GetLinkProgramExtra
-func gles_GetLinkProgramExtra(
-	ctx *C.context,
-	context *C.Context__R,
-	program *C.Program__R,
-	extra *C.BinaryExtra__R,
-	out **C.LinkProgramExtra__R) {
-
-	e := externsFromNative(ctx)
-	*out = e.GetLinkProgramExtra(
-		Contextʳ{context},
-		Programʳ{program},
-		BinaryExtraʳ{extra},
+	*o = e.GetEGLStaticContextState(
+		EGLDisplay(a.display),
+		EGLContext(a.context),
 	).c
 }
 
-//export gles_GetValidateProgramExtra
-func gles_GetValidateProgramExtra(
-	ctx *C.context,
-	context *C.Context__R,
-	program *C.Program__R,
-	out **C.ValidateProgramExtra__R) {
+func externGetLinkProgramExtra(env *executor.Env, args, out unsafe.Pointer) {
+	e := externsFromEnv(env)
+	a := (*C.GetLinkProgramExtra_args)(args)
+	o := (*C.GetLinkProgramExtra_res)(out)
 
-	e := externsFromNative(ctx)
-	*out = e.GetValidateProgramExtra(
-		Contextʳ{context},
-		Programʳ{program},
+	*o = e.GetLinkProgramExtra(
+		Contextʳ{a.ctx},
+		Programʳ{a.p},
+		BinaryExtraʳ{a.binary},
 	).c
 }
 
-//export gles_GetValidateProgramPipelineExtra
-func gles_GetValidateProgramPipelineExtra(
-	ctx *C.context,
-	context *C.Context__R,
-	pipeline *C.Pipeline__R,
-	out **C.ValidateProgramPipelineExtra__R) {
+func externGetValidateProgramExtra(env *executor.Env, args, out unsafe.Pointer) {
+	e := externsFromEnv(env)
+	a := (*C.GetValidateProgramExtra_args)(args)
+	o := (*C.GetValidateProgramExtra_res)(out)
 
-	e := externsFromNative(ctx)
-	*out = e.GetValidateProgramPipelineExtra(
-		Contextʳ{context},
-		Pipelineʳ{pipeline},
+	*o = e.GetValidateProgramExtra(
+		Contextʳ{a.ctx},
+		Programʳ{a.p},
 	).c
 }
 
-//export gles_ReadGPUTextureData
-func gles_ReadGPUTextureData(ctx *C.context, texture *C.Texture__R, level, layer GLint, out *C.slice) {
-	e := externsFromNative(ctx)
-	*out = *e.ReadGPUTextureData(
-		Textureʳ{texture},
-		level,
-		layer,
+func externGetValidateProgramPipelineExtra(env *executor.Env, args, out unsafe.Pointer) {
+	e := externsFromEnv(env)
+	a := (*C.GetValidateProgramPipelineExtra_args)(args)
+	o := (*C.GetValidateProgramPipelineExtra_res)(out)
+
+	*o = e.GetValidateProgramPipelineExtra(
+		Contextʳ{a.ctx},
+		Pipelineʳ{a.p},
 	).c
 }
 
-//export gles_addTag
-func gles_addTag(ctx *C.context, _ uint32, _ uint8) {
-	// TODO: panic("gles_addTag not implemented")
+func externReadGPUTextureData(env *executor.Env, args, out unsafe.Pointer) {
+	e := externsFromEnv(env)
+	a := (*C.ReadGPUTextureData_args)(args)
+	o := (*C.ReadGPUTextureData_res)(out)
+
+	*o = *e.ReadGPUTextureData(
+		Textureʳ{a.texture},
+		GLint(a.level),
+		GLint(a.layer),
+	).c
 }
 
-//export gles_mapMemory
-func gles_mapMemory(ctx *C.context, slice *C.slice) {
-	e := externsFromNative(ctx)
-	e.mapMemory(U8ˢ{slice})
+func externAddTag(env *executor.Env, args, out unsafe.Pointer) {
+	// e := externsFromEnv(env)
+	// a := (*C.AddTag_args)(args)
+	// o := (*C.AddTag_res)(out)
+	// TODO: panic("externAddTag not implemented")
 }
 
-//export gles_newMsg
-func gles_newMsg(ctx *C.context, severity Severity, _ uint8, out *uint32) {
-	// TODO: panic("gles_newMsg not implemented")
+func externMapMemory(env *executor.Env, args, out unsafe.Pointer) {
+	e := externsFromEnv(env)
+	a := (*C.mapMemory_args)(args)
+
+	e.mapMemory(U8ˢ{&a.slice})
 }
 
-//export gles_onGlError
-func gles_onGlError(ctx *C.context, err GLenum) {
-	e := externsFromNative(ctx)
-	e.onGlError(err)
+func externNewMsg(env *executor.Env, args, out unsafe.Pointer) {
+	// e := externsFromEnv(env)
+	// a := (*C.NewMsg_args)(args)
+	// o := (*C.NewMsg_res)(out)
+	// TODO: panic("externNewMsg not implemented")
 }
 
-//export gles_unmapMemory
-func gles_unmapMemory(ctx *C.context, slice *C.slice) {
-	e := externsFromNative(ctx)
-	e.unmapMemory(U8ˢ{slice})
+func externOnGlError(env *executor.Env, args, out unsafe.Pointer) {
+	e := externsFromEnv(env)
+	a := (*C.onGlError_args)(args)
+
+	e.onGlError(GLenum(a.v))
+}
+
+func externUnmapMemory(env *executor.Env, args, out unsafe.Pointer) {
+	e := externsFromEnv(env)
+	a := (*C.unmapMemory_args)(args)
+
+	e.unmapMemory(U8ˢ{&a.slice})
+}
+
+func externIndexLimits(env *executor.Env, args, out unsafe.Pointer) {
+	e := externsFromEnv(env)
+	a := (*C.IndexLimits_args)(args)
+	o := (*C.IndexLimits_res)(out)
+
+	*o = *e.IndexLimits(U8ˢ{&a.indices}, int32(a.sizeof_index)).c
 }

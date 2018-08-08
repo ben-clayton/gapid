@@ -61,9 +61,12 @@ type C struct {
 	// Settings are the configuration values used for this compile.
 	Settings Settings
 
-	plugins   plugins
-	functions map[*semantic.Function]*codegen.Function
-	ctx       struct { // Functions that operate on contexts
+	plugins     plugins
+	commands    map[*semantic.Function]*codegen.Function
+	externs     map[*semantic.Function]*codegen.Function
+	subroutines map[*semantic.Function]*codegen.Function
+	functions   map[string]*codegen.Function
+	ctx         struct { // Functions that operate on contexts
 		create  *codegen.Function
 		destroy *codegen.Function
 	}
@@ -86,6 +89,7 @@ type C struct {
 		alloc           *codegen.Function
 		applyReads      *codegen.Function
 		applyWrites     *codegen.Function
+		callExtern      *codegen.Function
 		copySlice       *codegen.Function
 		cstringToSlice  *codegen.Function
 		free            *codegen.Function
@@ -104,6 +108,7 @@ type C struct {
 		stringConcat    *codegen.Function
 		stringToSlice   *codegen.Function
 	}
+	module codegen.Global
 }
 
 // Compile compiles the given API semantic tree to a program using the given
@@ -130,7 +135,10 @@ func Compile(apis []*semantic.API, mappings *semantic.Mappings, s Settings) (*Pr
 		Settings: s,
 
 		plugins:       s.Plugins,
-		functions:     map[*semantic.Function]*codegen.Function{},
+		commands:      map[*semantic.Function]*codegen.Function{},
+		externs:       map[*semantic.Function]*codegen.Function{},
+		subroutines:   map[*semantic.Function]*codegen.Function{},
+		functions:     map[string]*codegen.Function{},
 		mappings:      mappings,
 		locationIndex: map[Location]int{},
 		locations:     []Location{},
@@ -146,7 +154,7 @@ func Compile(apis []*semantic.API, mappings *semantic.Mappings, s Settings) (*Pr
 		return nil, err
 	}
 
-	if err := prog.Module.Verify(); err != nil {
+	if err := c.M.Verify(); err != nil {
 		return nil, err
 	}
 
@@ -154,11 +162,8 @@ func Compile(apis []*semantic.API, mappings *semantic.Mappings, s Settings) (*Pr
 }
 
 func (c *C) program(s Settings) (*Program, error) {
-	commands := make(map[string]*CommandInfo, len(c.functions))
-	for a, f := range c.functions {
-		if a.Subroutine || a.Extern {
-			continue
-		}
+	commands := make(map[string]*CommandInfo, len(c.commands))
+	for a, f := range c.commands {
 		commands[a.Name()] = &CommandInfo{
 			Execute:    f,
 			Parameters: c.T.CmdParams[a].(*codegen.Struct),
@@ -166,13 +171,6 @@ func (c *C) program(s Settings) (*Program, error) {
 	}
 
 	globals := &StructInfo{Type: c.T.Globals}
-
-	functions := map[string]*codegen.Function{}
-	c.plugins.foreach(func(p FunctionExposerPlugin) {
-		for n, f := range p.Functions() {
-			functions[n] = f
-		}
-	})
 
 	structs := map[string]*StructInfo{}
 	for _, t := range c.T.target {
@@ -187,17 +185,16 @@ func (c *C) program(s Settings) (*Program, error) {
 	}
 
 	return &Program{
-		Settings:       c.Settings,
-		APIs:           c.APIs,
-		Commands:       commands,
-		Structs:        structs,
-		Globals:        globals,
-		Functions:      functions,
-		Maps:           maps,
-		Locations:      c.locations,
-		Module:         c.M,
-		CreateContext:  c.ctx.create,
-		DestroyContext: c.ctx.destroy,
+		Settings:  c.Settings,
+		APIs:      c.APIs,
+		Commands:  commands,
+		Structs:   structs,
+		Globals:   globals,
+		Functions: c.functions,
+		Maps:      maps,
+		Locations: c.locations,
+		Codegen:   c.M,
+		Module:    c.module,
 	}, nil
 }
 
@@ -232,26 +229,24 @@ func (c *C) compile() {
 
 	c.plugins.foreach(func(p Plugin) { p.Build(c) })
 
-	if c.Settings.EmitExec {
-		for _, api := range c.APIs {
-			c.currentAPI = api
-			for _, f := range api.Externs {
-				c.extern(f)
-			}
-			for _, f := range api.Subroutines {
-				c.subroutine(f)
-			}
-			for _, f := range api.Functions {
-				c.command(f)
-			}
+	c.plugins.foreach(func(p FunctionExposerPlugin) {
+		for n, f := range p.Functions() {
+			c.functions[n] = f
 		}
+	})
+
+	if c.Settings.EmitExec {
+		c.buildExec()
 	}
+
+	c.buildModule()
 }
 
 func (c *C) declareCallbacks() {
 	c.callbacks.alloc = c.M.ParseFunctionSignature(C.GoString(C.gapil_alloc_sig))
 	c.callbacks.applyReads = c.M.ParseFunctionSignature(C.GoString(C.gapil_apply_reads_sig))
 	c.callbacks.applyWrites = c.M.ParseFunctionSignature(C.GoString(C.gapil_apply_writes_sig))
+	c.callbacks.callExtern = c.M.ParseFunctionSignature(C.GoString(C.gapil_call_extern_sig))
 	c.callbacks.copySlice = c.M.ParseFunctionSignature(C.GoString(C.gapil_copy_slice_sig))
 	c.callbacks.cstringToSlice = c.M.ParseFunctionSignature(C.GoString(C.gapil_cstring_to_slice_sig))
 	c.callbacks.free = c.M.ParseFunctionSignature(C.GoString(C.gapil_free_sig))
@@ -276,15 +271,15 @@ func (c *C) declareCallbacks() {
 // If the function has a parameter of type context_t* then the Ctx, Location,
 // Globals and Arena scope fields are automatically assigned.
 func (c *C) Build(f *codegen.Function, do func(*S)) {
-	err(f.Build(func(jb *codegen.Builder) {
+	err(f.Build(func(b *codegen.Builder) {
 		s := &S{
-			Builder:    jb,
+			Builder:    b,
 			Parameters: map[*semantic.Parameter]*codegen.Value{},
 			locals:     map[*semantic.Local]*codegen.Value{},
 		}
 		for i, p := range f.Type.Signature.Parameters {
 			if p == c.T.CtxPtr {
-				s.Ctx = jb.Parameter(i).SetName("ctx")
+				s.Ctx = b.Parameter(i).SetName("ctx")
 				s.If(s.Ctx.IsNull(), func(s *S) {
 					c.LogF(s, "Context is null")
 				})
@@ -298,6 +293,17 @@ func (c *C) Build(f *codegen.Function, do func(*S)) {
 
 		s.enter(do)
 	}))
+}
+
+func (c *C) Ctor(priority int32, do func(*S)) {
+	c.M.Ctor(priority, func(b *codegen.Builder) {
+		s := &S{
+			Builder:    b,
+			Parameters: map[*semantic.Parameter]*codegen.Value{},
+			locals:     map[*semantic.Local]*codegen.Value{},
+		}
+		s.enter(do)
+	})
 }
 
 // MakeSlice creates a new slice of the given size in bytes.

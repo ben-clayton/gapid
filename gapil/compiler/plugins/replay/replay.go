@@ -27,9 +27,9 @@ import (
 import "C"
 
 const (
-	// getReplayData is the name of the function that retrieves the replay
+	// GetReplayData is the name of the function that retrieves the replay
 	// data from the context.
-	getReplayData = "get_replay_data"
+	GetReplayData = "get_replay_data"
 
 	// Anything very low in application address-space is extremely
 	// unlikely to be a valid pointer.
@@ -108,7 +108,7 @@ func (r *replayer) OnPreBuildContext(c *compiler.C) {
 		r.replayLayout = c.Settings.CaptureABI.MemoryLayout
 	}
 
-	r.getReplayData = c.M.Function(replayDataPtr, getReplayData, c.T.CtxPtr)
+	r.getReplayData = c.M.Function(replayDataPtr, GetReplayData, c.T.CtxPtr)
 
 	r.parseCallbacks()
 }
@@ -138,7 +138,7 @@ func (r *replayer) ContextData(c *compiler.C) []compiler.ContextField {
 
 func (r *replayer) Functions() map[string]*codegen.Function {
 	return map[string]*codegen.Function{
-		getReplayData: r.getReplayData,
+		GetReplayData: r.getReplayData,
 	}
 }
 
@@ -264,10 +264,7 @@ func (r *replayer) buildCall(cmd *semantic.Function) *codegen.Function {
 
 		api := cmd.Owner().(*semantic.API)
 
-		var apiIdx int
-		if api.Index != nil {
-			apiIdx = int(*api.Index)
-		}
+		apiIdx := int(api.Index)
 		cmdIdx := api.CommandIndex(cmd)
 		if cmdIdx < 0 {
 			panic("Command not found in API?!")

@@ -101,7 +101,7 @@ func StateTreeNode(ctx context.Context, p *path.StateTreeNode) (*service.StateTr
 	}
 	tree := boxed.(*stateTree)
 
-	env := executor.NewEnv(ctx, nil, executor.Config{})
+	env := executor.NewEnv(ctx, executor.Config{})
 	defer env.Dispose()
 	ctx = executor.PutEnv(ctx, env)
 
@@ -118,7 +118,7 @@ func StateTreeNodeForPath(ctx context.Context, p *path.StateTreeNodeForPath) (*p
 	}
 	tree := boxed.(*stateTree)
 
-	env := executor.NewEnv(ctx, nil, executor.Config{})
+	env := executor.NewEnv(ctx, executor.Config{})
 	defer env.Dispose()
 	ctx = executor.PutEnv(ctx, env)
 

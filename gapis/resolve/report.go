@@ -126,8 +126,13 @@ func (r *ReportResolvable) Resolve(ctx context.Context) (interface{}, error) {
 		}
 	}
 
+	ctx = status.Start(ctx, "Execute")
+	defer status.Finish(ctx)
+
 	// Gather report items from the state mutator, and collect together all the
 	// APIs in use.
+	errs := env.ExecuteN(ctx, 0, c.Commands)
+
 	api.ForeachCmd(ctx, c.Commands, func(ctx context.Context, id api.CmdID, cmd api.Cmd) error {
 		items, currentCmd = items[:0], uint64(id)
 
@@ -136,11 +141,9 @@ func (r *ReportResolvable) Resolve(ctx context.Context) (interface{}, error) {
 				messages.ErrTraceAssert(ctx, as.Reason)))
 		}
 
-		if err := env.Execute(ctx, cmd, id); err != nil {
-			if !api.IsErrCmdAborted(err) {
-				items = append(items, r.newReportItem(log.Error, uint64(id),
-					messages.ErrInternalError(ctx, err.Error())))
-			}
+		if err := errs[id]; err != nil && !api.IsErrCmdAborted(err) {
+			items = append(items, r.newReportItem(log.Error, uint64(id),
+				messages.ErrInternalError(ctx, err.Error())))
 		}
 
 		if filter(id, cmd, state) {

@@ -234,12 +234,12 @@ func (c *C) call(s *S, e *semantic.Call) *codegen.Value {
 	for i, a := range e.Arguments {
 		args[i+1] = c.expression(s, a).SetName(tf.FullParameters[i].Name())
 	}
-	f, ok := c.functions[tf]
+	f, ok := c.subroutines[tf]
 	if !ok && tf.Subroutine {
 		// Likely a subroutine calling another subrotine that hasn't been compiled yet.
 		// Compile it now.
 		c.subroutine(tf)
-		f, ok = c.functions[tf]
+		f, ok = c.subroutines[tf]
 	}
 	if !ok {
 		panic(fmt.Errorf("Couldn't resolve call target %v", tf.Name()))
@@ -562,7 +562,7 @@ func (c *C) sliceRange(s *S, e *semantic.SliceRange) *codegen.Value {
 }
 
 func (c *C) stringValue(s *S, e semantic.StringValue) *codegen.Value {
-	str := c.MakeString(s, s.Scalar(uint64(len(e))), s.GlobalString(string(e)))
+	str := c.MakeString(s, s.Scalar(uint64(len(e))), s.Scalar(string(e)))
 	c.deferRelease(s, str, semantic.StringType)
 	return str
 }

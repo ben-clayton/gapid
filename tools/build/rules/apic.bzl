@@ -95,6 +95,10 @@ def _apic_compile_impl(ctx):
             api_search_path(apilist),
             "--target",
             target,
+            "--capture",
+            ctx.attr.capture,
+            "--module",
+            ctx.attr.module,
             "--output",
             outputs[0].path,
             "--optimize=%s" % ctx.attr.optimize,
@@ -133,6 +137,14 @@ apic_compile = rule(
         "emit": attr.string_list(
             allow_empty = True,
             mandatory = True,
+        ),
+        "capture": attr.string(
+            default = "",
+            mandatory = False,
+        ),
+        "module": attr.string(
+            default = "",
+            mandatory = False,
         ),
         "namespace": attr.string(
             default = "",

@@ -32,7 +32,7 @@ import (
 func TestReferences(t *testing.T) {
 	ctx := log.Testing(t)
 	ctx = database.Put(ctx, database.NewInMemory(ctx))
-	ctx = executor.PutEnv(ctx, executor.NewEnv(ctx, nil, executor.Config{}))
+	ctx = executor.PutEnv(ctx, executor.NewEnv(ctx, executor.Config{}))
 	assert := assert.To(t)
 
 	a := arena.New()
@@ -80,7 +80,7 @@ func TestReferences(t *testing.T) {
 func TestEquals(t *testing.T) {
 	ctx := log.Testing(t)
 	ctx = database.Put(ctx, database.NewInMemory(ctx))
-	ctx = executor.PutEnv(ctx, executor.NewEnv(ctx, nil, executor.Config{}))
+	ctx = executor.PutEnv(ctx, executor.NewEnv(ctx, executor.Config{}))
 
 	a := arena.New()
 	defer a.Dispose()
@@ -94,7 +94,7 @@ func TestEquals(t *testing.T) {
 func TestCloneReferences(t *testing.T) {
 	ctx := log.Testing(t)
 	ctx = database.Put(ctx, database.NewInMemory(ctx))
-	ctx = executor.PutEnv(ctx, executor.NewEnv(ctx, nil, executor.Config{}))
+	ctx = executor.PutEnv(ctx, executor.NewEnv(ctx, executor.Config{}))
 	assert := assert.To(t)
 
 	a := arena.New()

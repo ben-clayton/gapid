@@ -27,20 +27,13 @@ import (
 // SizeOf returns the size of the type in bytes as a uint64.
 // If ty is void, a value of 1 is returned.
 func (b *Builder) SizeOf(ty Type) *Value {
-	if ty == b.m.Types.Void {
-		return b.Scalar(uint64(1))
-	}
-	if bits := ty.sizeInBits(); bits > 0 {
-		return b.Scalar(uint64((bits + 7) / 8)).
-			SetName(fmt.Sprintf("sizeof(%v)", ty.TypeName()))
-	}
-	return b.val(b.m.Types.Uint64, llvm.SizeOf(ty.llvmTy())).
+	return b.m.SizeOf(ty).Value(b).
 		SetName(fmt.Sprintf("sizeof(%v)", ty.TypeName()))
 }
 
 // AlignOf returns the alignment of the type in bytes.
 func (b *Builder) AlignOf(ty Type) *Value {
-	return b.val(b.m.Types.Uint64, llvm.AlignOf(ty.llvmTy())).
+	return b.m.AlignOf(ty).Value(b).
 		SetName(fmt.Sprintf("alignof(%v)", ty.TypeName()))
 }
 
@@ -269,6 +262,12 @@ func (t FunctionType) String() string    { return t.Signature.string("") }
 func (t FunctionType) sizeInBits() int   { return 0 }
 func (t FunctionType) llvmTy() llvm.Type { return t.llvm }
 
+// IsFunction returns true if ty is a function type.
+func IsFunction(ty Type) bool {
+	_, ok := ty.(*FunctionType)
+	return ok
+}
+
 // Signature holds signature information about a function.
 type Signature struct {
 	Parameters TypeList
@@ -335,7 +334,7 @@ func (t *Struct) llvmTy() llvm.Type { return t.llvm }
 func (t *Struct) Field(name string) Field {
 	f, ok := t.fieldIndices[name]
 	if !ok {
-		panic(fmt.Errorf("Struct '%v' does not have field with name '%v'", t.Name, name))
+		fail("Struct '%v' does not have field with name '%v'", t.Name, name)
 	}
 	return t.Fields[f]
 }
@@ -369,11 +368,11 @@ func (t *Types) struct_(name string, packed bool, fields []Field) *Struct {
 	if s, ok := t.structs[name]; ok {
 		if fields != nil {
 			if !reflect.DeepEqual(fields, s.Fields) {
-				panic(fmt.Errorf("Struct '%s' redeclared with different fields\nPrevious: %+v\nNew:      %+v",
-					name, s.Fields, fields))
+				fail("Struct '%s' redeclared with different fields\nPrevious: %+v\nNew:      %+v",
+					name, s.Fields, fields)
 			}
 			if packed != s.llvm.IsStructPacked() {
-				panic(fmt.Errorf("Struct '%s' redeclared with different packed flags", name))
+				fail("Struct '%s' redeclared with different packed flags", name)
 			}
 		}
 		return s
@@ -483,10 +482,32 @@ func (t *Types) PackedStruct(name string, fields ...Field) *Struct {
 // TypeOf returns the corresponding codegen type for the type of value v.
 // TypeOf may also accept a reflect.Type.
 func (t *Types) TypeOf(v interface{}) Type {
-	ty, ok := v.(reflect.Type)
-	if !ok {
+	var ty reflect.Type
+	switch v := v.(type) {
+	case Type:
+		return v
+	case *Value:
+		return v.Type()
+	case *Function:
+		if v != nil {
+			return v.Type
+		}
+	case Const:
+		return v.Type
+	case reflect.Type:
+		ty = v
+	}
+
+	if ty == nil {
 		ty = reflect.TypeOf(v)
 	}
+
+	if ty == reflect.TypeOf((*Function)(nil)) {
+		// We have a reflect type of a function, but we don't have a value to
+		// inspect its type. Return void* for these.
+		return t.Pointer(t.Void)
+	}
+
 	switch ty.Kind() {
 	case reflect.Bool:
 		return t.Bool
@@ -536,7 +557,8 @@ func (t *Types) TypeOf(v interface{}) Type {
 		s.SetBody(false, fields...)
 		return s
 	default:
-		panic(fmt.Errorf("Unsupported kind %v", ty.Kind()))
+		fail("Unsupported kind %v", ty.Kind())
+		return nil
 	}
 }
 
@@ -548,7 +570,7 @@ func (t *Types) FieldsOf(v interface{}) []Field {
 		ty = reflect.TypeOf(v)
 	}
 	if ty.Kind() != reflect.Struct {
-		panic(fmt.Errorf("FieldsOf must be passed a struct type. Got %v", ty))
+		fail("FieldsOf must be passed a struct type. Got %v", ty)
 	}
 	c := ty.NumField()
 	fields := make([]Field, 0, c)
@@ -562,7 +584,7 @@ func (t *Types) FieldsOf(v interface{}) []Field {
 			if name, ok := f.Tag.Lookup("ptr"); ok {
 				s, ok := t.structs[name]
 				if !ok {
-					panic(fmt.Errorf("Unknown pointer type '%v'", name))
+					fail("Unknown pointer type '%v'", name)
 				}
 				ty = t.Pointer(s)
 			}

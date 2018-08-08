@@ -124,3 +124,7 @@ func (v Const) Cast(ty Type) Const {
 		return Const{}
 	}
 }
+
+func (v Global) Cast(ty Type) Global {
+	return Global(Const(v).Cast(ty))
+}

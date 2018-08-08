@@ -1,4 +1,4 @@
-// Copyright (C) 2018 Google Inc.
+// Copyright (C) 2017 Google Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,12 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package compiler
+package executor
 
-const (
-	debugFunctionCalls    = false
-	debugStatements       = false
-	debugExpressions      = false
-	debugRefCounts        = false
-	debugDisableRefCounts = false
+import (
+	"unsafe"
 )
+
+type Extern func(e *Env, args, res unsafe.Pointer)
+
+var externs = map[string]Extern{}
+
+// RegisterGoExtern registers the golang extern e.
+func RegisterGoExtern(name string, e Extern) {
+	externs[name] = e
+}
+
+// RegisterCExtern registers the c extern e.
+func RegisterCExtern(name string, e unsafe.Pointer) {
+	registerCExtern(name, e)
+}

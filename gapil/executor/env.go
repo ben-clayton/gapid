@@ -20,6 +20,7 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/google/gapid/core/app/status"
 	"github.com/google/gapid/core/data/slice"
 	"github.com/google/gapid/core/math/u64"
 	"github.com/google/gapid/core/memory/arena"
@@ -29,49 +30,11 @@ import (
 	"github.com/google/gapid/gapis/memory"
 )
 
-// #include "gapil/runtime/cc/runtime.h"
+// #include "env.h"
 //
 // #include <string.h> // memset
-//
-// typedef context* (TCreateContext) (arena*);
-// typedef void     (TDestroyContext) (context*);
-// typedef uint32_t (TFunc) (void* ctx);
-//
-// static context* create_context(TCreateContext* func, arena* a) { return func(a); }
-// static void destroy_context(TDestroyContext* func, context* ctx) { func(ctx); }
-// static uint32_t call(context* ctx, TFunc* func) { return func(ctx); }
-//
-// // Implemented below.
-// extern void apply_reads(context*);
-// extern void apply_writes(context*);
-// extern void* resolve_pool_data(context*, uint64_t, uint64_t, gapil_data_access, uint64_t);
-// extern void copy_slice(context* ctx, slice* dst, slice* src);
-// extern void cstring_to_slice(context* ctx, uint64_t ptr, slice* out);
-// extern void store_in_database(context*, void*, uint64_t, uint8_t*);
-// extern uint64_t make_pool(context*, uint64_t);
-// extern void pool_reference(context*, uint64_t);
-// extern void pool_release(context*, uint64_t);
-//
-// static void set_callbacks() {
-//   gapil_runtime_callbacks callbacks = {
-//     .apply_reads       = &apply_reads,
-//     .apply_writes      = &apply_writes,
-//     .resolve_pool_data = &resolve_pool_data,
-//     .copy_slice        = &copy_slice,
-//     .cstring_to_slice  = &cstring_to_slice,
-//     .store_in_database = &store_in_database,
-//     .make_pool         = &make_pool,
-//     .pool_reference    = &pool_reference,
-//     .pool_release      = &pool_release,
-//   };
-//   gapil_set_runtime_callbacks(&callbacks);
-// }
+// #include <stdlib.h> // free
 import "C"
-
-func init() {
-	// Setup the gapil runtime environment.
-	C.set_callbacks()
-}
 
 // Env is the go execution environment.
 type Env struct {
@@ -90,13 +53,13 @@ type Env struct {
 	id    envID
 	cCtx  *C.context      // The gapil C context.
 	goCtx context.Context // The go context.
-	cmd   api.Cmd         // The currently executing command.
+	cmds  []api.Cmd       // The currently executing commands.
 }
 
 // Dispose releases the memory used by the environment.
 // Call after the env is no longer needed to avoid leaking memory.
 func (e *Env) Dispose() {
-	C.destroy_context((*C.TDestroyContext)(e.Executor.destroyContext), e.cCtx)
+	C.destroy_context(e.Executor.module, e.cCtx)
 	e.bufferArena.Dispose()
 	e.Arena.Dispose()
 }
@@ -158,38 +121,81 @@ func (e *Executor) NewEnv(ctx context.Context) *Env {
 	env.bufferArena = arena.New()
 
 	// Create the context and initialize the globals.
-	env.goCtx = ctx
-	env.cCtx = C.create_context((*C.TCreateContext)(e.createContext), (*C.arena)(env.Arena.Pointer))
-	env.cCtx.id = (C.uint32_t)(id)
-	env.goCtx = nil
+	status.Do(ctx, "Create Context", func(ctx context.Context) {
+		env.goCtx = ctx
+		env.cCtx = C.create_context(e.module, (*C.arena)(env.Arena.Pointer))
+		env.cCtx.id = (C.uint32_t)(id)
+		env.goCtx = nil
+	})
 
 	// Prime the state objects.
 	if env.cCtx.globals != nil {
 		globalsBase := uintptr(unsafe.Pointer(env.cCtx.globals))
-		for api, offset := range e.globalsAPIOffset {
-			addr := globalsBase + offset
-			env.State.APIs[api.ID()] = api.State(env.Arena, unsafe.Pointer(addr))
+		for _, api := range api.All() {
+			if m := C.get_api_module(e.module, C.uint32_t(api.Index())); m != nil {
+				addr := uintptr(m.globals_offset) + globalsBase
+				env.State.APIs[api.ID()] = api.State(env.Arena, unsafe.Pointer(addr))
+			}
 		}
 	}
 
 	return env
 }
 
-// Execute executes the command cmd.
-func (e *Env) Execute(ctx context.Context, cmd api.Cmd, id api.CmdID) error {
-	name := cmd.CmdName()
-	fptr, ok := e.Executor.cmdFunctions[name]
-	if !ok {
-		return fmt.Errorf("Program has no command '%v'", name)
+// Execute executes the all the commands in l.
+func (e *Env) Execute(ctx context.Context, cmdID api.CmdID, cmd api.Cmd) error {
+	return e.ExecuteN(ctx, cmdID, []api.Cmd{cmd})[0]
+}
+
+// ExecuteN executes the all the commands in cmds.
+func (e *Env) ExecuteN(ctx context.Context, firstID api.CmdID, cmds []api.Cmd) []error {
+	dataBuf := e.Arena.Allocate(len(cmds)*int(unsafe.Sizeof(C.cmd_data{})), int(unsafe.Alignof(C.cmd_data{})))
+	defer e.Arena.Free(dataBuf)
+
+	data := (*(*[1 << 40]C.cmd_data)(dataBuf))[:len(cmds)]
+	for i, cmd := range cmds {
+		flags := C.uint64_t(0)
+		if extras := cmd.Extras(); extras != nil {
+			if o := extras.Observations(); o != nil {
+				if len(o.Reads) > 0 {
+					flags |= C.CMD_FLAGS_HAS_READS
+				}
+				if len(o.Writes) > 0 {
+					flags |= C.CMD_FLAGS_HAS_WRITES
+				}
+			}
+		}
+		data[i] = C.cmd_data{
+			api_idx: C.uint32_t(cmd.API().Index()),
+			cmd_idx: C.uint32_t(cmd.CmdIndex()),
+			args:    cmd.ExecData(),
+			id:      C.uint64_t(firstID) + C.uint64_t(i),
+			flags:   flags,
+			thread:  C.uint64_t(cmd.Thread()),
+		}
 	}
 
-	e.cmd = cmd
-	e.cCtx.thread = (C.uint64_t)(cmd.Thread())
-	e.cCtx.cmd_id = (C.uint64_t)(id)
-	res := e.call(ctx, fptr, cmd.ExecData())
-	e.cmd = nil
+	res := make([]C.uint64_t, len(cmds))
 
-	return res
+	e.cmds = cmds
+	e.goCtx = ctx
+
+	call(
+		e.cCtx,
+		e.Executor.module,
+		&data[0],
+		C.uint64_t(len(cmds)),
+		&res[0],
+	)
+
+	e.goCtx = nil
+	e.cmds = nil
+
+	out := make([]error, len(cmds))
+	for i, r := range res {
+		out[i] = compiler.ErrorCode(r).Err()
+	}
+	return out
 }
 
 // CContext returns the pointer to the c context.
@@ -204,7 +210,7 @@ func (e *Env) Context() context.Context {
 
 // Cmd returns the currently executing command.
 func (e *Env) Cmd() api.Cmd {
-	return e.cmd
+	return e.cmds[e.cCtx.cmd_idx]
 }
 
 // CmdID returns the currently executing command identifer.
@@ -214,7 +220,7 @@ func (e *Env) CmdID() api.CmdID {
 
 // Globals returns the memory of the global state.
 func (e *Env) Globals() []byte {
-	return slice.Bytes((unsafe.Pointer)(e.cCtx.globals), e.Executor.globalsSize)
+	return slice.Bytes((unsafe.Pointer)(e.cCtx.globals), uint64(e.Executor.module.globals_size))
 }
 
 func (e *Env) readPoolData(pool memory.PoolID, ptr, size uint64) unsafe.Pointer {
@@ -225,7 +231,7 @@ func (e *Env) readPoolData(pool memory.PoolID, ptr, size uint64) unsafe.Pointer 
 	sli := p.Slice(rng)
 
 	switch sli := sli.(type) {
-	case memory.Native:
+	case *memory.Native:
 		return sli.Data()
 	default:
 		buf := e.bufferArena.Allocate(int(size), 1) // TODO: Free these!
@@ -244,50 +250,25 @@ func (e *Env) writePoolData(pool memory.PoolID, ptr, size uint64) unsafe.Pointer
 	return native.Data()
 }
 
-func (e *Env) call(ctx context.Context, fptr, args unsafe.Pointer) error {
-	e.goCtx = ctx
-	e.cCtx.arguments = args
-	err := compiler.ErrorCode(C.call(e.cCtx, (*C.TFunc)(fptr)))
-	e.goCtx = nil
-
-	return err.Err()
-}
-
-func (e *Env) applyObservations(l []api.CmdObservation) {
-	ctx := e.goCtx
-	for _, o := range l {
-		data, err := database.Resolve(ctx, o.ID)
-		if err != nil {
-			panic(err)
-		}
-		native := memory.NewNative(e.bufferArena, o.Range.Size)
-		copy(native.Sli(), data.([]byte))
-		e.State.Memory.ApplicationPool().Write(o.Range.Base, native)
-	}
-}
-
-//export apply_reads
-func apply_reads(c *C.context) {
+func applyReads(c *C.context) {
 	e := env(c)
-	if extras := e.cmd.Extras(); extras != nil {
+	if extras := e.Cmd().Extras(); extras != nil {
 		if o := extras.Observations(); o != nil {
-			e.applyObservations(o.Reads)
+			o.ApplyReads(e.State.Memory.ApplicationPool())
 		}
 	}
 }
 
-//export apply_writes
-func apply_writes(c *C.context) {
+func applyWrites(c *C.context) {
 	e := env(c)
-	if extras := e.cmd.Extras(); extras != nil {
+	if extras := e.Cmd().Extras(); extras != nil {
 		if o := extras.Observations(); o != nil {
-			e.applyObservations(o.Writes)
+			o.ApplyWrites(e.State.Memory.ApplicationPool())
 		}
 	}
 }
 
-//export resolve_pool_data
-func resolve_pool_data(c *C.context, pool C.uint64_t, ptr C.uint64_t, access C.gapil_data_access, size C.uint64_t) unsafe.Pointer {
+func resolvePoolData(c *C.context, pool C.uint64_t, ptr C.uint64_t, access C.gapil_data_access, size C.uint64_t) unsafe.Pointer {
 	env := EnvFromNative((unsafe.Pointer)(c))
 	switch access {
 	case C.GAPIL_READ:
@@ -299,8 +280,7 @@ func resolve_pool_data(c *C.context, pool C.uint64_t, ptr C.uint64_t, access C.g
 	}
 }
 
-//export copy_slice
-func copy_slice(c *C.context, dst, src *C.slice) {
+func copySlice(c *C.context, dst, src *C.slice) {
 	env := EnvFromNative((unsafe.Pointer)(c))
 	pDst := env.State.Memory.MustGet(memory.PoolID(dst.pool))
 	pSrc := env.State.Memory.MustGet(memory.PoolID(src.pool))
@@ -308,8 +288,7 @@ func copy_slice(c *C.context, dst, src *C.slice) {
 	pDst.Write(uint64(dst.base), pSrc.Slice(memory.Range{Base: uint64(src.base), Size: size}))
 }
 
-//export cstring_to_slice
-func cstring_to_slice(c *C.context, ptr C.uint64_t, out *C.slice) {
+func cstringToSlice(c *C.context, ptr C.uint64_t, out *C.slice) {
 	env := EnvFromNative((unsafe.Pointer)(c))
 	pool := env.State.Memory.ApplicationPool()
 	size, err := pool.Strlen(env.goCtx, uint64(ptr))
@@ -326,8 +305,7 @@ func cstring_to_slice(c *C.context, ptr C.uint64_t, out *C.slice) {
 	out.count = C.uint64_t(size)
 }
 
-//export store_in_database
-func store_in_database(c *C.context, ptr unsafe.Pointer, size C.uint64_t, idOut *C.uint8_t) {
+func storeInDatabase(c *C.context, ptr unsafe.Pointer, size C.uint64_t, idOut *C.uint8_t) {
 	env := EnvFromNative((unsafe.Pointer)(c))
 	ctx := env.Context()
 	sli := slice.Bytes(ptr, uint64(size))
@@ -339,19 +317,36 @@ func store_in_database(c *C.context, ptr unsafe.Pointer, size C.uint64_t, idOut 
 	copy(out, id[:])
 }
 
-//export make_pool
-func make_pool(c *C.context, size C.uint64_t) C.uint64_t {
+func makePool(c *C.context, size C.uint64_t) C.uint64_t {
 	env := EnvFromNative((unsafe.Pointer)(c))
 	id, _ := env.State.Memory.New()
 	return C.uint64_t(id)
 }
 
-//export pool_reference
-func pool_reference(c *C.context, pool C.uint64_t) {
+func poolReference(c *C.context, pool C.uint64_t) {
 	// TODO: Refcounting
 }
 
-//export pool_release
-func pool_release(c *C.context, pool C.uint64_t) {
+func poolRelease(c *C.context, pool C.uint64_t) {
 	// TODO: Refcounting
+}
+
+func callExtern(c *C.context, name *C.uint8_t, args, res unsafe.Pointer) {
+	env := EnvFromNative((unsafe.Pointer)(c))
+	n := C.GoString((*C.char)((unsafe.Pointer)(name)))
+	f, ok := externs[n]
+	if !ok {
+		panic(fmt.Sprintf("No handler for extern '%v'", n))
+	}
+	f(env, args, res)
+}
+
+func init() {
+	C.set_callbacks(callbacks())
+}
+
+func registerCExtern(name string, e unsafe.Pointer) {
+	n := C.CString(name)
+	C.register_c_extern(n, (*C.gapil_extern)(e))
+	C.free(unsafe.Pointer(n))
 }

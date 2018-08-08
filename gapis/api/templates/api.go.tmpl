@@ -85,7 +85,8 @@ import (»
   {{template "Go.CommentHeader" "Commands"}}
   {{range $c := AllCommands $}}
     {{if not (GetAnnotation $c "pfn")}} {{/* TODO remove the @pfn nastiness */}}
-      {{Template "DeclareCommand" $c}}¶
+      {{$idx := $.CommandIndex $c}}
+      {{Template "DeclareCommand" "Command" $c "Index" $idx}}¶
     {{end}}
   {{end}}
 ¶
@@ -1278,13 +1279,13 @@ import (»
 -------------------------------------------------------------------------------
 */}}
 {{define "DeclareCommand"}}
-  {{AssertType $ "Function"}}
+  {{AssertType $.Command "Function"}}
 
-  {{$name := $.Name | Title}}
-  {{$ret  := not (IsVoid $.Return.Type)}}
+  {{$name := $.Command.Name | Title}}
+  {{$ret  := not (IsVoid $.Command.Return.Type)}}
 
   type {{$name}} struct {
-    c *C.{{$.Name}}
+    c *C.{{$.Command.Name}}
     thread uint64
     caller ϟapi.CmdID
     extras ϟapi.CmdExtras
@@ -1304,16 +1305,18 @@ import (»
 
   func (ϟc *{{$name}}) SetCaller(id ϟapi.CmdID) { ϟc.caller = id }
 
-  func (ϟc *{{$name}}) CmdName() string { return "{{$.Name}}" }
+  func (ϟc *{{$name}}) CmdIndex() int { return {{$.Index}} }
+
+  func (ϟc *{{$name}}) CmdName() string { return "{{$.Command.Name}}" }
 
   func (ϟc *{{$name}}) String() string {
-    return fmt.Sprintf("{{$.Name}}(§
-      {{range $i, $p := $.CallParameters}}
+    return fmt.Sprintf("{{$.Command.Name}}(§
+      {{range $i, $p := $.Command.CallParameters}}
         {{if $i}}, §{{end}}
         {{$p.Name}}: %v§
       {{end}}
       ){{if $ret}} → %v{{end}}",§
-      {{range $i, $p := $.CallParameters}}
+      {{range $i, $p := $.Command.CallParameters}}
         {{Template "Go.Parameter" $p}}, §
       {{end}}
       {{if $ret}}ϟc.Result()§{{end}}
@@ -1324,7 +1327,7 @@ import (»
 
   func (ϟc *{{$name}}) CmdParams() ϟapi.Properties {
     return ϟapi.Properties{
-      {{range $p := $.CallParameters}}
+      {{range $p := $.Command.CallParameters}}
         {{$get := GoPublicName $p.Name}}
         {{$set := printf "Set%v" $get}}
         {{$cs  := ConstantSetIndex $p}}
@@ -1336,7 +1339,7 @@ import (»
 
   func (ϟc *{{$name}}) CmdResult() *ϟapi.Property {
     {{if $ret}}
-      {{$cs := ConstantSetIndex $.Return}}
+      {{$cs := ConstantSetIndex $.Command.Return}}
       return ϟapi.NewProperty("result", ϟc.Result, ϟc.SetResult)
       {{if ge $cs 0}}§.SetConstants({{$cs}}){{end}}
     {{else}}
@@ -1351,7 +1354,7 @@ import (»
     var out ϟapi.CmdFlags
     {{range $i, $name := $names}}
       {{$flag := index $flags $i}}
-      {{if $a := GetAnnotation $ $name}}
+      {{if $a := GetAnnotation $.Command $name}}
         {{if $expr := Macro "FlagExpr" "Annotation" $a "Flag" $flag}}
           {{$expr}}
         {{else}}
@@ -1380,7 +1383,7 @@ import (»
     return ϟc
   }
 
-  {{range $p := $.FullParameters}}
+  {{range $p := $.Command.FullParameters}}
     {{$pname := Macro "Go.Parameter" $p}}
     {{Template "DeclareGetterSetter" "Struct" $name "Name" $p.Name "Type" $p.Type}}¶
   {{end}}
@@ -1396,7 +1399,7 @@ import (»
   func (ϟc {{$name}}) clone(ϟenv *ϟexec.Env, ϟt unsafe.Pointer) *{{$name}} {
     ϟcc := (*C.context)(ϟenv.CContext())
     return &{{$name}}{
-      c:      C.{{$.Name}}__clone(ϟc.c, ϟcc, ϟt),
+      c:      C.{{$.Command.Name}}__clone(ϟc.c, ϟcc, ϟt),
       thread: ϟc.thread,
       caller: ϟc.caller,
       extras: ϟc.extras,

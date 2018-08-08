@@ -125,7 +125,7 @@ func init() {
 	cfg.DeviceScanDone = deviceScanDone
 
 	ctx = database.Put(ctx, database.NewInMemory(ctx))
-	env := executor.NewEnv(ctx, nil, executor.Config{})
+	env := executor.NewEnv(ctx, executor.Config{})
 	defer env.Dispose()
 	ctx = executor.PutEnv(ctx, env)
 	dev := host.Instance(ctx)

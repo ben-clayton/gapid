@@ -44,6 +44,9 @@ type Cmd interface {
 	// SetThread changes the thread index.
 	SetThread(uint64)
 
+	// CmdIndex returns the unique index for this command in the API.
+	CmdIndex() int
+
 	// CmdName returns the name of the command.
 	CmdName() string
 

@@ -233,31 +233,9 @@ func (c *C) buildRefRels() {
 			s.Call(c.callbacks.freeString, strPtr)
 		})
 
-	for apiTy, funcs := range r {
-		switch apiTy {
-		case semantic.StringType:
-			// Already implemented
-
-		default:
-			switch apiTy := apiTy.(type) {
-			case *semantic.Slice:
-				// Already implemented
-
-			case *semantic.Reference:
-				funcs.build(c,
-					func(s *S, refPtr *codegen.Value) *codegen.Value {
-						return refPtr.IsNull()
-					},
-					func(s *S, refPtr *codegen.Value) *codegen.Value {
-						return refPtr.Index(0, RefRefCount)
-					},
-					func(s *S, refPtr *codegen.Value) {
-						s.Arena = refPtr.Index(0, RefArena).Load().SetName("arena")
-						c.release(s, refPtr.Index(0, RefValue).Load(), apiTy.To)
-						c.Free(s, refPtr)
-					})
-
-			case *semantic.Map:
+	for _, api := range c.APIs {
+		for _, apiTy := range api.Maps {
+			if funcs, ok := r[apiTy]; ok {
 				funcs.build(c,
 					func(s *S, mapPtr *codegen.Value) *codegen.Value {
 						return mapPtr.IsNull()
@@ -270,8 +248,28 @@ func (c *C) buildRefRels() {
 						s.Call(c.T.Maps[apiTy].Clear, mapPtr, s.Ctx)
 						c.Free(s, mapPtr)
 					})
+			}
+		}
 
-			case *semantic.Class:
+		for _, apiTy := range api.References {
+			if funcs, ok := r[apiTy]; ok {
+				funcs.build(c,
+					func(s *S, refPtr *codegen.Value) *codegen.Value {
+						return refPtr.IsNull()
+					},
+					func(s *S, refPtr *codegen.Value) *codegen.Value {
+						return refPtr.Index(0, RefRefCount)
+					},
+					func(s *S, refPtr *codegen.Value) {
+						s.Arena = refPtr.Index(0, RefArena).Load().SetName("arena")
+						c.release(s, refPtr.Index(0, RefValue).Load(), apiTy.To)
+						c.Free(s, refPtr)
+					})
+			}
+		}
+
+		for _, apiTy := range api.Classes {
+			if funcs, ok := r[apiTy]; ok {
 				refFields := []*semantic.Field{}
 				for _, f := range apiTy.Fields {
 					ty := semantic.Underlying(f.Type)
@@ -292,26 +290,33 @@ func (c *C) buildRefRels() {
 						c.release(s, val.Extract(f.Name()), f.Type)
 					}
 				})
-			default:
-				fail("Unhandled reference type %T", apiTy)
 			}
 		}
 	}
 }
 
 func (c *C) reference(s *S, val *codegen.Value, ty semantic.Type) {
+	if debugDisableRefCounts {
+		return
+	}
 	if f, ok := c.refRels.tys[semantic.Underlying(ty)]; ok {
 		s.Call(f.reference, s.Ctx, val)
 	}
 }
 
 func (c *C) release(s *S, val *codegen.Value, ty semantic.Type) {
+	if debugDisableRefCounts {
+		return
+	}
 	if f, ok := c.refRels.tys[semantic.Underlying(ty)]; ok {
 		s.Call(f.release, s.Ctx, val)
 	}
 }
 
 func (c *C) deferRelease(s *S, val *codegen.Value, ty semantic.Type) {
+	if debugDisableRefCounts {
+		return
+	}
 	if debugRefCounts {
 		c.LogI(s, "deferRelease("+fmt.Sprintf("%T", ty)+": %p)", val)
 	}

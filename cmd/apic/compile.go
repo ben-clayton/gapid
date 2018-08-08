@@ -66,9 +66,11 @@ func (s *symbols) Choose(v interface{}) {
 }
 
 type compileVerb struct {
-	Target string `help:"The target device ABI"`
-	Output string `help:"The output file path"`
-	Emit   struct {
+	Target  string `help:"The target device ABI"`
+	Capture string `help:"The capture device ABI. Defaults to target"`
+	Output  string `help:"The output file path"`
+	Module  string `help:"The name of the global module variable to emit"`
+	Emit    struct {
 		Clone   bool `help:"Emit clone methods"`
 		Encode  bool `help:"Emit encoder logic"`
 		Exec    bool `help:"Emit executor logic. Implies --emit-context"`
@@ -82,30 +84,44 @@ type compileVerb struct {
 	Search    file.PathList `help:"The set of paths to search for includes"`
 }
 
+func parseABI(s string) (*device.ABI, error) {
+	switch s { // Must match values in: tools/build/BUILD.bazel
+	case "":
+		return nil, nil // host
+	case "k8":
+		return device.LinuxX86_64, nil
+	case "darwin_x86_64":
+		return device.OSXX86_64, nil
+	case "x64_windows":
+		return device.WindowsX86_64, nil
+	case "armeabi-v7a":
+		return device.AndroidARMv7a, nil
+	case "arm64-v8a":
+		return device.AndroidARM64v8a, nil
+	case "x86":
+		return device.AndroidX86, nil
+	default:
+		return nil, fmt.Errorf("Unrecognised target: '%v'", s)
+	}
+}
+
 func (v *compileVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 	api, mappings, err := resolve(ctx, v.Search, flags, resolver.Options{})
 	if err != nil {
 		return err
 	}
 
-	var abi *device.ABI
-	switch v.Target { // Must match values in: tools/build/BUILD.bazel
-	case "":
-		abi = nil // host
-	case "k8":
-		abi = device.LinuxX86_64
-	case "darwin_x86_64":
-		abi = device.OSXX86_64
-	case "x64_windows":
-		abi = device.WindowsX86_64
-	case "armeabi-v7a":
-		abi = device.AndroidARMv7a
-	case "arm64-v8a":
-		abi = device.AndroidARM64v8a
-	case "x86":
-		abi = device.AndroidX86
-	default:
-		return fmt.Errorf("Unrecognised target: '%v'", v.Target)
+	targetABI, err := parseABI(v.Target)
+	if err != nil {
+		return err
+	}
+
+	captureABI := targetABI
+	if v.Capture != "" {
+		captureABI, err = parseABI(v.Capture)
+		if err != nil {
+			return err
+		}
 	}
 
 	var namespaces []string
@@ -114,8 +130,9 @@ func (v *compileVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 	}
 
 	settings := compiler.Settings{
-		TargetABI:   abi,
-		CaptureABI:  abi,
+		Module:      v.Module,
+		TargetABI:   targetABI,
+		CaptureABI:  captureABI,
 		Namespaces:  namespaces,
 		EmitExec:    v.Emit.Exec,
 		EmitContext: v.Emit.Context,
@@ -144,15 +161,15 @@ func (v *compileVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 	}
 
 	if v.Optimize {
-		prog.Module.Optimize()
+		prog.Codegen.Optimize()
 	}
 
 	if v.Dump {
-		fmt.Fprintln(os.Stderr, prog.Module.String())
+		fmt.Fprintln(os.Stderr, prog.Codegen.String())
 		return fmt.Errorf("IR dump")
 	}
 
-	obj, err := prog.Module.Object(v.Optimize)
+	obj, err := prog.Codegen.Object(v.Optimize)
 	if err != nil {
 		return err
 	}

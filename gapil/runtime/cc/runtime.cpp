@@ -250,7 +250,7 @@ void* gapil_resolve_pool_data(context* ctx, uint64_t pool_id, uint64_t ptr,
                               gapil_data_access access, uint64_t size) {
   DEBUG_PRINT("gapil_resolve_pool_data(ctx: %p, pool: %" PRIu64
               ", ptr: 0x%" PRIx64 ", access: %d, size: 0x%" PRIx64 ")",
-              ctx, pool, ptr, access, size);
+              ctx, pool_id, ptr, access, size);
   GAPID_ASSERT(runtime_callbacks.resolve_pool_data != nullptr);
   return runtime_callbacks.resolve_pool_data(ctx, pool_id, ptr, access, size);
 }
@@ -268,7 +268,8 @@ void gapil_copy_slice(context* ctx, slice* dst, slice* src) {
 }
 
 void gapil_cstring_to_slice(context* ctx, uint64_t ptr, slice* out) {
-  DEBUG_PRINT("gapil_cstring_to_slice(ptr: 0x%" PRIx64 ")", ptr);
+  DEBUG_PRINT("gapil_cstring_to_slice(ctx: %p, ptr: 0x%" PRIx64 ", out: %p)",
+              ctx, ptr, out);
 
   GAPID_ASSERT(runtime_callbacks.cstring_to_slice != nullptr);
   return runtime_callbacks.cstring_to_slice(ctx, ptr, out);
@@ -299,12 +300,19 @@ void gapil_pool_reference(context* ctx, uint64_t pool_id) {
 }
 
 void gapil_pool_release(context* ctx, uint64_t pool_id) {
-  DEBUG_PRINT("gapil_pool_release(pool: %" PRIu64 ")", pool);
+  DEBUG_PRINT("gapil_pool_release(pool: %" PRIu64 ")", pool_id);
   GAPID_ASSERT(runtime_callbacks.pool_release != nullptr);
   if (pool_id == 0) {
     GAPID_FATAL("Attempting to release application pool")
   }
   runtime_callbacks.pool_release(ctx, pool_id);
+}
+
+void gapil_call_extern(context* ctx, uint8_t* name, void* args, void* res) {
+  DEBUG_PRINT("gapil_call_extern(ctx: %p, name: %s, args: %p, res: %p)", ctx,
+              name, args, res);
+  GAPID_ASSERT(runtime_callbacks.call_extern != nullptr);
+  runtime_callbacks.call_extern(ctx, name, args, res);
 }
 
 }  // extern "C"

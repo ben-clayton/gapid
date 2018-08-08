@@ -40,7 +40,7 @@ func TestDeadCommandRemoval(t *testing.T) {
 	ctx := log.Testing(t)
 	ctx = bind.PutRegistry(ctx, bind.NewRegistry())
 	ctx = database.Put(ctx, database.NewInMemory(ctx))
-	ctx = executor.PutEnv(ctx, executor.NewEnv(ctx, abi, executor.Config{}))
+	ctx = executor.PutEnv(ctx, executor.NewEnv(ctx, executor.Config{CaptureABI: abi}))
 
 	a := arena.New()
 	defer a.Dispose()

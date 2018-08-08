@@ -16,17 +16,17 @@
 
 #include <stdint.h>
 
-void gles_IndexLimits(context* ctx, slice* s, uint32_t index_size,
-                      u32Limits* out) {
-  void* data =
-      gapil_resolve_pool_data(ctx, s->pool, s->root, GAPIL_READ, s->size);
+void externIndexLimits(context* ctx, IndexLimits_args* args,
+                       IndexLimits_res* out) {
+  slice s = args->indices;
+  void* data = gapil_resolve_pool_data(ctx, s.pool, s.root, GAPIL_READ, s.size);
   uint32_t min = 0xffffffff;
   uint32_t max = 0x00000000;
-  switch (index_size) {
+  switch (args->sizeof_index) {
 #define IMPL_CASE(SIZE, TYPE)            \
   case SIZE: {                           \
     TYPE* indices = (TYPE*)data;         \
-    size_t count = s->size / SIZE;       \
+    size_t count = s.size / SIZE;        \
     for (size_t i = 0; i < count; i++) { \
       TYPE val = indices[i];             \
       min = (val < min) ? val : min;     \
@@ -40,7 +40,7 @@ void gles_IndexLimits(context* ctx, slice* s, uint32_t index_size,
     IMPL_CASE(8, uint64_t)
     default:
       gapil_logf(GAPIL_LOG_LEVEL_FATAL, 0, 0, "Unhandled index size %d",
-                 (int)index_size);
+                 (int)args->sizeof_index);
   }
   out->first = min;
   out->count = max - min;

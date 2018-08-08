@@ -283,12 +283,6 @@ func (b *Builder) IsBlockTerminated() bool {
 	return !b.llvm.GetInsertBlock().LastInstruction().IsATerminatorInst().IsNil()
 }
 
-// GlobalString returns a pointer to a global variable holidng the string data.
-func (b *Builder) GlobalString(s string) *Value {
-	tys := b.m.Types
-	return b.val(tys.Pointer(tys.Uint8), b.llvm.CreateGlobalStringPtr(s, "str"))
-}
-
 // FuncAddr returns the pointer to the given function.
 func (b *Builder) FuncAddr(f *Function) *Value {
 	return b.val(b.m.Types.Pointer(f.Type), f.llvm)
@@ -351,4 +345,17 @@ func (b *Builder) block(block, next llvm.BasicBlock, f func()) {
 	if !next.IsNil() && !b.IsBlockTerminated() {
 		b.llvm.CreateBr(next)
 	}
+}
+
+// StructOf builds a struct value that holds all the values in v.
+func (b *Builder) StructOf(name string, v []*Value) *Value {
+	fields := make([]Field, len(v))
+	for i, v := range v {
+		fields[i].Type = v.Type()
+	}
+	s := b.Undef(b.m.Types.Struct(name, fields...))
+	for i, v := range v {
+		s = s.Insert(i, v)
+	}
+	return s
 }

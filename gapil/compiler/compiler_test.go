@@ -1970,7 +1970,14 @@ func (t test) run(ctx context.Context) (succeeded bool) {
 		return false
 	}
 
-	exec := executor.NewExecutor(ctx, program, true)
+	e, err := program.Codegen.Executor(true)
+	if err != nil {
+		panic(err)
+	}
+
+	module := e.GlobalAddress(program.Module)
+
+	exec := executor.New(ctx, executor.Config{}, module)
 	env := exec.NewEnv(ctx)
 	defer env.Dispose()
 
@@ -1980,7 +1987,7 @@ func (t test) run(ctx context.Context) (succeeded bool) {
 
 	defer func() {
 		if !succeeded {
-			fmt.Println(program.Dump())
+			// fmt.Println(program.Dump())
 		}
 	}()
 
@@ -1988,6 +1995,19 @@ func (t test) run(ctx context.Context) (succeeded bool) {
 
 	for i, cmd := range t.cmds {
 		fmt.Printf("    > %s\n", cmd.N)
+
+		cmd.I = -1
+		for i, f := range a.Functions {
+			if f.Name() == cmd.N {
+				cmd.I = i
+				break
+			}
+		}
+		if cmd.I == -1 {
+			log.E(ctx, "No command found with name '%v'", cmd.N)
+			continue
+		}
+
 		testutils.ExternA = func(env *executor.Env, i uint64, f float32, b bool) uint64 {
 			externCalls = append(externCalls, externA{i, f, b})
 			return i + uint64(f)
@@ -1996,7 +2016,7 @@ func (t test) run(ctx context.Context) (succeeded bool) {
 			externCalls = append(externCalls, externB{s})
 			return s == "meow"
 		}
-		err = env.Execute(ctx, &cmd, api.CmdID(0x1000+i))
+		err = env.Execute(ctx, api.CmdID(0x1000+i), &cmd)
 		if !assert.For(ctx, "Execute(%v, %v)", i, cmd.N).ThatError(err).DeepEquals(t.expected.err) {
 			return false
 		}

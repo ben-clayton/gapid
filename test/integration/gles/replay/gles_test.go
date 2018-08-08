@@ -76,7 +76,7 @@ func setup(ctx context.Context) (context.Context, *device.Instance) {
 	m := replay.New(ctx)
 	ctx = replay.PutManager(ctx, m)
 	ctx = database.Put(ctx, database.NewInMemory(ctx))
-	ctx = executor.PutEnv(ctx, executor.NewEnv(ctx, nil, executor.Config{}))
+	ctx = executor.PutEnv(ctx, executor.NewEnv(ctx, executor.Config{}))
 	bind.GetRegistry(ctx).AddDevice(ctx, bind.Host(ctx))
 	return ctx, r.DefaultDevice().Instance()
 }

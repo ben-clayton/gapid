@@ -111,9 +111,9 @@ type cbBackref struct {
 
 func withEncoder(f func(ctx *C.context)) callbacks {
 	a := arena.New()
-	ctx := C.gapil_create_context((*C.arena)(a.Pointer))
+	ctx := C.create_context((*C.arena)(a.Pointer))
 	defer func() {
-		C.gapil_destroy_context(ctx)
+		C.destroy_context(ctx)
 		a.Dispose()
 	}()
 

@@ -32,10 +32,11 @@ type Native struct {
 	data      unsafe.Pointer
 	size      uint64
 	ownsAlloc bool
+	id        id.ID
 }
 
-func NewNative(arena arena.Arena, size uint64) Native {
-	return Native{
+func NewNative(arena arena.Arena, size uint64) *Native {
+	return &Native{
 		arena:     arena,
 		data:      arena.Allocate(int(size), 8),
 		size:      size,
@@ -56,12 +57,15 @@ func (r Native) Get(ctx context.Context, offset uint64, out []byte) error {
 	return nil
 }
 
-func (r Native) ResourceID(ctx context.Context) (id.ID, error) {
-	ident, err := database.Store(ctx, r.Sli())
-	if err != nil {
-		return id.ID{}, err
+func (r *Native) ResourceID(ctx context.Context) (id.ID, error) {
+	if !r.id.IsValid() {
+		i, err := database.Store(ctx, r.Sli())
+		if err != nil {
+			return id.ID{}, err
+		}
+		r.id = i
 	}
-	return ident, nil
+	return r.id, nil
 }
 
 func (r Native) Size() uint64 {
@@ -69,7 +73,7 @@ func (r Native) Size() uint64 {
 }
 
 func (r Native) Slice(rng Range) Data {
-	return Native{
+	return &Native{
 		arena: r.arena,
 		data:  unsafe.Pointer(uintptr(r.data) + uintptr(rng.Base)),
 		size:  rng.Size,

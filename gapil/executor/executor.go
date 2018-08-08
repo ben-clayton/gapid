@@ -18,27 +18,27 @@ package executor
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"unsafe"
 
 	"github.com/google/gapid/core/app/status"
-	"github.com/google/gapid/core/codegen"
 	"github.com/google/gapid/core/os/device"
 	"github.com/google/gapid/gapil/compiler"
+	"github.com/google/gapid/gapil/compiler/plugins/replay"
 	"github.com/google/gapid/gapil/semantic"
 	"github.com/google/gapid/gapis/api"
 )
 
+//#include "gapil/runtime/cc/runtime.h"
+import "C"
+
 // Executor is used to create execution environments for a compiled program.
 // Use New() or For() to create Executors, do not create directly.
 type Executor struct {
-	program          *compiler.Program
-	exec             *codegen.Executor
-	createContext    unsafe.Pointer
-	destroyContext   unsafe.Pointer
-	globalsSize      uint64
-	globalsAPIOffset map[api.API]uintptr
-	cmdFunctions     map[string]unsafe.Pointer
+	cfg     Config
+	module  *C.gapil_module
+	symbols map[string]unsafe.Pointer
 }
 
 var cache sync.Map
@@ -51,50 +51,33 @@ type apiExec struct {
 // Config is a configuration for an executor.
 type Config struct {
 	CaptureABI *device.ABI
+	ReplayABI  *device.ABI
 	Execute    bool
-	Plugins    []compiler.Plugin
+	Optimize   bool
 
 	// APIs to compile for. If empty, then all registered APIs will be compiled.
 	APIs []api.API
 }
 
+func (c Config) key() string {
+	key := fmt.Sprintf("capture: %+v replay: %+v exec: %v opt: %v",
+		c.CaptureABI,
+		c.ReplayABI,
+		c.Execute,
+		c.Optimize)
+	fmt.Fprintln(os.Stderr, key)
+	return key
+}
+
 // NewEnv returns a new environment for an executor with the given config.
-func NewEnv(ctx context.Context, abi *device.ABI, cfg Config) *Env {
+func NewEnv(ctx context.Context, cfg Config) *Env {
 	ctx = status.Start(ctx, "NewEnv")
 	defer status.Finish(ctx)
 
-	key := fmt.Sprintf("%v", cfg)
-	obj, existing := cache.LoadOrStore(key, &apiExec{ready: make(chan struct{})})
+	obj, existing := cache.LoadOrStore(cfg.key(), &apiExec{ready: make(chan struct{})})
 	ae := obj.(*apiExec)
 	if !existing {
-		apis := cfg.APIs
-		if len(apis) == 0 {
-			apis = api.All()
-		}
-		sems := make([]*semantic.API, len(apis))
-		mappings := &semantic.Mappings{}
-		for i, api := range apis {
-			def := api.Definition()
-			if def.Semantic == nil {
-				panic(fmt.Errorf("API %v has no semantic definition", api.Name()))
-			}
-			sems[i] = def.Semantic
-			if def.Mappings != nil {
-				mappings.MergeIn(def.Mappings)
-			}
-		}
-		settings := compiler.Settings{
-			CaptureABI:  abi,
-			EmitContext: true,
-			EmitExec:    cfg.Execute,
-			Plugins:     cfg.Plugins,
-		}
-
-		prog, err := compiler.Compile(sems, mappings, settings)
-		if err != nil {
-			panic(err)
-		}
-		ae.exec = NewExecutor(ctx, prog, true)
+		ae.exec = Compile(ctx, cfg)
 		close(ae.ready)
 	} else {
 		<-ae.ready
@@ -102,53 +85,81 @@ func NewEnv(ctx context.Context, abi *device.ABI, cfg Config) *Env {
 	return ae.exec.NewEnv(ctx)
 }
 
-// NewExecutor returns a new and initialized Executor for the given program.
-func NewExecutor(ctx context.Context, prog *compiler.Program, optimize bool) *Executor {
-	ctx = status.Start(ctx, "NewExecutor")
+// Compile returns a new and initialized Executor for the given config.
+func Compile(ctx context.Context, cfg Config) *Executor {
+	ctx = status.Start(ctx, "executor.Compile")
 	defer status.Finish(ctx)
 
-	e, err := prog.Module.Executor(optimize)
+	apis := cfg.APIs
+	if len(apis) == 0 {
+		apis = api.All()
+	}
+
+	sems := make([]*semantic.API, len(apis))
+	mappings := &semantic.Mappings{}
+	for i, api := range apis {
+		def := api.Definition()
+		if def.Semantic == nil {
+			panic(fmt.Errorf("API %v has no semantic definition", api.Name()))
+		}
+		sems[i] = def.Semantic
+		if def.Mappings != nil {
+			mappings.MergeIn(def.Mappings)
+		}
+	}
+
+	settings := compiler.Settings{
+		CaptureABI:  cfg.CaptureABI,
+		EmitContext: true,
+		EmitExec:    cfg.Execute,
+	}
+
+	if cfg.ReplayABI != nil {
+		settings.Plugins = append(settings.Plugins, replay.Plugin(cfg.ReplayABI.MemoryLayout))
+	}
+
+	prog, err := compiler.Compile(sems, mappings, settings)
 	if err != nil {
 		panic(err)
 	}
 
-	if prog.CreateContext == nil || prog.DestroyContext == nil {
-		panic("Program has no context functions. Was EmitContext not set to true?")
+	e, err := prog.Codegen.Executor(cfg.Optimize)
+	if err != nil {
+		panic(err)
 	}
 
-	// Gather all the API state offsets from the globals base pointer.
-	apiOffsets := map[api.API]uintptr{}
-	fieldOffsets := e.FieldOffsets(prog.Globals.Type)
-	for _, api := range api.All() {
-		name := api.Definition().Semantic.Name()
-		if idx := prog.Globals.Type.FieldIndex(name); idx >= 0 {
-			apiOffsets[api] = uintptr(fieldOffsets[idx])
-		}
+	module := e.GlobalAddress(prog.Module)
+
+	return New(ctx, cfg, module)
+}
+
+// New returns a new and initialized Executor for the given program.
+func New(ctx context.Context, cfg Config, module unsafe.Pointer) *Executor {
+	ctx = status.Start(ctx, "executor.New")
+	defer status.Finish(ctx)
+
+	m := (*C.gapil_module)(module)
+
+	if m.create_context == nil || m.destroy_context == nil {
+		panic(fmt.Errorf("Program has no context functions. Was EmitContext not set to true?\nmodule: %+v", m))
 	}
 
 	exec := &Executor{
-		program:          prog,
-		exec:             e,
-		createContext:    e.FunctionAddress(prog.CreateContext),
-		destroyContext:   e.FunctionAddress(prog.DestroyContext),
-		globalsSize:      uint64(e.SizeOf(prog.Globals.Type)),
-		globalsAPIOffset: apiOffsets,
-		cmdFunctions:     map[string]unsafe.Pointer{},
+		cfg:     cfg,
+		module:  m,
+		symbols: map[string]unsafe.Pointer{},
 	}
 
-	for name, info := range prog.Commands {
-		exec.cmdFunctions[name] = e.FunctionAddress(info.Execute)
+	symbols := (*[65536]C.gapil_symbol)(unsafe.Pointer(m.symbols))[:m.num_symbols]
+	for _, s := range symbols {
+		exec.symbols[C.GoString(s.name)] = s.addr
 	}
 
 	return exec
 }
 
-// FunctionAddress returns the function address of the function with the given
-// name or nil if the function was not found.
-func (e *Executor) FunctionAddress(name string) unsafe.Pointer {
-	f, ok := e.program.Functions[name]
-	if !ok {
-		return nil
-	}
-	return e.exec.FunctionAddress(f)
+// Symbol returns the address of the symnol with the given name or nil if the
+// symbol was not found.
+func (e *Executor) Symbol(name string) unsafe.Pointer {
+	return e.symbols[name]
 }

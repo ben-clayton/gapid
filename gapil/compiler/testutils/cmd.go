@@ -27,16 +27,18 @@ import (
 // Cmd is a custom implementation of the api.Cmd interface that simplifies
 // testing compiler generated commands.
 type Cmd struct {
-	N string  // Command name
-	D []byte  // Encoded command used by the compiler generated execute function
-	E *Extras // Command extras
-	T uint64  // Command thread
+	N  string  // Command name
+	I  int     // Command index
+	AI int     // API index
+	D  []byte  // Encoded command used by the compiler generated execute function
+	E  *Extras // Command extras
+	T  uint64  // Command thread
 }
 
 var _ api.Cmd = &Cmd{}
 
 // API stubs the api.Cmd interface.
-func (c *Cmd) API() api.API { return nil }
+func (c *Cmd) API() api.API { return API{c.AI} }
 
 // ExecData stubs the api.Cmd interface.
 func (c *Cmd) ExecData() unsafe.Pointer {
@@ -60,6 +62,9 @@ func (c *Cmd) SetThread(thread uint64) { c.T = thread }
 
 // CmdName stubs the api.Cmd interface.
 func (c *Cmd) CmdName() string { return c.N }
+
+// CmdIndex stubs the api.Cmd interface.
+func (c *Cmd) CmdIndex() int { return c.I }
 
 // CmdParams stubs the api.Cmd interface.
 func (c *Cmd) CmdParams() api.Properties { return nil }

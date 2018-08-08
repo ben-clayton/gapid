@@ -183,9 +183,10 @@ func (c *Capture) NewCustomEnv(
 	}
 	interval.Remove(&freeList, interval.U64Span{Start: 0, End: value.FirstValidAddress})
 
+	cfg.CaptureABI = c.Header.ABI
 	cfg.APIs = c.APIs
 
-	env := executor.NewEnv(ctx, c.Header.ABI, cfg)
+	env := executor.NewEnv(ctx, cfg)
 	env.State.MemoryLayout = c.Header.ABI.MemoryLayout
 	env.State.Arena = arena.New()
 	env.State.Memory = memory.NewPools()
@@ -359,7 +360,7 @@ func fromProto(ctx context.Context, r *Record) (out *Capture, err error) {
 	// Bind the arena used to for all allocations for this capture.
 	ctx = arena.Put(ctx, a)
 
-	env := executor.NewEnv(ctx, nil, executor.Config{})
+	env := executor.NewEnv(ctx, executor.Config{})
 	// defer env.Dispose() // TODO
 	ctx = executor.PutEnv(ctx, env)
 

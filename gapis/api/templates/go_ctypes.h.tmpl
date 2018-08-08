@@ -43,6 +43,7 @@
   {{ForEach $.Classes    "DeclareType" | JoinWith "\n"}}¶
 
   {{ForEach (AllCommands $) "DeclareCommand" | JoinWith "\n"}}¶
+  {{ForEach $.Externs       "DeclareExtern" | JoinWith "\n"}}¶
 ¶
   {{Template "DeclareState" $}}
 ¶
@@ -244,6 +245,28 @@
   } {{$.Name}};
 
   {{$.Name}}* {{$.Name}}__clone({{$.Name}}* object, context* ctx, void* tracker);
+{{end}}
+
+
+{{/*
+-------------------------------------------------------------------------------
+  Emits the C declaration of the Extern
+-------------------------------------------------------------------------------
+*/}}
+{{define "DeclareExtern"}}
+  {{range $p := $.FullParameters}}
+    {{Template "DeclareType" $p.Type}}
+  {{end}}
+
+  typedef struct {{$.Name}}_args {
+    {{range $p := $.CallParameters}}
+      {{Template "C.Type" $p}} {{$p.Name | CFieldName}};
+    {{end}}
+  } {{$.Name}}_args;
+
+  {{if not (IsVoid $.Return.Type)}}
+    typedef {{Template "C.Type" $.Return.Type}} {{$.Name}}_res;
+  {{end}}
 {{end}}
 
 

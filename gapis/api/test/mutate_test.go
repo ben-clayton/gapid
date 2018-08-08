@@ -24,8 +24,6 @@ import (
 	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/core/memory/arena"
 	"github.com/google/gapid/core/os/device"
-	"github.com/google/gapid/gapil/compiler"
-	"github.com/google/gapid/gapil/compiler/plugins/replay"
 	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapir/client"
 	"github.com/google/gapid/gapis/api"
@@ -47,8 +45,11 @@ type test struct {
 	expected expected
 }
 
-func (test test) check(ctx context.Context, ca, ra *device.MemoryLayout) {
-	header := &capture.Header{ABI: &device.ABI{MemoryLayout: ca}}
+func (test test) check(ctx context.Context, cl, rl *device.MemoryLayout) {
+	ca := &device.ABI{MemoryLayout: cl}
+	ra := &device.ABI{MemoryLayout: rl}
+
+	header := &capture.Header{ABI: ca}
 	cp, err := capture.New(ctx, arena.New(), "test", header, test.cmds)
 	if !assert.For(ctx, "Build Capture").ThatError(err).Succeeded() {
 		return
@@ -59,8 +60,9 @@ func (test test) check(ctx context.Context, ca, ra *device.MemoryLayout) {
 	}
 
 	env := c.NewEnv(ctx, executor.Config{
-		Execute: true,
-		Plugins: []compiler.Plugin{replay.Plugin(ra)},
+		Execute:    true,
+		CaptureABI: ca,
+		ReplayABI:  ra,
 	})
 	defer env.Dispose()
 
@@ -68,7 +70,7 @@ func (test test) check(ctx context.Context, ca, ra *device.MemoryLayout) {
 		env.Execute(ctx, c, api.CmdID(i))
 	}
 
-	payload, err := replay.Build(env, ra)
+	payload, err := env.BuildReplay(ctx)
 	if assert.For(ctx, "Build").ThatError(err).Succeeded() {
 		got, err := opcode.Disassemble(bytes.NewReader(payload.Opcodes), device.LittleEndian)
 		if assert.For(ctx, "Disassemble").ThatError(err).Succeeded() {

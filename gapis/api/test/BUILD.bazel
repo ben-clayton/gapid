@@ -154,8 +154,6 @@ go_test(
         "//core/memory/arena:go_default_library",
         "//core/os/device:go_default_library",
         "//gapil/bapi:go_default_library",  # keep
-        "//gapil/compiler:go_default_library",
-        "//gapil/compiler/plugins/replay:go_default_library",
         "//gapil/constset:go_default_library",  # keep
         "//gapil/executor:go_default_library",
         "//gapir/client:go_default_library",

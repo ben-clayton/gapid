@@ -12,12 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package compiler
+package executor
 
-const (
-	debugFunctionCalls    = false
-	debugStatements       = false
-	debugExpressions      = false
-	debugRefCounts        = false
-	debugDisableRefCounts = false
+import (
+	"context"
+	"unsafe"
 )
+
+func RegisterPrebuilt(cfg Config, module unsafe.Pointer) {
+	exec := New(context.Background(), cfg, module)
+	ready := make(chan struct{})
+	cache.Store(cfg.key(), &apiExec{exec: exec, ready: ready})
+	close(ready)
+}

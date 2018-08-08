@@ -24,7 +24,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#if 0
+#if 1
 #define DEBUG_PRINT(...) GAPID_WARNING(__VA_ARGS__)
 #else
 #define DEBUG_PRINT(...)

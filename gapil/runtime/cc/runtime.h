@@ -50,13 +50,15 @@ typedef struct string_t string;
 // context contains information about the environment in which a function is
 // executing.
 typedef struct context_t {
-  uint32_t id;        // the context identifier. Can be treated as user-data.
-  uint32_t location;  // the API source location.
-  uint64_t cmd_id;    // the current command identifier.
-  globals* globals;   // a pointer to the global state.
-  arena* arena;       // the memory arena used for allocations.
-  uint64_t thread;    // the identifier of the currently executing thread.
-  void* arguments;    // the arguments to the currently executing command.
+  uint32_t id;         // the context identifier. Can be treated as user-data.
+  uint32_t location;   // the API source location.
+  globals* globals;    // a pointer to the global state.
+  arena* arena;        // the memory arena used for allocations.
+  uint64_t thread;     // the identifier of the currently executing thread.
+  void* cmd_args;      // the arguments to the currently executing command.
+  uint64_t cmd_id;     // the current command identifier.
+  uint64_t cmd_idx;    // the index of the current command being executed.
+  uint64_t cmd_flags;  // extra info for the current command being executed.
   // additional data used by compiler plugins goes here.
 } context;
 
@@ -105,6 +107,54 @@ typedef struct buffer_t {
   uint32_t size;      // current size of the buffer.
 } buffer;
 
+// gapil_api_module holds the functions produced by a compilation for a single
+// API.
+typedef struct gapil_api_module_t {
+  // Offset in bytes of the API's globals from context.globals.
+  uint64_t globals_offset;
+
+  // Size in bytes of the API's globals.
+  uint64_t globals_size;
+
+  // number of functions in this module.
+  uint64_t num_cmds;
+
+  // array of functions generated for all the commands.
+  uint32_t (**cmds)(void* ctx);
+
+} gapil_api_module;
+
+// gapil_symbol is a pair of name and address.
+typedef struct gapil_symbol_t {
+  const char* name;
+  const void* addr;
+} gapil_symbol;
+
+// gapil_module holds the functions produced by a compilation.
+typedef struct gapil_module_t {
+  // creates an initializes a new context with the given arena.
+  context* (*create_context)(arena* arena);
+
+  // destroys the context created by create_context.
+  void (*destroy_context)(context*);
+
+  // Size in bytes of all globals.
+  uint64_t globals_size;
+
+  // number of APIs in this module.
+  uint32_t num_apis;
+
+  // array of all the APIs.
+  gapil_api_module* apis;
+
+  // number of symbols in this module.
+  uint32_t num_symbols;
+
+  // array of all the symbols.
+  gapil_symbol* symbols;
+
+} gapil_module;
+
 typedef uint8_t GAPIL_BOOL;
 
 #define GAPIL_FALSE 0
@@ -136,6 +186,10 @@ typedef struct gapil_runtime_callbacks_t {
   void* (*resolve_pool_data)(context*, uint64_t pool_id, uint64_t ptr,
                              gapil_data_access, uint64_t size);
 
+  // call_extern calls the extern with the given name and arguments. If the
+  // extern has a return type, then the result should be be stored to res.
+  void (*call_extern)(context*, uint8_t* name, void* args, void* res);
+
   // copies N bytes of data from src to dst, where N is min(dst.size, src.size).
   void (*copy_slice)(context*, slice* dst, slice* src);
 
@@ -158,6 +212,7 @@ typedef struct gapil_runtime_callbacks_t {
   // decrements the reference count of the given pool, freeing it if the
   // reference count reaches 0.
   void (*pool_release)(context*, uint64_t pool_id);
+
 } gapil_runtime_callbacks;
 
 void gapil_set_runtime_callbacks(gapil_runtime_callbacks*);
@@ -165,12 +220,6 @@ void gapil_set_runtime_callbacks(gapil_runtime_callbacks*);
 ////////////////////////////////////////////////////////////////////////////////
 // Runtime API implemented by the compiler                                    //
 ////////////////////////////////////////////////////////////////////////////////
-
-// creates an initializes a new context with the given arena.
-context* gapil_create_context(arena* arena);
-
-// destroys the context created by gapil_create_context.
-void gapil_destroy_context(context*);
 
 void gapil_string_reference(string*);
 void gapil_string_release(string*);
@@ -268,6 +317,11 @@ DECL_GAPIL_CB(void, gapil_pool_reference, context*, uint64_t pool_id);
 // decrements the reference count of the given pool, freeing it if the reference
 // count reaches 0.
 DECL_GAPIL_CB(void, gapil_pool_release, context*, uint64_t pool_id);
+
+// gapil_call_extern calls the extern with the given name and arguments. If the
+// extern has a return type, then the result should be be stored to res.
+DECL_GAPIL_CB(void, gapil_call_extern, context*, uint8_t* name, void* args,
+              void* res);
 
 #undef DECL_GAPIL_CB
 

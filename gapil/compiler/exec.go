@@ -14,10 +14,14 @@
 
 package compiler
 
-const (
-	debugFunctionCalls    = false
-	debugStatements       = false
-	debugExpressions      = false
-	debugRefCounts        = false
-	debugDisableRefCounts = false
-)
+func (c *C) buildExec() {
+	for _, api := range c.APIs {
+		c.currentAPI = api
+		for _, f := range api.Subroutines {
+			c.subroutine(f)
+		}
+		for _, f := range api.Functions {
+			c.command(f)
+		}
+	}
+}

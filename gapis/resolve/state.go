@@ -57,7 +57,7 @@ func GlobalState(ctx context.Context, p *path.GlobalState) (*api.GlobalState, co
 	defer analytics.SendTiming("resolve", "global-state")(analytics.Count(len(cmds)))
 
 	err = api.ForeachCmd(ctx, cmds, func(ctx context.Context, id api.CmdID, cmd api.Cmd) error {
-		env.Execute(ctx, cmd, id)
+		env.Execute(ctx, id, cmd)
 		return nil
 	})
 	if err != nil {
