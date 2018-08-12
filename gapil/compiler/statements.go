@@ -64,7 +64,7 @@ func (c *C) command(f *semantic.Function) {
 	name := fmt.Sprintf("%v_%v", c.CurrentAPI().Name(), f.Name())
 
 	out := c.M.
-		Function(c.returnType(f), name, c.T.CtxPtr).
+		Function(c.T.Uint32, name, c.T.CtxPtr).
 		LinkInternal()
 
 	c.Build(out, func(s *S) {
@@ -182,8 +182,7 @@ func (c *C) statement(s *S, n semantic.Statement) bool {
 }
 
 func (c *C) abort(s *S, n *semantic.Abort) {
-	retTy := c.returnType(c.currentFunc)
-	s.Return(s.Zero(retTy).Insert(retError, s.Scalar(ErrAborted)))
+	c.returnErr(s, s.Scalar(ErrAborted))
 }
 
 func (c *C) applyReads(s *S) {
@@ -443,26 +442,46 @@ func (c *C) read(s *S, n *semantic.Read) {
 }
 
 func (c *C) return_(s *S, n *semantic.Return) {
-	var val *codegen.Value
-	var ty semantic.Type
 	switch {
-	case n.Value != nil:
-		val = c.expression(s, n.Value)
-		ty = n.Value.ExpressionType()
-	case c.currentFunc.Signature.Return != semantic.VoidType:
-		val = c.initialValue(s, c.currentFunc.Signature.Return)
-		ty = c.currentFunc.Signature.Return
+	case c.currentFunc.Subroutine:
+		// Subroutines return a <error, value> pair.
+		var val *codegen.Value
+		var ty semantic.Type
+		switch {
+		case n.Value != nil:
+			val = c.expression(s, n.Value)
+			ty = n.Value.ExpressionType()
+		case c.currentFunc.Signature.Return != semantic.VoidType:
+			val = c.initialValue(s, c.currentFunc.Signature.Return)
+			ty = c.currentFunc.Signature.Return
+		default:
+			s.Return(nil)
+			return
+		}
+
+		val = val.Cast(c.T.Target(n.Function.Return.Type))
+
+		c.reference(s, val, ty)
+		retTy := c.returnType(c.currentFunc) // <error, value>
+		ret := s.Zero(retTy).Insert(retValue, val)
+		s.Return(ret)
+
 	default:
-		s.Return(nil)
-		return
+		// Commands return an error code
+		s.Return(s.Scalar(ErrSuccess))
 	}
+}
 
-	val = val.Cast(c.T.Target(n.Function.Return.Type))
-
-	c.reference(s, val, ty)
-	retTy := c.returnType(c.currentFunc) // <error, value>
-	ret := s.Zero(retTy).Insert(retValue, val)
-	s.Return(ret)
+func (c *C) returnErr(s *S, err *codegen.Value) {
+	switch {
+	case c.currentFunc.Subroutine:
+		// Subroutines return a <error, value> pair.
+		retTy := c.returnType(c.currentFunc)
+		s.Return(s.Zero(retTy).Insert(retError, err))
+	default:
+		// Commands return an error code
+		s.Return(s.Scalar(err))
+	}
 }
 
 func (c *C) sliceAssign(s *S, n *semantic.SliceAssign) {

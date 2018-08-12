@@ -255,8 +255,7 @@ func (c *C) call(s *S, e *semantic.Call) *codegen.Value {
 		// Check the error.
 		err := res.Extract(retError)
 		s.If(s.NotEqual(err, s.Scalar(ErrSuccess)), func(s *S) {
-			retTy := c.returnType(c.currentFunc)
-			s.Return(s.Zero(retTy).Insert(retError, err))
+			c.returnErr(s, err)
 		})
 		if tf.Return.Type == semantic.VoidType {
 			return nil
