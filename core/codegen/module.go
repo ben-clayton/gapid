@@ -108,7 +108,7 @@ func (m *Module) Verify() error {
 	for f := m.llvm.FirstFunction(); !f.IsNil(); f = llvm.NextFunction(f) {
 		if err := llvm.VerifyFunction(f, llvm.ReturnStatusAction); err != nil {
 			f.Dump()
-			modErr := llvm.VerifyModule(m.llvm, llvm.ReturnStatusAction)
+			modErr := slashHexToRune(llvm.VerifyModule(m.llvm, llvm.ReturnStatusAction).Error())
 			return fmt.Errorf("Function '%s' verification failed:\n%v\n%v", f.Name(), err, modErr)
 		}
 	}
