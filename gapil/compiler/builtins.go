@@ -33,6 +33,8 @@ const (
 	ErrAborted = ErrorCode(C.GAPIL_ERR_ABORTED)
 )
 
+const ApplicationPool uint64 = 0
+
 // Map constants
 const (
 	mapElementEmpty   = (uint64)(C.GAPIL_MAP_ELEMENT_EMPTY)

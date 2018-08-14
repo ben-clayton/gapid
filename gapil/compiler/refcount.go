@@ -16,6 +16,8 @@ package compiler
 
 import (
 	"fmt"
+	"runtime"
+	"strings"
 
 	"github.com/google/gapid/core/codegen"
 	"github.com/google/gapid/core/log"
@@ -54,7 +56,7 @@ func (f *refRel) build(
 		refPtr := getRefPtr(s, val)
 		oldCount := refPtr.Load()
 		s.If(s.Equal(oldCount, s.Scalar(uint32(0))), func(s *S) {
-			c.Log(s, log.Fatal, "Attempting to reference released "+f.name)
+			c.Log(s, log.Fatal, "Attempting to reference released "+f.name+" (%p)", refPtr)
 		})
 		newCount := s.Add(oldCount, s.Scalar(uint32(1)))
 		if debugRefCounts {
@@ -71,7 +73,7 @@ func (f *refRel) build(
 		refPtr := getRefPtr(s, val)
 		oldCount := refPtr.Load()
 		s.If(s.Equal(oldCount, s.Scalar(uint32(0))), func(s *S) {
-			c.Log(s, log.Fatal, "Attempting to release "+f.name+" with no remaining references!")
+			c.Log(s, log.Fatal, "Attempting to release "+f.name+" with no remaining references! (%p)", refPtr)
 		})
 		newCount := s.Sub(oldCount, s.Scalar(uint32(1)))
 		if debugRefCounts {
@@ -295,30 +297,56 @@ func (c *C) buildRefRels() {
 	}
 }
 
+func caller() string {
+	_, file, line, ok := runtime.Caller(2)
+	if !ok {
+		return "<unknown>"
+	}
+	if i := strings.LastIndex(file, "/"); i > 0 {
+		file = file[i+1:]
+	}
+	return fmt.Sprintf("%v:%v", file, line)
+}
+
 func (c *C) reference(s *S, val *codegen.Value, ty semantic.Type) {
+	if got, expect := val.Type(), c.T.Target(ty); got != expect {
+		fail("reference() called with a value of an expected type. Got %+v, expect %+v", got, expect)
+	}
 	if debugDisableRefCounts {
 		return
 	}
 	if f, ok := c.refRels.tys[semantic.Underlying(ty)]; ok {
+		if debugRefCounts {
+			c.LogI(s, fmt.Sprintf("reference(%v: %%p): %v", ty, caller()), val)
+		}
 		s.Call(f.reference, s.Ctx, val)
 	}
 }
 
 func (c *C) release(s *S, val *codegen.Value, ty semantic.Type) {
+	if got, expect := val.Type(), c.T.Target(ty); got != expect {
+		fail("release() called with a value of an expected type. Got %+v, expect %+v", got, expect)
+	}
 	if debugDisableRefCounts {
 		return
 	}
 	if f, ok := c.refRels.tys[semantic.Underlying(ty)]; ok {
+		if debugRefCounts {
+			c.LogI(s, fmt.Sprintf("release(%v: %%p): %v", ty, caller()), val)
+		}
 		s.Call(f.release, s.Ctx, val)
 	}
 }
 
 func (c *C) deferRelease(s *S, val *codegen.Value, ty semantic.Type) {
+	if got, expect := val.Type(), c.T.Target(ty); got != expect {
+		fail("deferRelease() called with a value of an expected type. Got %+v, expect %+v", got, expect)
+	}
 	if debugDisableRefCounts {
 		return
 	}
 	if debugRefCounts {
-		c.LogI(s, "deferRelease("+fmt.Sprintf("%T", ty)+": %p)", val)
+		c.LogI(s, fmt.Sprintf("deferRelease(%v: %%p): %v", ty, caller()), val)
 	}
 	s.onExit(func() {
 		if s.IsBlockTerminated() {

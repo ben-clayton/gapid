@@ -49,6 +49,8 @@ type Env struct {
 
 	// Arena to use for buffers
 	bufferArena arena.Arena
+	buffers     []unsafe.Pointer
+	lastCmdID   api.CmdID
 
 	id    envID
 	cCtx  *C.context      // The gapil C context.
@@ -223,7 +225,21 @@ func (e *Env) Globals() []byte {
 	return slice.Bytes((unsafe.Pointer)(e.cCtx.globals), uint64(e.Executor.module.globals_size))
 }
 
+func (e *Env) changedCommand() bool {
+	cur := api.CmdID(e.cCtx.cmd_id)
+	changed := cur != e.lastCmdID
+	e.lastCmdID = cur
+	return changed
+}
+
 func (e *Env) readPoolData(pool memory.PoolID, ptr, size uint64) unsafe.Pointer {
+	if e.changedCommand() {
+		for _, b := range e.buffers {
+			e.bufferArena.Free(b)
+		}
+		e.buffers = e.buffers[:0]
+	}
+
 	ctx := e.goCtx
 	p := e.State.Memory.MustGet(pool)
 
@@ -239,6 +255,7 @@ func (e *Env) readPoolData(pool memory.PoolID, ptr, size uint64) unsafe.Pointer 
 		if err := sli.Get(ctx, 0, slice.Bytes(buf, size)); err != nil {
 			panic(err)
 		}
+		e.buffers = append(e.buffers, buf)
 		return buf
 	}
 }

@@ -40,8 +40,8 @@
 
 #define SLICE_FMT                                             \
   "[pool: %" PRIu64 ", root: 0x%" PRIx64 ", base: 0x%" PRIx64 \
-  ", size: 0x%" PRIx64 "]"
-#define SLICE_ARGS(sli) sli->pool, sli->root, sli->base, sli->size
+  ", size: 0x%" PRIx64 ", count: 0x%" PRIx64 "]"
+#define SLICE_ARGS(sli) sli->pool, sli->root, sli->base, sli->size, sli->count
 
 using core::Arena;
 

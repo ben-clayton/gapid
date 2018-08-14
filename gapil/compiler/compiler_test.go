@@ -1230,12 +1230,34 @@ cmd void MapRehash() {
 			cmds:     []cmd{{N: "MapRehash"}},
 			expected: expected{data: D([]uint32{17, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})},
 		}, { /////////////////////////////////////////////////////
+			name: "Statements.MapIteration",
+			src: `
+class S { u32 i }
+class M { map!(u32, S) m }
+u32[3] r
+cmd void MapIteration() {
+	m := M().m
+	m[1] = S(5)
+	m[2] = S(7)
+	m[3] = S(9)
+	for i, k, v in m {
+		r[0] = r[0] + as!u32(i)
+		r[1] = r[1] + k
+		r[2] = r[2] + v.i
+	}
+}`,
+			cmds:     []cmd{{N: "MapIteration"}},
+			expected: expected{data: D([]uint32{3, 6, 21})},
+		}, { /////////////////////////////////////////////////////
 			name: "Statements.Read",
 			src: `
 cmd void Read(u32* ptr) {
 	read(ptr[0:5])
 }`, // TODO: test read callbacks
-			cmds: []cmd{{N: "Read"}},
+			cmds: []cmd{{
+				N: "Read",
+				D: D(ptrA),
+			}},
 		}, { /////////////////////////////////////////////////////
 			name: "Statements.Return",
 			src: `
@@ -1987,7 +2009,7 @@ func (t test) run(ctx context.Context) (succeeded bool) {
 
 	defer func() {
 		if !succeeded {
-			// fmt.Println(program.Dump())
+			fmt.Println(program.Dump())
 		}
 	}()
 

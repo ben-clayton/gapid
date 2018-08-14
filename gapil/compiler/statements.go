@@ -278,11 +278,12 @@ func (c *C) doAssign(s *S, op string, lhs, rhs semantic.Expression) {
 
 func (c *C) expressionAddr(s *S, target semantic.Expression) *codegen.Value {
 	path := []codegen.ValueIndexOrName{}
-	revPath := func() {
+	revPath := func() []codegen.ValueIndexOrName {
 		for i, c, m := 0, len(path), len(path)/2; i < m; i++ {
 			j := c - i - 1
 			path[i], path[j] = path[j], path[i]
 		}
+		return path
 	}
 	for {
 		switch n := target.(type) {
