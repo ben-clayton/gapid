@@ -259,17 +259,17 @@ func (c *C) doAssign(s *S, op string, lhs, rhs semantic.Expression) {
 	switch op {
 	case ast.OpAssign:
 		c.reference(s, val, rhs.ExpressionType())
-		c.release(s, dst.Load(), lhs.ExpressionType())
+		c.deferRelease(s, dst.Load(), lhs.ExpressionType())
 		dst.Store(val)
 	case ast.OpAssignPlus:
 		val := c.doBinaryOp(s, ast.OpPlus, dst.Load(), val)
 		c.reference(s, val, rhs.ExpressionType())
-		c.release(s, dst.Load(), lhs.ExpressionType())
+		c.deferRelease(s, dst.Load(), lhs.ExpressionType())
 		dst.Store(val)
 	case ast.OpAssignMinus:
 		val := c.doBinaryOp(s, ast.OpMinus, dst.Load(), val)
 		c.reference(s, val, rhs.ExpressionType())
-		c.release(s, dst.Load(), lhs.ExpressionType())
+		c.deferRelease(s, dst.Load(), lhs.ExpressionType())
 		dst.Store(val)
 	default:
 		fail("Unsupported composite assignment operator '%s'", op)
@@ -289,38 +289,33 @@ func (c *C) expressionAddr(s *S, target semantic.Expression) *codegen.Value {
 		switch n := target.(type) {
 		case *semantic.Global:
 			path = append(path, n.Name(), c.CurrentAPI().Name(), 0)
-			revPath()
-			return s.Globals.Index(path...)
+			return s.Globals.Index(revPath()...)
 		case *semantic.Local:
 			path = append(path, 0)
-			revPath()
-			return s.locals[n].Index(path...)
+			return s.locals[n].Index(revPath()...)
 		case *semantic.Member:
 			path = append(path, n.Field.Name())
 			target = n.Object
 			if semantic.IsReference(target.ExpressionType()) {
 				path = append(path, RefValue, 0)
-				revPath()
-				return c.expression(s, target).Index(path...)
+				return c.expression(s, target).Index(revPath()...)
 			}
 		case *semantic.ArrayIndex:
 			path = append(path, c.expression(s, n.Index))
 			target = n.Array
 		case *semantic.MapIndex:
 			path = append(path, 0)
-			revPath()
 			m := c.expression(s, n.Map)
 			k := c.expression(s, n.Index)
 			v := s.Call(c.T.Maps[n.Type].Index, m, s.Ctx, k, s.Scalar(false)).SetName("map_get")
-			return v.Index(path...)
+			return v.Index(revPath()...)
 		case *semantic.Unknown:
 			target = n.Inferred
 		case *semantic.Ignore:
 			return nil
 		default:
 			path = append(path, 0)
-			revPath()
-			return s.LocalInit("tmp", c.expression(s, n)).Index(path...)
+			return s.LocalInit("tmp", c.expression(s, n)).Index(revPath()...)
 		}
 	}
 }
@@ -369,7 +364,7 @@ func (c *C) declareLocal(s *S, n *semantic.DeclareLocal) {
 	c.reference(s, def, n.Local.Type)
 	local := s.LocalInit(n.Local.Name(), def)
 	s.locals[n.Local] = local
-	defer func() { c.release(s, local.Load(), n.Local.Type) }()
+	c.deferRelease(s, local.Load(), n.Local.Type)
 }
 
 func (c *C) fence(s *S, n *semantic.Fence) {

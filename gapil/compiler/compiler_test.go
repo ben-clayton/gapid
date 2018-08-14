@@ -685,6 +685,7 @@ cmd void map_length() {
 }`,
 			cmds:     []cmd{{N: "map_length"}},
 			expected: expected{data: D(uint32(2))},
+			dump:     true,
 		}, { /////////////////////////////////////////////////////
 			name:     "Expressions.Length.String",
 			src:      `u32 i = len("123456789")`,
@@ -1416,6 +1417,7 @@ cmd void MapsOfStructsOfMaps() {
 `,
 			cmds:     []cmd{{N: "MapsOfStructsOfMaps"}},
 			expected: expected{data: D(uint32(42))},
+			dump:     true,
 		},
 		////////////////////////////////////////////////////////
 		// Reference Counting                                 //
@@ -1459,7 +1461,11 @@ cmd void StringFromSubroutine() { x := ReturnAString() }
 			src: `
 class C { string s }
 C c
-cmd void StringInClass() { c = C("purr") }
+cmd void StringInClass() {
+	c = C("purr")
+	c = C("meow")
+	c = C("hiss")
+}
 `,
 			cmds:     []cmd{{N: "StringInClass"}},
 			expected: expected{numAllocs: 1},

@@ -15,9 +15,10 @@
 package compiler
 
 const (
-	debugFunctionCalls    = false
-	debugStatements       = false
-	debugExpressions      = false
-	debugRefCounts        = false
-	debugDisableRefCounts = false
+	debugFunctionCalls       = false
+	debugStatements          = false
+	debugExpressions         = false
+	debugRefCounts           = false
+	debugDisableRefCounts    = false
+	debugDisableRefCountOpts = false
 )

@@ -203,6 +203,8 @@ void gapil_string_to_slice(context* ctx, string* str, slice* out) {
 
 string* gapil_string_concat(string* a, string* b) {
   DEBUG_PRINT("gapil_string_concat(a: '%s', b: '%s')", a->data, b->data);
+  GAPID_ASSERT(a->ref_count > 0);
+  GAPID_ASSERT(b->ref_count > 0);
 
   if (a->length == 0) {
     b->ref_count++;
