@@ -22,13 +22,11 @@ package compiler
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/google/gapid/core/codegen"
 	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/core/os/device/host"
-	"github.com/google/gapid/core/text/parse/cst"
 	"github.com/google/gapid/gapil/compiler/mangling"
 	"github.com/google/gapid/gapil/compiler/mangling/c"
 	"github.com/google/gapid/gapil/semantic"
@@ -77,8 +75,6 @@ type C struct {
 	}
 	emptyString     codegen.Global
 	mappings        *semantic.Mappings
-	locationIndex   map[Location]int
-	locations       []Location
 	refRels         refRels
 	currentAPI      *semantic.API
 	currentFunc     *semantic.Function
@@ -134,14 +130,12 @@ func Compile(apis []*semantic.API, mappings *semantic.Mappings, s Settings) (*Pr
 		Mangler:  s.Mangler,
 		Settings: s,
 
-		plugins:       s.Plugins,
-		commands:      map[*semantic.Function]*codegen.Function{},
-		externs:       map[*semantic.Function]*codegen.Function{},
-		subroutines:   map[*semantic.Function]*codegen.Function{},
-		functions:     map[string]*codegen.Function{},
-		mappings:      mappings,
-		locationIndex: map[Location]int{},
-		locations:     []Location{},
+		plugins:     s.Plugins,
+		commands:    map[*semantic.Function]*codegen.Function{},
+		externs:     map[*semantic.Function]*codegen.Function{},
+		subroutines: map[*semantic.Function]*codegen.Function{},
+		functions:   map[string]*codegen.Function{},
+		mappings:    mappings,
 	}
 	for _, n := range s.Namespaces {
 		c.Root = &mangling.Namespace{Name: n, Parent: c.Root}
@@ -175,7 +169,7 @@ func (c *C) program(s Settings) (*Program, error) {
 	structs := map[string]*StructInfo{}
 	for _, t := range c.T.target {
 		if s, ok := t.(*codegen.Struct); ok {
-			structs[s.Name] = &StructInfo{Type: s}
+			structs[s.TypeName()] = &StructInfo{Type: s}
 		}
 	}
 
@@ -192,7 +186,6 @@ func (c *C) program(s Settings) (*Program, error) {
 		Globals:   globals,
 		Functions: c.functions,
 		Maps:      maps,
-		Locations: c.locations,
 		Codegen:   c.M,
 		Module:    c.module,
 	}, nil
@@ -275,7 +268,7 @@ func (c *C) Build(f *codegen.Function, do func(*S)) {
 		s := &S{
 			Builder:    b,
 			Parameters: map[*semantic.Parameter]*codegen.Value{},
-			locals:     map[*semantic.Local]*codegen.Value{},
+			locals:     map[*semantic.Local]local{},
 		}
 		for i, p := range f.Type.Signature.Parameters {
 			if p == c.T.CtxPtr {
@@ -286,7 +279,6 @@ func (c *C) Build(f *codegen.Function, do func(*S)) {
 				s.Globals = s.Ctx.Index(0, ContextGlobals).Load().SetName("globals")
 				s.Arena = s.Ctx.Index(0, ContextArena).Load().SetName("arena")
 				s.CurrentThread = s.Ctx.Index(0, ContextThread).Load().SetName("thread")
-				s.Location = s.Ctx.Index(0, ContextLocation)
 				break
 			}
 		}
@@ -301,7 +293,7 @@ func (c *C) Ctor(priority int32, do func(*S)) {
 		s := &S{
 			Builder:    b,
 			Parameters: map[*semantic.Parameter]*codegen.Value{},
-			locals:     map[*semantic.Local]*codegen.Value{},
+			locals:     map[*semantic.Local]local{},
 		}
 		s.enter(do)
 	})
@@ -527,27 +519,6 @@ func (c *C) SourceLocation() SourceLocation {
 	return SourceLocation{}
 }
 
-func (c *C) setCodeLocation(s *S, t cst.Token) {
-	_, file := filepath.Split(t.Source.Filename)
-	line, col := t.Cursor()
-	loc := Location{file, line, col}
-	idx, ok := c.locationIndex[loc]
-	if !ok {
-		idx = len(c.locations)
-		c.locations = append(c.locations, loc)
-	}
-	if idx != s.locationIdx {
-		s.locationIdx = idx
-		c.updateCodeLocation(s)
-	}
-}
-
-func (c *C) updateCodeLocation(s *S) {
-	if c.Settings.CodeLocations && s.Location != nil {
-		s.Location.Store(s.Scalar(uint32(s.locationIdx)))
-	}
-}
-
 func (c *C) setCurrentFunction(f *semantic.Function) *semantic.Function {
 	old := c.currentFunc
 	c.currentFunc = f
@@ -574,11 +545,8 @@ func (c *C) popExpression(s *S) {
 
 func (c *C) onChangeStatement(s *S) {
 	n := c.CurrentStatement()
-	if n == nil {
-		return
-	}
-	if cst := c.mappings.CST(n); cst != nil {
-		c.setCodeLocation(s, cst.Tok())
+	if loc := c.SourceLocationFor(n); loc.Line != 0 {
+		s.SetLocation(loc.Line, loc.Column)
 	}
 }
 

@@ -51,7 +51,6 @@ typedef struct string_t string;
 // executing.
 typedef struct context_t {
   uint32_t id;         // the context identifier. Can be treated as user-data.
-  uint32_t location;   // the API source location.
   globals* globals;    // a pointer to the global state.
   arena* arena;        // the memory arena used for allocations.
   uint64_t thread;     // the identifier of the currently executing thread.

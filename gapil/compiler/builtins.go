@@ -54,12 +54,11 @@ func init() {
 
 // Field names for the context_t runtime type.
 const (
-	ContextLocation = "location"
-	ContextGlobals  = "globals"
-	ContextArena    = "arena"
-	ContextThread   = "thread"
-	ContextCmdID    = "cmd_id"
-	ContextCmdArgs  = "cmd_args"
+	ContextGlobals = "globals"
+	ContextArena   = "arena"
+	ContextThread  = "thread"
+	ContextCmdID   = "cmd_id"
+	ContextCmdArgs = "cmd_args"
 )
 
 // Field names for the slice_t runtime type.

@@ -685,7 +685,6 @@ cmd void map_length() {
 }`,
 			cmds:     []cmd{{N: "map_length"}},
 			expected: expected{data: D(uint32(2))},
-			dump:     true,
 		}, { /////////////////////////////////////////////////////
 			name:     "Expressions.Length.String",
 			src:      `u32 i = len("123456789")`,

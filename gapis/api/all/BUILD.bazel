@@ -24,7 +24,7 @@ apic_compile(
         "exec",
     ],
     module = "prebuilt_host",
-    #optimize = True,
+    optimize = True,
     symbols = "c",
 )
 
@@ -37,7 +37,7 @@ apic_compile(
         "exec",
     ],
     module = "prebuilt_armv7a",
-    #optimize = True,
+    optimize = True,
     symbols = "c",
 )
 

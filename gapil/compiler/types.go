@@ -108,18 +108,14 @@ func (c *C) declareTypes() {
 			c.T.target[t] = mapPtrTy
 		}
 
-		// Declare all the slice types.
+		// Forward-declare all the slice types.
 		for _, t := range api.Slices {
 			c.T.target[t] = c.T.Sli
 		}
 
-		// Declare all the command parameter structs.
+		// Forward-declare all the command parameter structs.
 		for _, f := range api.Functions {
-			fields := make([]codegen.Field, 0, len(f.FullParameters)+1)
-			for _, p := range f.FullParameters {
-				fields = append(fields, codegen.Field{Name: p.Name(), Type: c.T.Target(p.Type)})
-			}
-			c.T.CmdParams[f] = c.T.Struct(f.Name()+"Params", fields...)
+			c.T.CmdParams[f] = c.T.DeclareStruct(f.Name() + "Params")
 		}
 	}
 }
@@ -190,6 +186,15 @@ func (c *C) buildTypes() {
 				codegen.Field{Name: RefArena, Type: c.T.ArenaPtr},
 				codegen.Field{Name: RefValue, Type: c.T.Target(t.To)},
 			)
+		}
+
+		// Build all the command parameter types.
+		for _, f := range api.Functions {
+			fields := make([]codegen.Field, 0, len(f.FullParameters)+1)
+			for _, p := range f.FullParameters {
+				fields = append(fields, codegen.Field{Name: p.Name(), Type: c.T.Target(p.Type)})
+			}
+			c.T.CmdParams[f].SetBody(fields...)
 		}
 	}
 

@@ -28,6 +28,7 @@ type Function struct {
 	Type  *FunctionType
 	llvm  llvm.Value
 	m     *Module
+	dbg   *funcDbg
 	built bool
 }
 

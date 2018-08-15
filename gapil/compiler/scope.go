@@ -48,13 +48,18 @@ type S struct {
 	pendingRefRels pendingRefRels
 
 	parent      *S
-	locals      map[*semantic.Local]*codegen.Value
+	locals      map[*semantic.Local]local
 	locationIdx int
 	onExitLogic []func()
 }
 
+type local struct {
+	val   *codegen.Value
+	isPtr bool
+}
+
 func (s *S) enter(f func(*S)) {
-	locals := make(map[*semantic.Local]*codegen.Value, len(s.locals))
+	locals := make(map[*semantic.Local]local, len(s.locals))
 	for l, v := range s.locals {
 		locals[l] = v
 	}

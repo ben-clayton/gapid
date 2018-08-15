@@ -42,8 +42,8 @@ func init() {
 	executor.RegisterGoExtern("gles.onGlError", externOnGlError)
 	executor.RegisterGoExtern("gles.unmapMemory", externUnmapMemory)
 
-	executor.RegisterCExtern("gles.IndexLimits", C.externIndexLimits)
-	//executor.RegisterGoExtern("gles.IndexLimits", externIndexLimits)
+	// executor.RegisterCExtern("gles.IndexLimits", C.externIndexLimits)
+	executor.RegisterGoExtern("gles.IndexLimits", externIndexLimits)
 }
 
 func externsFromEnv(env *executor.Env) *externs {
