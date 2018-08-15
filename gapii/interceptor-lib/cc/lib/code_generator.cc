@@ -81,7 +81,8 @@ bool CodeGenerator::Initialize() {
   writer_ = asmb_->createObjectWriter(code_stream_);
   if (!writer_) return false;
 
-  asm_.reset(new llvm::MCAssembler(*ctx_, *asmb_, *codegen_, *writer_));
+  asm_.reset(new llvm::MCAssembler(*ctx_, std::move(asmb_), std::move(codegen_),
+                                   std::move(writer_)));
   if (!asm_) return false;
 
   return true;
@@ -117,7 +118,8 @@ Error CodeGenerator::LinkCode(uintptr_t location) {
     }
 
     asmb_->applyFixup(*asm_, fixup, mc_value,
-        llvm::makeMutableArrayRef(code_.data(), code_.size()), value, pc_rel);
+                      llvm::makeMutableArrayRef(code_.data(), code_.size()),
+                      value, pc_rel, sti_.get());
   }
 
   if (start_alignment_ != 0)

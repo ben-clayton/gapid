@@ -32,7 +32,8 @@ def gapid_dependencies(android = True, java_client = True, mingw = True, locals 
     #####################################################
     # Get repositories with workspace rules we need first
 
-    maybe_repository(github_repository,
+    maybe_repository(
+        github_repository,
         name = "io_bazel_rules_go",
         locals = locals,
         organization = "bazelbuild",
@@ -40,7 +41,8 @@ def gapid_dependencies(android = True, java_client = True, mingw = True, locals 
         commit = "01c7b1ba59c7a1819f1003cf58400cb3d4f7d22e",
     )
 
-    maybe_repository(github_repository,
+    maybe_repository(
+        github_repository,
         name = "bazel_gazelle",
         locals = locals,
         organization = "bazelbuild",
@@ -48,7 +50,8 @@ def gapid_dependencies(android = True, java_client = True, mingw = True, locals 
         commit = "84ec09c308035853493731ef1401ec4812f9674f",
     )
 
-    maybe_repository(github_repository,
+    maybe_repository(
+        github_repository,
         name = "com_google_protobuf",
         locals = locals,
         organization = "google",
@@ -59,7 +62,8 @@ def gapid_dependencies(android = True, java_client = True, mingw = True, locals 
         build_file = "@gapid//tools/build/third_party:protobuf.BUILD",
     )
 
-    maybe_repository(github_repository,
+    maybe_repository(
+        github_repository,
         name = "com_github_grpc_grpc",
         locals = locals,
         organization = "grpc",
@@ -74,7 +78,8 @@ def gapid_dependencies(android = True, java_client = True, mingw = True, locals 
     ###########################################
     # Now get all our other non-go dependencies
 
-    maybe_repository(github_repository,
+    maybe_repository(
+        github_repository,
         name = "com_google_googletest",
         locals = locals,
         organization = "google",
@@ -82,7 +87,8 @@ def gapid_dependencies(android = True, java_client = True, mingw = True, locals 
         commit = "62dbaa2947f7d058ea7e16703faea69b1134b024",
     )
 
-    maybe_repository(github_repository,
+    maybe_repository(
+        github_repository,
         name = "astc_encoder",
         locals = locals,
         organization = "ARM-software",
@@ -91,14 +97,16 @@ def gapid_dependencies(android = True, java_client = True, mingw = True, locals 
         build_file = "@gapid//tools/build/third_party:astc-encoder.BUILD",
     )
 
-    maybe_repository(breakpad,
+    maybe_repository(
+        breakpad,
         name = "breakpad",
         locals = locals,
         commit = "a61afe7a3e865f1da7ff7185184fe23977c2adca",
         build_file = "@gapid//tools/build/third_party/breakpad:breakpad.BUILD",
     )
 
-    maybe_repository(github_repository,
+    maybe_repository(
+        github_repository,
         name = "cityhash",
         locals = locals,
         organization = "google",
@@ -107,7 +115,8 @@ def gapid_dependencies(android = True, java_client = True, mingw = True, locals 
         build_file = "@gapid//tools/build/third_party:cityhash.BUILD",
     )
 
-    maybe_repository(github_repository,
+    maybe_repository(
+        github_repository,
         name = "glslang",
         locals = locals,
         organization = "KhronosGroup",
@@ -116,16 +125,18 @@ def gapid_dependencies(android = True, java_client = True, mingw = True, locals 
         build_file = "@gapid//tools/build/third_party:glslang.BUILD",
     )
 
-    maybe_repository(github_repository,
+    maybe_repository(
+        github_repository,
         name = "llvm",
         locals = locals,
-        organization = "llvm-mirror",
+        organization = "ben-clayton",
         project = "llvm",
-        commit = "aeb3e4fcbba63c2750aa27cfe75c4374a8b23550",
+        commit = "1095ff796f14debccddf96775b31064dab4c2f86",
         build_file = "@gapid//tools/build/third_party:llvm.BUILD",
     )
 
-    maybe_repository(native.new_git_repository,
+    maybe_repository(
+        native.new_git_repository,
         name = "lss",
         locals = locals,
         remote = "https://chromium.googlesource.com/linux-syscall-support",
@@ -133,7 +144,8 @@ def gapid_dependencies(android = True, java_client = True, mingw = True, locals 
         build_file = "@gapid//tools/build/third_party:lss.BUILD",
     )
 
-    maybe_repository(github_repository,
+    maybe_repository(
+        github_repository,
         name = "spirv_headers",
         locals = locals,
         organization = "KhronosGroup",
@@ -142,7 +154,8 @@ def gapid_dependencies(android = True, java_client = True, mingw = True, locals 
         build_file = "@gapid//tools/build/third_party:spirv-headers.BUILD",
     )
 
-    maybe_repository(github_repository,
+    maybe_repository(
+        github_repository,
         name = "spirv_cross",
         locals = locals,
         organization = "KhronosGroup",
@@ -151,7 +164,8 @@ def gapid_dependencies(android = True, java_client = True, mingw = True, locals 
         build_file = "@gapid//tools/build/third_party:spirv-cross.BUILD",
     )
 
-    maybe_repository(github_repository,
+    maybe_repository(
+        github_repository,
         name = "spirv_tools",
         locals = locals,
         organization = "KhronosGroup",
@@ -161,7 +175,8 @@ def gapid_dependencies(android = True, java_client = True, mingw = True, locals 
     )
 
     if java_client:
-        maybe_repository(github_repository,
+        maybe_repository(
+            github_repository,
             name = "com_github_grpc_java",
             locals = locals,
             organization = "grpc",
@@ -171,19 +186,22 @@ def gapid_dependencies(android = True, java_client = True, mingw = True, locals 
         )
 
     if android:
-        maybe_repository(native.android_sdk_repository,
+        maybe_repository(
+            native.android_sdk_repository,
             name = "androidsdk",
             locals = locals,
             api_level = 21,
         )
 
-        maybe_repository(native.android_ndk_repository,
+        maybe_repository(
+            native.android_ndk_repository,
             name = "androidndk",
             locals = locals,
             api_level = 21,
         )
 
-        maybe_repository(android_native_app_glue,
+        maybe_repository(
+            android_native_app_glue,
             name = "android_native_app_glue",
             locals = locals,
         )
