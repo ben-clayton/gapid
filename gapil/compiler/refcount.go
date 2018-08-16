@@ -32,8 +32,12 @@ type refRel struct {
 }
 
 func (f *refRel) declare(c *C, name, ref, rel string, ty codegen.Type) {
-	f.reference = c.M.Function(c.T.Void, ref, c.T.CtxPtr, ty).LinkOnceODR().Inline()
-	f.release = c.M.Function(c.T.Void, rel, c.T.CtxPtr, ty).LinkOnceODR().Inline()
+	f.reference = c.M.Function(c.T.Void, ref, c.T.CtxPtr, ty).
+		LinkInternal().
+		Inline()
+	f.release = c.M.Function(c.T.Void, rel, c.T.CtxPtr, ty).
+		LinkInternal().
+		Inline()
 	f.name = name
 }
 

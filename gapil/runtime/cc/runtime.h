@@ -217,18 +217,14 @@ typedef struct gapil_runtime_callbacks_t {
 void gapil_set_runtime_callbacks(gapil_runtime_callbacks*);
 
 ////////////////////////////////////////////////////////////////////////////////
-// Runtime API implemented by the compiler                                    //
-////////////////////////////////////////////////////////////////////////////////
-
-void gapil_string_reference(string*);
-void gapil_string_release(string*);
-
-void gapil_slice_reference(context*, slice);
-void gapil_slice_release(context*, slice);
-
-////////////////////////////////////////////////////////////////////////////////
 // Runtime API implemented in runtime.cpp                                     //
 ////////////////////////////////////////////////////////////////////////////////
+
+DECL_GAPIL_CB(void, gapil_string_reference, string*);
+DECL_GAPIL_CB(void, gapil_string_release, string*);
+
+DECL_GAPIL_CB(void, gapil_slice_reference, context*, slice*);
+DECL_GAPIL_CB(void, gapil_slice_release, context*, slice*);
 
 // allocates memory using the arena with the given size and alignment.
 DECL_GAPIL_CB(void*, gapil_alloc, arena*, uint64_t size, uint64_t align);
