@@ -63,7 +63,13 @@ void call(context* ctx, gapil_module* m, cmd_data_t* cmds, uint64_t count,
     ctx->cmd_args = cmd.args;
     ctx->cmd_flags = cmd.flags;
 
-    res[i] = fptr(ctx);
+    res[i] = 0;
+
+    try {
+      fptr(ctx);
+    } catch (uint32_t err) {
+      res[i] = err;
+    }
   }
 }
 

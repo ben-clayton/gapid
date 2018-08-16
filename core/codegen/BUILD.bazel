@@ -23,6 +23,7 @@ go_library(
         "cast.go",
         "debug.go",
         "doc.go",
+        "exceptions.go",
         "function.go",
         "intrinsics.go",
         "module.go",

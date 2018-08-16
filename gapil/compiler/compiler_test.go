@@ -1009,6 +1009,25 @@ cmd void AbortInSub() {
 				err:  api.ErrCmdAborted{},
 			},
 		}, { /////////////////////////////////////////////////////
+			name: "Statements.Abort.InCmd.Cleanup",
+			src: `
+cmd void AbortInCmdCleanup() {
+	s := "this string must be released before throwing the exception"
+	abort
+}`,
+			cmds:     []cmd{{N: "AbortInCmdCleanup"}},
+			expected: expected{err: api.ErrCmdAborted{}},
+		}, { /////////////////////////////////////////////////////
+			name: "Statements.Abort.InSub.Cleanup",
+			src: `
+sub void call_abort() { abort }
+cmd void AbortInSubCleanup() {
+	s := "this string must be released in the exception cleanup"
+	call_abort()
+}`,
+			cmds:     []cmd{{N: "AbortInSubCleanup"}},
+			expected: expected{err: api.ErrCmdAborted{}},
+		}, { /////////////////////////////////////////////////////
 			name: "Statements.ArrayAssign",
 			src: `
 u32[5] i
@@ -1940,6 +1959,10 @@ cmd void Read(StructInStruct* input) {
 		},
 	} {
 		for _, optimize := range []bool{false, true} {
+			name := test.name
+			if optimize {
+				name += " opt"
+			}
 			t.Run(test.name, func(t *testing.T) {
 				test.run(log.SubTest(ctx, t), optimize)
 			})
@@ -1999,6 +2022,10 @@ func (t test) run(ctx context.Context, optimize bool) (succeeded bool) {
 		return false
 	}
 
+	if t.dump {
+		fmt.Println(program.Dump())
+	}
+
 	e, err := program.Codegen.Executor(optimize)
 	if !assert.For(ctx, "Executor(%v)", optimize).ThatError(err).Succeeded() {
 		return false
@@ -2009,10 +2036,6 @@ func (t test) run(ctx context.Context, optimize bool) (succeeded bool) {
 	exec := executor.New(ctx, executor.Config{}, module)
 	env := exec.NewEnv(ctx)
 	defer env.Dispose()
-
-	if t.dump {
-		fmt.Println(program.Dump())
-	}
 
 	defer func() {
 		if !succeeded {

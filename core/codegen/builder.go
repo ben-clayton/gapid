@@ -66,7 +66,51 @@ func (b *Builder) CallIndirect(f *Value, args ...*Value) *Value {
 	return b.call(f.llvm, fty.Signature, f.name, args)
 }
 
-func (b *Builder) call(v llvm.Value, sig Signature, name string, args []*Value) *Value {
+func (b *Builder) call(fn llvm.Value, sig Signature, name string, args []*Value) *Value {
+	l := b.callArgs(sig, name, args)
+	if sig.Result == b.m.Types.Void {
+		name = ""
+	}
+	return b.val(sig.Result, b.llvm.CreateCall(fn, l, name))
+}
+
+// Invoke invokes the function f with the specified arguments.
+// If an exception is thrown while calling f, then cleanup will be called before
+// rethrowing the exception.
+func (b *Builder) Invoke(f *Function, cleanup func(), args ...*Value) *Value {
+	fn, sig, name := f.llvm, f.Type.Signature, f.Name
+
+	l := b.callArgs(sig, name, args)
+
+	then := b.m.ctx.AddBasicBlock(b.function.llvm, fmt.Sprintf("%v_nothrow", name))
+	throw := b.m.ctx.AddBasicBlock(b.function.llvm, fmt.Sprintf("%v_catch", name))
+
+	if sig.Result == b.m.Types.Void {
+		name = ""
+	}
+
+	res := b.val(sig.Result, b.llvm.CreateInvoke(fn, l, then, throw, name))
+
+	b.function.llvm.SetPersonality(b.m.exceptions.personalityFn.llvm)
+
+	b.block(throw, llvm.BasicBlock{}, func() {
+		lp := b.llvm.CreateLandingPad(b.m.exceptions.exceptionTy.llvmTy(), 0, "cleanup")
+		lp.SetCleanup(true)
+		cleanup()
+		b.llvm.CreateResume(lp)
+	})
+
+	b.setInsertPointAtEnd(then)
+
+	return res
+}
+
+// Throw throws an exception with the given value.
+func (b *Builder) Throw(v *Value) {
+	b.m.exceptions.throw(b, v)
+}
+
+func (b *Builder) callArgs(sig Signature, name string, args []*Value) []llvm.Value {
 	if sig.Variadic {
 		if g, e := len(args), len(sig.Parameters); g < e {
 			fail("Got %d arguments, but needed %d to call %v", g, e, sig.string(name))
@@ -87,10 +131,7 @@ func (b *Builder) call(v llvm.Value, sig Signature, name string, args []*Value) 
 			}
 		}
 	}
-	if sig.Result == b.m.Types.Void {
-		name = ""
-	}
-	return b.val(sig.Result, b.llvm.CreateCall(v, l, name))
+	return l
 }
 
 // Parameter returns i'th function parameter

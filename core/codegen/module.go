@@ -28,17 +28,18 @@ import (
 
 // Module is a JIT module.
 type Module struct {
-	Types   Types
-	llvm    llvm.Module
-	ctx     llvm.Context
-	target  *device.ABI
-	triple  Triple
-	name    string
-	funcs   map[string]*Function
-	strings map[string]llvm.Value
-	memcpy  *Function
-	memset  *Function
-	dbg     *dbg
+	Types      Types
+	llvm       llvm.Module
+	ctx        llvm.Context
+	target     *device.ABI
+	triple     Triple
+	name       string
+	funcs      map[string]*Function
+	strings    map[string]llvm.Value
+	memcpy     *Function
+	memset     *Function
+	exceptions exceptions
+	dbg        *dbg
 }
 
 // NewModule returns a new module with the specified name.
@@ -112,6 +113,8 @@ func NewModule(name string, target *device.ABI) *Module {
 	// void @llvm.memset.p0i8.i32(i8* <dest>, i8 <val>, i32 <len>, i1 <isvolatile>)
 	m.memset = m.Function(m.Types.Void, "llvm.memset.p0i8.i32",
 		voidPtr, m.Types.Uint8, m.Types.Uint32, m.Types.Bool)
+
+	m.exceptions.init(m)
 
 	return m
 }
