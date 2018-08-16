@@ -57,7 +57,7 @@ func NewModule(name string, target *device.ABI) *Module {
 
 	module := ctx.NewModule(name)
 	module.SetTarget(triple.String())
-
+	module.SetDataLayout("e-m:e-i64:64-f80:128-n8:16:32:64-S128") // HACK:TODO: switch on ABI
 	bt := func(name string, dtl *device.DataTypeLayout, llvm llvm.Type) basicType {
 		return basicType{name, 8 * int(dtl.Size), 8 * int(dtl.Alignment), llvm}
 	}
