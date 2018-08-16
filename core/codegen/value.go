@@ -52,11 +52,9 @@ func (v *Value) SetName(name string) *Value {
 	return v
 }
 
-// SetNameIfUnset assigns a name to the value if it isn't already set.
-func (v *Value) SetNameIfUnset(name string) *Value {
-	if v.Name() == "" {
-		v.SetName(name)
-	}
+// EmitDebug emits debug info for the value.
+func (v *Value) EmitDebug(name string) *Value {
+	v.b.dbgEmitValue(v, name)
 	return v
 }
 

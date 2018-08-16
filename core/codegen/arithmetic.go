@@ -49,8 +49,7 @@ func (b *Builder) One(ty Type) *Value {
 // Not returns !x. The type of x must be Bool.
 func (b *Builder) Not(x *Value) *Value {
 	assertTypesEqual(x.ty, b.m.Types.Bool)
-	one := b.One(b.m.Types.Bool)
-	return b.val(b.m.Types.Bool, b.llvm.CreateXor(x.llvm, one.llvm, "!"+x.Name()))
+	return b.val(b.m.Types.Bool, b.llvm.CreateNot(x.llvm, "!"+x.Name()))
 }
 
 // Invert returns ~x.

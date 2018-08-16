@@ -110,7 +110,8 @@ func (b *Builder) Local(name string, ty Type) *Value {
 	b.llvm.SetInsertPoint(b.entry, b.entry.FirstInstruction())
 	local := b.llvm.CreateAlloca(ty.llvmTy(), "")
 	b.setInsertPointAtEnd(block)
-	return b.val(b.m.Types.Pointer(ty), local).SetName(name)
+	v := b.val(b.m.Types.Pointer(ty), local).SetName(name)
+	return v
 }
 
 // LocalInit returns a new local variable with the specified name and initial value.
@@ -364,5 +365,5 @@ func (b *Builder) setInsertPointAtEnd(block llvm.BasicBlock) {
 	b.llvm.SetInsertPointAtEnd(block)
 	// LLVM will clear the debug location on a insert point change.
 	// Restore it to what we previously had.
-	b.restoreLocation()
+	b.dbgRestoreLocation()
 }

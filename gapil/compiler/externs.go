@@ -32,10 +32,10 @@ func (c *C) callExtern(s *S, e *semantic.Call) *codegen.Value {
 	}
 
 	name := fmt.Sprintf("%v.%v", c.CurrentAPI().Name(), tf.Name())
-	args := s.LocalInit("call-params", s.StructOf(name+"-args", vals))
+	args := s.LocalInit(tf.Name()+"_params", s.StructOf(name+"-args", vals))
 
 	if tf.Return.Type != semantic.VoidType {
-		resPtr := s.LocalInit("call-res", s.Zero(c.T.Target(tf.Return.Type)))
+		resPtr := s.LocalInit(tf.Name()+"_res", s.Zero(c.T.Target(tf.Return.Type)))
 		s.Call(c.callbacks.callExtern, s.Ctx, s.Scalar(name), args.Cast(c.T.VoidPtr), resPtr.Cast(c.T.VoidPtr))
 		res := resPtr.Load()
 		c.deferRelease(s, res, tf.Return.Type)

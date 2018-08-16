@@ -19,6 +19,7 @@ const (
 	debugStatements          = false
 	debugExpressions         = false
 	debugRefCounts           = false
+	debugCtxNotNull          = false
 	debugDisableRefCounts    = false
 	debugDisableRefCountOpts = false
 )

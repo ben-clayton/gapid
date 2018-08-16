@@ -151,6 +151,9 @@ func (e *Env) Execute(ctx context.Context, cmdID api.CmdID, cmd api.Cmd) error {
 
 // ExecuteN executes the all the commands in cmds.
 func (e *Env) ExecuteN(ctx context.Context, firstID api.CmdID, cmds []api.Cmd) []error {
+	ctx = status.Start(ctx, "Execute<%v>", len(cmds))
+	defer status.Finish(ctx)
+
 	dataBuf := e.Arena.Allocate(len(cmds)*int(unsafe.Sizeof(C.cmd_data{})), int(unsafe.Alignof(C.cmd_data{})))
 	defer e.Arena.Free(dataBuf)
 

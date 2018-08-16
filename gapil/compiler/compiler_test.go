@@ -1939,9 +1939,11 @@ cmd void Read(StructInStruct* input) {
 			},
 		},
 	} {
-		t.Run(test.name, func(t *testing.T) {
-			test.run(log.SubTest(ctx, t))
-		})
+		for _, optimize := range []bool{false, true} {
+			t.Run(test.name, func(t *testing.T) {
+				test.run(log.SubTest(ctx, t), optimize)
+			})
+		}
 	}
 }
 
@@ -1974,7 +1976,7 @@ type test struct {
 	settings compiler.Settings
 }
 
-func (t test) run(ctx context.Context) (succeeded bool) {
+func (t test) run(ctx context.Context, optimize bool) (succeeded bool) {
 	defer func() {
 		if r := recover(); r != nil {
 			panic(fmt.Errorf("Panic in test '%v':\n%v", t.name, r))
@@ -1997,9 +1999,9 @@ func (t test) run(ctx context.Context) (succeeded bool) {
 		return false
 	}
 
-	e, err := program.Codegen.Executor(true)
-	if err != nil {
-		panic(err)
+	e, err := program.Codegen.Executor(optimize)
+	if !assert.For(ctx, "Executor(%v)", optimize).ThatError(err).Succeeded() {
+		return false
 	}
 
 	module := e.GlobalAddress(program.Module)

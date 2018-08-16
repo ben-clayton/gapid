@@ -160,7 +160,7 @@ func (c *C) program(s Settings) (*Program, error) {
 	for a, f := range c.commands {
 		commands[a.Name()] = &CommandInfo{
 			Execute:    f,
-			Parameters: c.T.CmdParams[a].(*codegen.Struct),
+			Parameters: c.T.CmdParams[a],
 		}
 	}
 
@@ -273,12 +273,20 @@ func (c *C) Build(f *codegen.Function, do func(*S)) {
 		for i, p := range f.Type.Signature.Parameters {
 			if p == c.T.CtxPtr {
 				s.Ctx = b.Parameter(i).SetName("ctx")
-				s.If(s.Ctx.IsNull(), func(s *S) {
-					c.LogF(s, "Context is null")
-				})
-				s.Globals = s.Ctx.Index(0, ContextGlobals).Load().SetName("globals")
-				s.Arena = s.Ctx.Index(0, ContextArena).Load().SetName("arena")
-				s.CurrentThread = s.Ctx.Index(0, ContextThread).Load().SetName("thread")
+				if debugCtxNotNull {
+					s.If(s.Ctx.IsNull(), func(s *S) {
+						c.LogF(s, "Context is null")
+					})
+				}
+				s.Globals = s.Ctx.Index(0, ContextGlobals).Load().
+					SetName("globals").
+					EmitDebug("globals")
+				s.Arena = s.Ctx.Index(0, ContextArena).Load().
+					SetName("arena").
+					EmitDebug("arena")
+				s.CurrentThread = s.Ctx.Index(0, ContextThread).Load().
+					SetName("thread").
+					EmitDebug("$Thread")
 				break
 			}
 		}
@@ -544,8 +552,8 @@ func (c *C) popExpression(s *S) {
 }
 
 func (c *C) onChangeStatement(s *S) {
-	n := c.CurrentStatement()
-	if loc := c.SourceLocationFor(n); loc.Line != 0 {
+	if n := c.CurrentStatement(); n != nil {
+		loc := c.SourceLocationFor(n)
 		s.SetLocation(loc.Line, loc.Column)
 	}
 }

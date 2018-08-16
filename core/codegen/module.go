@@ -65,7 +65,7 @@ func NewModule(name string, target *device.ABI) *Module {
 	m := &Module{
 		Types: Types{
 			Void:     basicType{"void", 0, 0, ctx.VoidType()},
-			Bool:     Integer{true, bt("bool", layout.I8, ctx.Int8Type())},
+			Bool:     Integer{false, basicType{"bool", 1, 8, ctx.Int1Type()}},
 			Int:      Integer{true, bt("int", layout.Integer, ctx.IntType(intSize))},
 			Int8:     Integer{true, bt("int8", layout.I8, ctx.Int8Type())},
 			Int16:    Integer{true, bt("int16", layout.I16, ctx.Int16Type())},
@@ -121,8 +121,6 @@ func (m *Module) Verify() error {
 	if d := m.dbg; d != nil {
 		d.finalize()
 	}
-
-	return nil // TEMP
 
 	for f := m.llvm.FirstFunction(); !f.IsNil(); f = llvm.NextFunction(f) {
 		if err := llvm.VerifyFunction(f, llvm.ReturnStatusAction); err != nil {

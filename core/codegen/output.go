@@ -74,11 +74,12 @@ func (m *Module) Object(optimize bool) ([]byte, error) {
 func (m *Module) validateTargetData(td llvm.TargetData) {
 	abi := m.target
 	errs := []string{}
-	check := func(llvm, gapid interface{}, name string) {
+	check := func(llvm, gapid interface{}, name string) bool {
 		if reflect.DeepEqual(llvm, gapid) {
-			return
+			return true
 		}
 		errs = append(errs, fmt.Sprintf("%v target mismatch for %v: %v (llvm) != %v (gapid)", name, abi.Name, llvm, gapid))
+		return false
 	}
 	checkTD := func(ty Type, dtl *device.DataTypeLayout) {
 		check(td.TypeStoreSize(ty.llvmTy()), uint64(dtl.Size), ty.String()+"-size")
@@ -104,8 +105,10 @@ func (m *Module) validateTargetData(td llvm.TargetData) {
 		if !s.hasBody {
 			continue
 		}
-		check(int(td.TypeStoreSize(s.llvm))*8, s.SizeInBits(), fmt.Sprintf("%v-size", s.name))
-		check(int(td.ABITypeAlignment(s.llvm))*8, s.AlignInBits(), fmt.Sprintf("%v-align", s.name))
+		if !check(int(td.TypeStoreSize(s.llvm))*8, s.SizeInBits(), fmt.Sprintf("%v-size", s.name)) ||
+			!check(int(td.ABITypeAlignment(s.llvm))*8, s.AlignInBits(), fmt.Sprintf("%v-align", s.name)) {
+			errs = append(errs, fmt.Sprintf("%v: %v", s.name, s))
+		}
 		for i := range s.Fields() {
 			llvm := int(td.ElementOffset(s.llvm, i)) * 8
 			gapid := s.FieldOffsetInBits(i)

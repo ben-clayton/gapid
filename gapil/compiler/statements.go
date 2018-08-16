@@ -39,8 +39,9 @@ func (c *C) LoadParameters(s *S, f *semantic.Function) {
 		SetName("params")
 
 	for _, p := range f.FullParameters {
-		v := params.Index(0, p.Name()).Load()
-		v.SetName(p.Name())
+		v := params.Index(0, p.Name()).Load().
+			SetName(p.Name()).
+			EmitDebug(p.Name())
 		s.Parameters[p] = v
 	}
 }
@@ -62,12 +63,12 @@ func (c *C) command(f *semantic.Function) {
 	}
 	old := c.setCurrentFunction(f)
 	name := fmt.Sprintf("%v_%v", c.CurrentAPI().Name(), f.Name())
+	loc := c.SourceLocationFor(f)
 	out := c.M.
 		Function(c.T.Uint32, name, c.T.CtxPtr).
+		SetLocation(loc.File, loc.Line).
+		SetParameterNames("gapil_context").
 		LinkInternal()
-
-	loc := c.SourceLocationFor(f)
-	out.SetLocation(loc.File, loc.Line)
 
 	c.Build(out, func(s *S) {
 		if debugFunctionCalls {
@@ -97,18 +98,21 @@ func (c *C) subroutine(f *semantic.Function) {
 
 	params := f.CallParameters()
 	paramTys := make([]codegen.Type, len(params)+1)
+	paramNames := make([]string, len(params)+1)
 	paramTys[0] = c.T.CtxPtr
+	paramNames[0] = "ctx"
 	for i, p := range params {
 		paramTys[i+1] = c.T.Target(p.Type)
+		paramNames[i+1] = p.Name()
 	}
 	name := fmt.Sprintf("%v_%v", c.CurrentAPI().Name(), f.Name())
 
+	loc := c.SourceLocationFor(f)
 	out := c.M.
 		Function(resTy, name, paramTys...).
+		SetLocation(loc.File, loc.Line).
+		SetParameterNames(paramNames...).
 		LinkInternal()
-
-	loc := c.SourceLocationFor(f)
-	out.SetLocation(loc.File, loc.Line)
 
 	c.subroutines[f] = out
 	c.Build(out, func(s *S) {
@@ -369,11 +373,14 @@ func (c *C) declareLocal(s *S, n *semantic.DeclareLocal) {
 	} else {
 		def = c.initialValue(s, n.Local.Type)
 	}
+	var l local
 	if isLocalImmutable(n.Local) {
-		s.locals[n.Local] = local{def, false}
+		l = local{def, false}
 	} else {
-		s.locals[n.Local] = local{s.LocalInit(n.Local.Name(), def), true}
+		l = local{s.LocalInit(n.Local.Name(), def), true}
 	}
+	l.val.EmitDebug(n.Local.Name())
+	s.locals[n.Local] = l
 }
 
 func isLocalImmutable(l *semantic.Local) bool {

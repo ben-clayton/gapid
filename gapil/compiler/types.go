@@ -28,22 +28,22 @@ import "C"
 // Types augments the codegen.Types structure.
 type Types struct {
 	codegen.Types
-	Ctx             *codegen.Struct                     // context_t
-	CtxPtr          codegen.Type                        // context_t*
-	PoolID          codegen.Type                        // uint64_t
-	Sli             codegen.Type                        // slice_t
-	Str             *codegen.Struct                     // string_t
-	StrPtr          codegen.Type                        // string_t*
-	Arena           *codegen.Struct                     // arena_t
-	ArenaPtr        codegen.Type                        // arena_t*
-	Uint8Ptr        codegen.Type                        // uint8_t*
-	VoidPtr         codegen.Type                        // void* (aliased of uint8_t*)
-	VoidPtrPtr      codegen.Type                        // void** (aliased of uint8_t**)
-	Globals         *codegen.Struct                     // API global variables structure.
-	GlobalsPtr      codegen.Type                        // Pointer to Globals.
-	Buf             codegen.Type                        // buffer_t
-	BufPtr          codegen.Type                        // buffer_t*
-	CmdParams       map[*semantic.Function]codegen.Type // struct holding all command parameters and return value.
+	Ctx             *codegen.Struct                        // context_t
+	CtxPtr          codegen.Type                           // context_t*
+	PoolID          codegen.Type                           // uint64_t
+	Sli             codegen.Type                           // slice_t
+	Str             *codegen.Struct                        // string_t
+	StrPtr          codegen.Type                           // string_t*
+	Arena           *codegen.Struct                        // arena_t
+	ArenaPtr        codegen.Type                           // arena_t*
+	Uint8Ptr        codegen.Type                           // uint8_t*
+	VoidPtr         codegen.Type                           // void* (aliased of uint8_t*)
+	VoidPtrPtr      codegen.Type                           // void** (aliased of uint8_t**)
+	Globals         *codegen.Struct                        // API global variables structure.
+	GlobalsPtr      codegen.Type                           // Pointer to Globals.
+	Buf             codegen.Type                           // buffer_t
+	BufPtr          codegen.Type                           // buffer_t*
+	CmdParams       map[*semantic.Function]*codegen.Struct // struct holding all command parameters and return value.
 	DataAccess      codegen.Type
 	Maps            map[*semantic.Map]*MapInfo
 	mapImpls        []mapImpl
@@ -79,7 +79,7 @@ func (c *C) declareTypes() {
 	c.T.Buf = c.T.TypeOf(C.buffer{})
 	c.T.BufPtr = c.T.Pointer(c.T.Buf)
 	c.T.Maps = map[*semantic.Map]*MapInfo{}
-	c.T.CmdParams = map[*semantic.Function]codegen.Type{}
+	c.T.CmdParams = map[*semantic.Function]*codegen.Struct{}
 	c.T.DataAccess = c.T.Enum("gapil_data_access")
 	c.T.target = map[semantic.Type]codegen.Type{}
 	c.T.storage = map[memLayoutKey]*StorageTypes{}
@@ -194,7 +194,7 @@ func (c *C) buildTypes() {
 			for _, p := range f.FullParameters {
 				fields = append(fields, codegen.Field{Name: p.Name(), Type: c.T.Target(p.Type)})
 			}
-			c.T.CmdParams[f].SetBody(fields...)
+			c.T.CmdParams[f].SetBody(false, fields...)
 		}
 	}
 

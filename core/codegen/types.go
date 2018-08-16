@@ -40,7 +40,7 @@ func (b *Builder) AlignOf(ty Type) *Value {
 
 // StrideInBits returns the number of bits per element when held in an array.
 func StrideInBits(ty Type) int {
-	return sint.AlignUp(ty.SizeInBits(), ty.AlignInBits())
+	return sint.AlignUp(sint.Max(ty.SizeInBits(), 8), ty.AlignInBits())
 }
 
 // Types contains all the types for a module.
@@ -159,7 +159,7 @@ func (t *Types) Array(el Type, n int) *Array {
 	if !ok {
 		a = &Array{el, n, basicType{
 			fmt.Sprintf("%v[%d]", el.TypeName(), n),
-			el.SizeInBits() * n,
+			StrideInBits(el) * n,
 			el.AlignInBits(),
 			llvm.ArrayType(el.llvmTy(), n),
 		}}
@@ -317,6 +317,7 @@ var Variadic variadicTy
 
 // Struct is the type of a structure.
 type Struct struct {
+	t            *Types
 	name         string
 	fields       []Field
 	fieldIndices map[string]int
@@ -340,17 +341,11 @@ func (t *Struct) getStructLayout() *structLayout {
 		fail("Attempting to get struct '%s' layout before it has a body", t.name)
 	}
 	offsets := make([]int, len(t.fields))
-	offset, align := 0, 1
-	if len(t.fields) == 0 || t.packed {
-		// HACK: For some unknown reason, llvm is reporting empty and packed
-		// structs of having an alignment of 8. This should be investigated.
-		// Mimic this behavior.
-		align = 8
-	}
+	offset, align := 0, 8
 	for i, f := range t.fields {
 		if t.packed {
 			offsets[i] = offset
-			offset += f.Type.SizeInBits()
+			offset += StrideInBits(f.Type)
 		} else {
 			a := f.Type.AlignInBits()
 			offset = sint.AlignUp(offset, a)
@@ -444,6 +439,7 @@ func (t *Types) struct_(name string, packed bool, fields []Field) *Struct {
 
 	ty := t.m.ctx.StructCreateNamed(name)
 	s := &Struct{
+		t:      t,
 		name:   name,
 		packed: packed,
 		llvm:   ty,
@@ -468,6 +464,11 @@ func (t *Types) registerNamed(ty Type) {
 // SetBody sets the fields of the declared struct.
 func (t *Struct) SetBody(packed bool, fields ...Field) *Struct {
 	indices := map[string]int{}
+	if len(fields) == 0 {
+		// Add a single byte field to empty structs.
+		// LLVM will do this automatically anyway.
+		fields = []Field{{"empty-struct", t.t.Int8}}
+	}
 	l := make([]llvm.Type, len(fields))
 	for i, f := range fields {
 		if f.Type == nil {
