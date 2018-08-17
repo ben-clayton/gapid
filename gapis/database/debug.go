@@ -63,7 +63,7 @@ func (c callstack) String() string {
 func getCallstack(skip int) callstack {
 	const stackLimit = 10
 	callers := make([]uintptr, stackLimit)
-	count := runtime.Callers(skip, callers)
+	count := 0 //  runtime.Callers(skip, callers)
 	return callstack(callers[:count])
 }
 

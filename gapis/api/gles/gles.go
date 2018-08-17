@@ -75,7 +75,7 @@ func (s *State) SetupInitialState(ctx context.Context, g *api.GlobalState) {
 	}
 }
 
-func (s *State) InitializeCustomState() {}
+func (*State) initCustomState() {}
 
 func (s *State) contextRoot(ctx context.Context, p *path.Command, thread uint64) *path.MapIndex {
 	return path.NewField("Contexts", resolve.APIStateAfter(ctx, p, ID)).MapIndex(ctx, thread)

@@ -47,6 +47,10 @@ type Env struct {
 	// State is the global state for the environment.
 	State *api.GlobalState
 
+	cStackSize int
+	cStackHigh unsafe.Pointer
+	cStackLow  unsafe.Pointer
+
 	// Arena to use for buffers
 	bufferArena arena.Arena
 	buffers     []unsafe.Pointer
@@ -121,6 +125,12 @@ func (e *Executor) NewEnv(ctx context.Context) *Env {
 		Memory: memory.NewPools(),
 	}
 	env.bufferArena = arena.New()
+	env.cStackSize = 20 << 10 // 20K
+	env.cStackLow = env.bufferArena.Allocate(env.cStackSize, 16)
+	env.cStackHigh = unsafe.Pointer(uintptr(env.cStackLow) + uintptr(env.cStackSize))
+
+	fmt.Println("Stack High:", env.cStackHigh)
+	fmt.Println("Stack Low: ", env.cStackLow)
 
 	// Create the context and initialize the globals.
 	status.Do(ctx, "Create Context", func(ctx context.Context) {
@@ -185,9 +195,7 @@ func (e *Env) ExecuteN(ctx context.Context, firstID api.CmdID, cmds []api.Cmd) [
 	e.cmds = cmds
 	e.goCtx = ctx
 
-	call(
-		e.cCtx,
-		e.Executor.module,
+	e.call(
 		&data[0],
 		C.uint64_t(len(cmds)),
 		&res[0],

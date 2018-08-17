@@ -1504,7 +1504,7 @@ import (»
         g.Set{{$g.Name | GoPublicName}}({{Template "Go.Read" $g.Default}})
       {{end}}
     {{end}}
-    g.InitializeCustomState()
+    g.initCustomState()
   }
 
   // Properties returns all the properties of the state.
@@ -1555,10 +1555,12 @@ import (»
 
 	// State returns a Go state object for the native state at p.
 	func (API) State(a arena.Arena, p unsafe.Pointer) ϟapi.State {
-    return &State{
+    s := &State{
       c: (*C.State)(p),
       a: a,
     }
+    s.initCustomState()
+    return s
   }
 
   // ID returns the unique identifier of the {{Global "API"}} API.

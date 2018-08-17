@@ -71,6 +71,10 @@ type Types struct {
 	enums    map[string]Enum
 	aliases  map[string]Alias
 	named    map[string]Type
+
+	// emptyStructField is a field that is placed into empty structs so they
+	// are addressable. This is also automatically done by LLVM.
+	emptyStructField Field
 }
 
 type typeInt struct {
@@ -424,6 +428,9 @@ type Field struct {
 // If packed is true then fields will be stored back-to-back.
 func (t *Types) struct_(name string, packed bool, fields []Field) *Struct {
 	name = sanitizeStructName(name)
+	if len(fields) == 0 {
+		fields = []Field{t.emptyStructField}
+	}
 	if s, ok := t.structs[name]; ok {
 		if fields != nil {
 			if !reflect.DeepEqual(fields, s.fields) {
@@ -465,9 +472,7 @@ func (t *Types) registerNamed(ty Type) {
 func (t *Struct) SetBody(packed bool, fields ...Field) *Struct {
 	indices := map[string]int{}
 	if len(fields) == 0 {
-		// Add a single byte field to empty structs.
-		// LLVM will do this automatically anyway.
-		fields = []Field{{"empty-struct", t.t.Int8}}
+		fields = []Field{t.t.emptyStructField}
 	}
 	l := make([]llvm.Type, len(fields))
 	for i, f := range fields {

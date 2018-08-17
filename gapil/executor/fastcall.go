@@ -25,8 +25,12 @@ import "C"
 
 const fastcallEnabled = false
 
-func call(ctx *C.context, m *C.gapil_module, cmds *C.cmd_data, count C.uint64_t, res *C.uint64_t) {
+func (e *Env) call(cmds *C.cmd_data, count C.uint64_t, res *C.uint64_t) {
+	ctx := e.cCtx
+	m := e.Executor.module
+
 	if fastcallEnabled {
+		ctx.stack = e.cStackHigh
 		fastcallC((unsafe.Pointer)(C.call), ctx, m, cmds, count, res)
 	} else {
 		C.call(ctx, m, cmds, count, res)
@@ -75,7 +79,7 @@ func funcPtr(f interface{}) unsafe.Pointer {
 	return unsafe.Pointer(reflect.ValueOf(f).Pointer())
 }
 
-func fastcallC(unsafe.Pointer, *C.context, *C.gapil_module, *C.cmd_data, C.uint64_t, *C.uint64_t) C.uint32_t
+func fastcallC(pfn unsafe.Pointer, ctx *C.context, mod *C.gapil_module, cmds *C.cmd_data, cnt C.uint64_t, res *C.uint64_t)
 
 func applyReadsFC()
 func applyWritesFC()

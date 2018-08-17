@@ -105,6 +105,7 @@ go_library(
         "drawCall.go",
         "draw_call_mesh.go",
         "externs.go",
+        "externs_binding.go",
         "find_issues.go",
         "footprint_builder.go",
         "image_primer.go",

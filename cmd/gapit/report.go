@@ -19,6 +19,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -97,19 +98,19 @@ func (verb *reportVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 	}
 	commands := boxedCommands.(*service.Commands).List
 
-	// client.BeginCPUProfile(ctx)
+	client.BeginCPUProfile(ctx)
 
 	boxedReport, err := client.Get(ctx, capturePath.Report(device, filter).Path())
 	if err != nil {
 		return log.Err(ctx, err, "Failed to acquire the capture's report")
 	}
 
-	// pprof, err := client.EndCPUProfile(ctx)
-	// if err != nil {
-	// 	return log.Err(ctx, err, "Failed to acquire the capture's report")
-	// }
+	pprof, err := client.EndCPUProfile(ctx)
+	if err != nil {
+		return log.Err(ctx, err, "Failed to acquire the capture's report")
+	}
 
-	// ioutil.WriteFile("report.pprof", pprof, 0666)
+	ioutil.WriteFile("report.pprof", pprof, 0666)
 
 	var reportWriter io.Writer = os.Stdout
 	if verb.Out != "" {

@@ -19,7 +19,9 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/google/gapid/core/app/status"
 	"github.com/google/gapid/core/log"
+	"github.com/google/gapid/gapil/executor"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/api/sync"
 	"github.com/google/gapid/gapis/api/transform"
@@ -81,10 +83,10 @@ func (*State) Root(ctx context.Context, p *path.State) (path.Node, error) {
 // SetupInitialState recreates the command lamdas from the state block.
 // These are not encoded so we have to set them up here.
 func (c *State) SetupInitialState(ctx context.Context, s *api.GlobalState) {
-	c.InitializeCustomState()
+	c.initCustomState()
 }
 
-func (c *State) InitializeCustomState() {
+func (c *State) initCustomState() {
 	c.queuedCommands = make(map[CommandReferenceʳ]QueuedCommand)
 	c.initialCommands = make(map[VkCommandBuffer][]api.Cmd)
 
@@ -150,17 +152,27 @@ type markerInfo struct {
 
 func (API) ResolveSynchronization(ctx context.Context, d *sync.Data, c *path.Capture) error {
 	ctx = capture.Put(ctx, c)
-	st, err := capture.NewState(ctx)
+	ctx = status.Start(ctx, "vulkan.ResolveSynchronization")
+
+	defer status.Finish(ctx)
+
+	capture, err := capture.Resolve(ctx)
 	if err != nil {
 		return err
 	}
+
+	env := capture.NewEnv(ctx, executor.Config{Execute: true})
+	defer env.Dispose()
+	ctx = executor.PutEnv(ctx, env)
+
+	st := env.State
+	s := GetState(st)
+
 	cmds, ctx, err := resolve.Cmds(ctx, c)
 	if err != nil {
 		return err
 	}
-	s := GetState(st)
 
-	i := api.CmdID(0)
 	submissionMap := make(map[api.Cmd]api.CmdID)
 	commandMap := make(map[api.Cmd]api.CmdID)
 	lastCmdIndex := api.CmdID(0)
@@ -232,7 +244,7 @@ func (API) ResolveSynchronization(ctx context.Context, d *sync.Data, c *path.Cap
 		// Update the submission map before execute subcommand callback and
 		// postSubCommand callback.
 		if _, ok := submissionMap[s.CurrentSubmission]; !ok {
-			submissionMap[s.CurrentSubmission] = i
+			submissionMap[s.CurrentSubmission] = env.CmdID()
 		}
 		// Examine the marker stack. If the comming subcommand is submitted in a
 		// different command buffer or submission batch or VkQueueSubmit call, and
@@ -288,8 +300,9 @@ func (API) ResolveSynchronization(ctx context.Context, d *sync.Data, c *path.Cap
 	}
 
 	s.PostSubcommand = func(a interface{}) {
+		i := env.CmdID()
 		data := a.(CommandReferenceʳ)
-		rootIdx := api.CmdID(i)
+		rootIdx := i
 		if k, ok := submissionMap[s.CurrentSubmission]; ok {
 			rootIdx = api.CmdID(k)
 		} else {
@@ -347,20 +360,11 @@ func (API) ResolveSynchronization(ctx context.Context, d *sync.Data, c *path.Cap
 	s.AddCommand = func(a interface{}) {
 		data := a.(CommandReferenceʳ)
 		if initialCommands, ok := s.initialCommands[data.Buffer()]; ok {
-			commandMap[initialCommands[data.CommandIndex()]] = i
+			commandMap[initialCommands[data.CommandIndex()]] = env.CmdID()
 		}
 	}
 
-	err = api.ForeachCmd(ctx, cmds, func(ctx context.Context, id api.CmdID, cmd api.Cmd) error {
-		i = id
-		if err := cmd.Mutate(ctx, id, st, nil); err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
+	env.ExecuteN(ctx, 0, cmds)
 
 	submittedCmdBufs := lastSubCmdsInSubmittedCmdBufs.PostOrderSortedKeys()
 	for _, submittedCmdBufIdx := range submittedCmdBufs {

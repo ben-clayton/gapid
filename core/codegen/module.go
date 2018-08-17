@@ -97,6 +97,7 @@ func NewModule(name string, target *device.ABI) *Module {
 		funcs:   map[string]*Function{},
 		strings: map[string]llvm.Value{},
 	}
+	m.Types.emptyStructField = Field{"empty-struct", m.Types.Int8}
 	m.Types.m = m
 
 	if true {

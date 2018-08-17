@@ -46,15 +46,14 @@ func (API) Context(ctx context.Context, state *api.GlobalState, thread uint64) a
 	return nil
 }
 
+func (*State) initCustomState() {}
+
 // Root is a no-op function so that State conforms to the api.State interface.
 func (State) Root(ctx context.Context, p *path.State) (path.Node, error) { return nil, nil }
 
 // SetupInitialState is a no-op function so that State conforms to the api.State
 // interface.
 func (State) SetupInitialState(ctx context.Context, g *api.GlobalState) {}
-
-// InitializeCustomState is a no-op function.
-func (State) InitializeCustomState() {}
 
 // RebuildState is a no-op function.
 func (State) RebuildState(ctx context.Context, s *api.GlobalState) ([]api.Cmd, interval.U64RangeList) {
