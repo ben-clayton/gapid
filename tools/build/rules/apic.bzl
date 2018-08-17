@@ -78,8 +78,10 @@ apic_binary = rule(
 )
 
 def _apic_compile_impl(ctx):
-    api = ctx.attr.api
-    apilist = api.includes.to_list()
+    apis = ctx.attr.apis
+    apilist = []
+    for api in ctx.attr.apis:
+        apilist += api.includes.to_list()
     generated = depset()
 
     target = ctx.fragments.cpp.cpu
@@ -90,28 +92,28 @@ def _apic_compile_impl(ctx):
         inputs = apilist,
         outputs = outputs,
         arguments = [
-            "compile",
-            "--search",
-            api_search_path(apilist),
-            "--target",
-            target,
-            "--capture",
-            ctx.attr.capture,
-            "--module",
-            ctx.attr.module,
-            "--output",
-            outputs[0].path,
-            "--optimize=%s" % ctx.attr.optimize,
-            "--dump=%s" % ctx.attr.dump,
-            "--namespace",
-            ctx.attr.namespace,
-            "--symbols",
-            ctx.attr.symbols,
-        ] + ["--emit-" + emit for emit in ctx.attr.emit] + [
-            api.main.path,
-        ],
+                        "compile",
+                        "--search",
+                        api_search_path(apilist),
+                        "--target",
+                        target,
+                        "--capture",
+                        ctx.attr.capture,
+                        "--module",
+                        ctx.attr.module,
+                        "--output",
+                        outputs[0].path,
+                        "--optimize=%s" % ctx.attr.optimize,
+                        "--dump=%s" % ctx.attr.dump,
+                        "--namespace",
+                        ctx.attr.namespace,
+                        "--symbols",
+                        ctx.attr.symbols,
+                    ] +
+                    ["--emit-" + emit for emit in ctx.attr.emit] +
+                    [api.main.path for api in apis],
         mnemonic = "apic",
-        progress_message = "apic compiling " + api.main.short_path + " for " + target,
+        progress_message = "apic compiling apis for " + target,
         executable = ctx.executable._apic,
         use_default_shell_env = True,
     )
@@ -124,7 +126,7 @@ def _apic_compile_impl(ctx):
 apic_compile = rule(
     _apic_compile_impl,
     attrs = {
-        "api": attr.label(
+        "apis": attr.label_list(
             allow_files = False,
             mandatory = True,
             providers = [

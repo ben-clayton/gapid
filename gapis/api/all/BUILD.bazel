@@ -17,7 +17,11 @@ load("//tools/build:rules.bzl", "apic_compile")
 
 apic_compile(
     name = "prebuilt-host",
-    api = "//gapis/api/gles:api",
+    apis = [
+        "//gapis/api/gles:api",
+        "//gapis/api/vulkan:api",
+        "//gapis/api/gvr:api",
+    ],
     capture = "armeabi-v7a",
     emit = [
         "context",
@@ -30,7 +34,11 @@ apic_compile(
 
 apic_compile(
     name = "prebuilt-armv7a",
-    api = "//gapis/api/gles:api",
+    apis = [
+        "//gapis/api/gles:api",
+        "//gapis/api/vulkan:api",
+        "//gapis/api/gvr:api",
+    ],
     capture = "armeabi-v7a",
     emit = [
         "context",

@@ -62,7 +62,7 @@ embed(
 
 apic_compile(
     name = "api_compiled",
-    api = ":api",
+    apis = [":api"],
     emit = ["clone"],
     symbols = "c",
 )

@@ -32,7 +32,6 @@ import (
 	"github.com/google/gapid/gapil/compiler/plugins/encoder"
 	"github.com/google/gapid/gapil/compiler/plugins/replay"
 	"github.com/google/gapid/gapil/resolver"
-	"github.com/google/gapid/gapil/semantic"
 )
 
 func init() {
@@ -106,7 +105,7 @@ func parseABI(s string) (*device.ABI, error) {
 }
 
 func (v *compileVerb) Run(ctx context.Context, flags flag.FlagSet) error {
-	api, mappings, err := resolve(ctx, v.Search, flags, resolver.Options{})
+	apis, mappings, err := resolve(ctx, flags.Args(), v.Search, resolver.Options{})
 	if err != nil {
 		return err
 	}
@@ -155,7 +154,7 @@ func (v *compileVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 		settings.Mangler = ia64.Mangle
 	}
 
-	prog, err := compiler.Compile([]*semantic.API{api}, mappings, settings)
+	prog, err := compiler.Compile(apis, mappings, settings)
 	if err != nil {
 		return err
 	}

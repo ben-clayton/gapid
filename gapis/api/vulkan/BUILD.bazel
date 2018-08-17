@@ -66,7 +66,7 @@ embed(
 
 apic_compile(
     name = "api_compiled",
-    api = ":api",
+    apis = [":api"],
     emit = ["clone"],
     symbols = "c",
 )
@@ -138,6 +138,7 @@ go_library(
     importpath = "github.com/google/gapid/gapis/api/vulkan",
     visibility = ["//visibility:public"],
     deps = [
+        "//core/app/status:go_default_library",
         "//core/data:go_default_library",  # keep
         "//core/data/binary:go_default_library",
         "//core/data/dictionary:go_default_library",
