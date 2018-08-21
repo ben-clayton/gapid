@@ -14,15 +14,14 @@
 
 #include "gapil/runtime/cc/runtime.h"
 
-void applyReadsCgo(context*);
-void applyWritesCgo(context*);
-void* resolvePoolDataCgo(context*, uint64_t pool_id, uint64_t ptr,
-                         gapil_data_access, uint64_t size);
-void callExternCgo(context*, uint8_t* name, void* args, void* res);
-void copySliceCgo(context*, slice* dst, slice* src);
-void cstringToSliceCgo(context*, uint64_t ptr, slice* out);
-void storeInDatabaseCgo(context* ctx, void* ptr, uint64_t size,
-                        uint8_t* id_out);
-uint64_t makePoolCgo(context*, uint64_t size);
-void poolReferenceCgo(context*, uint64_t pool_id);
-void poolReleaseCgo(context*, uint64_t pool_id);
+void applyReads(context*);
+void applyWrites(context*);
+void* resolvePoolData(context*, uint64_t pool_id, uint64_t ptr,
+                      gapil_data_access, uint64_t size);
+void callExtern(context*, uint8_t* name, void* args, void* res);
+void copySlice(context*, slice* dst, slice* src);
+void cstringToSlice(context*, uint64_t ptr, slice* out);
+void storeInDatabase(context*, void* ptr, uint64_t size, uint8_t* id_out);
+uint64_t makePool(context*, uint64_t size);
+void poolReference(context*, uint64_t pool_id);
+void poolRelease(context*, uint64_t pool_id);

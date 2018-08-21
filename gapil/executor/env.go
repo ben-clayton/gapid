@@ -47,10 +47,6 @@ type Env struct {
 	// State is the global state for the environment.
 	State *api.GlobalState
 
-	cStackSize int
-	cStackHigh unsafe.Pointer
-	cStackLow  unsafe.Pointer
-
 	// Arena to use for buffers
 	bufferArena arena.Arena
 	buffers     []unsafe.Pointer
@@ -125,12 +121,6 @@ func (e *Executor) NewEnv(ctx context.Context) *Env {
 		Memory: memory.NewPools(),
 	}
 	env.bufferArena = arena.New()
-	env.cStackSize = 20 << 10 // 20K
-	env.cStackLow = env.bufferArena.Allocate(env.cStackSize, 16)
-	env.cStackHigh = unsafe.Pointer(uintptr(env.cStackLow) + uintptr(env.cStackSize))
-
-	fmt.Println("Stack High:", env.cStackHigh)
-	fmt.Println("Stack Low: ", env.cStackLow)
 
 	// Create the context and initialize the globals.
 	status.Do(ctx, "Create Context", func(ctx context.Context) {
@@ -278,8 +268,7 @@ func (e *Env) writePoolData(pool memory.PoolID, ptr, size uint64) unsafe.Pointer
 	return native.Data()
 }
 
-func applyReads(c *C.context) {
-	e := env(c)
+func (e *Env) applyReads() {
 	if extras := e.Cmd().Extras(); extras != nil {
 		if o := extras.Observations(); o != nil {
 			o.ApplyReads(e.State.Memory.ApplicationPool())
@@ -287,8 +276,7 @@ func applyReads(c *C.context) {
 	}
 }
 
-func applyWrites(c *C.context) {
-	e := env(c)
+func (e *Env) applyWrites() {
 	if extras := e.Cmd().Extras(); extras != nil {
 		if o := extras.Observations(); o != nil {
 			o.ApplyWrites(e.State.Memory.ApplicationPool())
@@ -296,30 +284,27 @@ func applyWrites(c *C.context) {
 	}
 }
 
-func resolvePoolData(c *C.context, pool C.uint64_t, ptr C.uint64_t, access C.gapil_data_access, size C.uint64_t) unsafe.Pointer {
-	env := EnvFromNative((unsafe.Pointer)(c))
+func (e *Env) resolvePoolData(pool C.uint64_t, ptr C.uint64_t, access C.gapil_data_access, size C.uint64_t) unsafe.Pointer {
 	switch access {
 	case C.GAPIL_READ:
-		return env.readPoolData(memory.PoolID(pool), uint64(ptr), uint64(size))
+		return e.readPoolData(memory.PoolID(pool), uint64(ptr), uint64(size))
 	case C.GAPIL_WRITE:
-		return env.writePoolData(memory.PoolID(pool), uint64(ptr), uint64(size))
+		return e.writePoolData(memory.PoolID(pool), uint64(ptr), uint64(size))
 	default:
 		panic(fmt.Errorf("Unexpected access: %v", access))
 	}
 }
 
-func copySlice(c *C.context, dst, src *C.slice) {
-	env := EnvFromNative((unsafe.Pointer)(c))
-	pDst := env.State.Memory.MustGet(memory.PoolID(dst.pool))
-	pSrc := env.State.Memory.MustGet(memory.PoolID(src.pool))
+func (e *Env) copySlice(dst, src *C.slice) {
+	pDst := e.State.Memory.MustGet(memory.PoolID(dst.pool))
+	pSrc := e.State.Memory.MustGet(memory.PoolID(src.pool))
 	size := u64.Min(uint64(dst.size), uint64(src.size))
 	pDst.Write(uint64(dst.base), pSrc.Slice(memory.Range{Base: uint64(src.base), Size: size}))
 }
 
-func cstringToSlice(c *C.context, ptr C.uint64_t, out *C.slice) {
-	env := EnvFromNative((unsafe.Pointer)(c))
-	pool := env.State.Memory.ApplicationPool()
-	size, err := pool.Strlen(env.goCtx, uint64(ptr))
+func (e *Env) cstringToSlice(ptr C.uint64_t, out *C.slice) {
+	pool := e.State.Memory.ApplicationPool()
+	size, err := pool.Strlen(e.goCtx, uint64(ptr))
 	if err != nil {
 		panic(err)
 	}
@@ -333,9 +318,8 @@ func cstringToSlice(c *C.context, ptr C.uint64_t, out *C.slice) {
 	out.count = C.uint64_t(size)
 }
 
-func storeInDatabase(c *C.context, ptr unsafe.Pointer, size C.uint64_t, idOut *C.uint8_t) {
-	env := EnvFromNative((unsafe.Pointer)(c))
-	ctx := env.Context()
+func (e *Env) storeInDatabase(ptr unsafe.Pointer, size C.uint64_t, idOut *C.uint8_t) {
+	ctx := e.Context()
 	sli := slice.Bytes(ptr, uint64(size))
 	id, err := database.Store(ctx, sli)
 	if err != nil {
@@ -345,28 +329,26 @@ func storeInDatabase(c *C.context, ptr unsafe.Pointer, size C.uint64_t, idOut *C
 	copy(out, id[:])
 }
 
-func makePool(c *C.context, size C.uint64_t) C.uint64_t {
-	env := EnvFromNative((unsafe.Pointer)(c))
-	id, _ := env.State.Memory.New()
+func (e *Env) makePool(size C.uint64_t) C.uint64_t {
+	id, _ := e.State.Memory.New()
 	return C.uint64_t(id)
 }
 
-func poolReference(c *C.context, pool C.uint64_t) {
+func (e *Env) poolReference(pool C.uint64_t) {
 	// TODO: Refcounting
 }
 
-func poolRelease(c *C.context, pool C.uint64_t) {
+func (e *Env) poolRelease(pool C.uint64_t) {
 	// TODO: Refcounting
 }
 
-func callExtern(c *C.context, name *C.uint8_t, args, res unsafe.Pointer) {
-	env := EnvFromNative((unsafe.Pointer)(c))
+func (e *Env) callExtern(name *C.uint8_t, args, res unsafe.Pointer) {
 	n := C.GoString((*C.char)((unsafe.Pointer)(name)))
 	f, ok := externs[n]
 	if !ok {
 		panic(fmt.Sprintf("No handler for extern '%v'", n))
 	}
-	f(env, args, res)
+	f(e, args, res)
 }
 
 func init() {

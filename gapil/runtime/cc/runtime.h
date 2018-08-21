@@ -50,7 +50,6 @@ typedef struct string_t string;
 // context contains information about the environment in which a function is
 // executing.
 typedef struct context_t {
-  void* stack;
   uint32_t id;         // the context identifier. Can be treated as user-data.
   globals* globals;    // a pointer to the global state.
   arena* arena;        // the memory arena used for allocations.
