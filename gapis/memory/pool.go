@@ -27,6 +27,15 @@ import (
 	"github.com/pkg/errors"
 )
 
+// PoolID is an identifier of a Pool.
+type PoolID uint32
+
+const (
+	// ApplicationPool is the PoolID of Pool representing the application's memory
+	// address space.
+	ApplicationPool = PoolID(PoolNames_Application)
+)
+
 // Pool represents an unbounded and isolated memory space. Pool can be used
 // to represent the application address space, or hidden GPU Pool.
 //
@@ -41,9 +50,6 @@ type Pool struct {
 	OnWrite func(Range)
 }
 
-// PoolID is an identifier of a Pool.
-type PoolID uint32
-
 // Pools contains a collection of Pools identified by PoolIDs.
 type Pools struct {
 	pools      map[PoolID]*Pool
@@ -55,12 +61,6 @@ type poolSlice struct {
 	rng    Range         // The memory range of the slice.
 	writes poolWriteList // The list of writes to the pool when this slice was created.
 }
-
-const (
-	// ApplicationPool is the PoolID of Pool representing the application's memory
-	// address space.
-	ApplicationPool = PoolID(PoolNames_Application)
-)
 
 // NewPools creates and returns a new Pools instance.
 func NewPools() Pools {

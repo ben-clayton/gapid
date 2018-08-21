@@ -12,14 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package compiler
+#ifndef GAPIS_MEMORY_POOL_H
+#define GAPIS_MEMORY_POOL_H
 
-const (
-	debugFunctionCalls       = false
-	debugStatements          = false
-	debugExpressions         = false
-	debugCtxNotNull          = false
-	debugRefCounts           = false
-	debugDisableRefCounts    = false
-	debugDisableRefCountOpts = false
-)
+#include "gapil/runtime/cc/runtime.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+struct memory;
+
+memory* memory_create(arena*);
+void memory_destroy(memory*);
+
+void* memory_read(memory*, slice* sli);
+void memory_write(memory*, slice* sli, const void* data);
+void memory_copy(memory*, slice* dst, slice* src);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif
+
+#endif  // GAPIS_MEMORY_POOL_H
