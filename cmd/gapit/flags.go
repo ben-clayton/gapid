@@ -221,6 +221,15 @@ type (
 			Port int `help:"connect to an application already running on the server using this port"`
 		}
 	}
+	BenchmarkFlags struct {
+		DeviceFlags
+		For            time.Duration `help:"duration to trace for"`
+		AdditionalArgs string        `help:"additional arguments to pass to the application"`
+		WorkingDir     string        `help:"working directory for the application"`
+		URI            string        `help:"uri of the application to trace"`
+		API            string        `help:"only capture the given API valid options are gles and vulkan"`
+		DumpTrace      string        `help:"dump a systrace of gapis"`
+	}
 
 	PackagesFlags struct {
 		DeviceFlags
