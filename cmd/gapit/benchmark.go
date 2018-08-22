@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
@@ -126,18 +127,11 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 	}
 	defer client.Close()
 
-	traceURI := verb.URI
-
-	if traceURI == "" {
-		if flags.NArg() != 1 {
-			app.Usage(ctx, "Expected application name")
-			return nil
-		}
-		traceURI = flags.Arg(0)
+	if flags.NArg() > 0 {
+		traceURI := flags.Arg(0)
+		verb.doTrace(ctx, client, traceURI)
+		verb.traceDoneTime = time.Now()
 	}
-
-	verb.doTrace(ctx, client, traceURI)
-	verb.traceDoneTime = time.Now()
 
 	s, err := os.Stat(BenchmarkName)
 	if err != nil {
@@ -470,33 +464,33 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 
 	interactionWG.Wait()
 	verb.interactionDoneTime = time.Now()
-	fmt.Printf("Gapis creation time %+v\n", (verb.gapisStartTime.Sub(verb.startTime).Seconds()))
-	fmt.Printf("Gapis get string table time %+v\n", verb.gapisStringTableTime.Sub(verb.gapisStartTime).Seconds())
-	fmt.Printf("Get Server Info Time %+v\n", (verb.serverInfoTime.Sub(verb.gapisStringTableTime).Seconds()))
-	fmt.Printf("Start until Devices enumerated %+v\n", (verb.serverInfoTime.Sub(verb.startTime).Seconds()))
-	fmt.Printf("Finding the correct target %+v\n", (verb.foundTraceTargetTime.Sub(verb.gotDevicesTime).Seconds()))
-	fmt.Printf("Setting up trace %+v\n", (verb.traceInitializedTime.Sub(verb.beforeStartTraceTime).Seconds()))
-	fmt.Printf("Trace setup time: : %+v\n", (verb.traceDoneTime.Sub(verb.traceInitializedTime).Seconds())-verb.For.Seconds())
-	fmt.Printf("Total trace time: %+v\n", (verb.traceDoneTime.Sub(verb.traceInitializedTime).Seconds()))
+	fmt.Printf("Gapis creation time %+v\n", (verb.gapisStartTime.Sub(verb.startTime)))
+	fmt.Printf("Gapis get string table time %+v\n", verb.gapisStringTableTime.Sub(verb.gapisStartTime))
+	fmt.Printf("Get Server Info Time %+v\n", (verb.serverInfoTime.Sub(verb.gapisStringTableTime)))
+	fmt.Printf("Start until Devices enumerated %+v\n", (verb.serverInfoTime.Sub(verb.startTime)))
+	fmt.Printf("Finding the correct target %+v\n", (verb.foundTraceTargetTime.Sub(verb.gotDevicesTime)))
+	fmt.Printf("Setting up trace %+v\n", (verb.traceInitializedTime.Sub(verb.beforeStartTraceTime)))
+	fmt.Printf("Trace setup time: : %+v\n", verb.traceDoneTime.Sub(verb.traceInitializedTime)-verb.For)
+	fmt.Printf("Total trace time: %+v\n", (verb.traceDoneTime.Sub(verb.traceInitializedTime)))
 	fmt.Printf("Trace Size %+vMB\n", (verb.traceSizeInBytes / (1024 * 1024)))
 	fmt.Printf("Total frames captured %+v\n", verb.traceFrames)
 	fmt.Printf("Frame Time %+v\n", (verb.For.Seconds() / float64(verb.traceFrames)))
 
-	fmt.Printf("Server Trace Load Time %+v\n", verb.gapisTraceLoadedTime.Sub(verb.gapisTraceLoadTime).Seconds())
-	fmt.Printf("Resolved Replay Device Time %+v\n", verb.gapisGotReplayDevicesTime.Sub(verb.gapisTraceLoadedTime).Seconds())
-	fmt.Printf("Resolved Resources Time %+v\n", verb.gapisGotResourcesTime.Sub(verb.gapisGotReplayDevicesTime).Seconds())
-	fmt.Printf("Got Contexts Time %+v\n", verb.gapisGotContextsTime.Sub(verb.gapisGotReplayDevicesTime).Seconds())
+	fmt.Printf("Server Trace Load Time %+v\n", verb.gapisTraceLoadedTime.Sub(verb.gapisTraceLoadTime))
+	fmt.Printf("Resolved Replay Device Time %+v\n", verb.gapisGotReplayDevicesTime.Sub(verb.gapisTraceLoadedTime))
+	fmt.Printf("Resolved Resources Time %+v\n", verb.gapisGotResourcesTime.Sub(verb.gapisGotReplayDevicesTime))
+	fmt.Printf("Got Contexts Time %+v\n", verb.gapisGotContextsTime.Sub(verb.gapisGotReplayDevicesTime))
 	fmt.Printf("Report completed time %+v\n", verb.gapisReportTime.Sub(verb.gapisGotReplayDevicesTime))
 	fmt.Printf("Thumbnails completed time %+v\n", verb.gapisGotThumbnailsTime.Sub(verb.gapisGotReplayDevicesTime))
 	fmt.Printf("Command Tree Nodes time %+v\n", verb.gapisCommandTreeNodesResolved.Sub(verb.gapisGotReplayDevicesTime))
 	fmt.Printf("Command Tree Thumbnails time %+v\n", verb.gapisCommandTreeThumbnailsResolved.Sub(verb.gapisGotReplayDevicesTime))
 
 	fmt.Printf("Interaction Command Index: %+v\n", commandToClick.Indices[0])
-	fmt.Printf("Interactions: State Tree: %+v\n", verb.interactionResolvedStateTree.Sub(verb.interactionStartTime).Seconds())
-	fmt.Printf("Interactions: Framebuffer: %+v\n", verb.interactionFramebufferTime.Sub(verb.interactionStartTime).Seconds())
-	fmt.Printf("Interactions: Mesh: %+v\n", verb.interactionMeshTime.Sub(verb.interactionStartTime).Seconds())
-	fmt.Printf("Interactions: Resources: %+v\n", verb.interactionResourcesTime.Sub(verb.interactionStartTime).Seconds())
-	fmt.Printf("Interactions Done: %+v\n", verb.interactionDoneTime.Sub(verb.interactionStartTime).Seconds())
+	fmt.Printf("Interactions: State Tree: %+v\n", verb.interactionResolvedStateTree.Sub(verb.interactionStartTime))
+	fmt.Printf("Interactions: Framebuffer: %+v\n", verb.interactionFramebufferTime.Sub(verb.interactionStartTime))
+	fmt.Printf("Interactions: Mesh: %+v\n", verb.interactionMeshTime.Sub(verb.interactionStartTime))
+	fmt.Printf("Interactions: Resources: %+v\n", verb.interactionResourcesTime.Sub(verb.interactionStartTime))
+	fmt.Printf("Interactions Done: %+v\n", verb.interactionDoneTime.Sub(verb.interactionStartTime))
 
 	return nil
 }
