@@ -16,11 +16,11 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
@@ -28,6 +28,7 @@ import (
 
 	"github.com/google/gapid/core/app"
 	"github.com/google/gapid/core/app/crash"
+	"github.com/google/gapid/core/app/status"
 	"github.com/google/gapid/core/event/task"
 	img "github.com/google/gapid/core/image"
 	"github.com/google/gapid/core/log"
@@ -85,6 +86,9 @@ func init() {
 }
 
 func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
+	oldCtx := ctx
+	ctx = status.Start(ctx, "Initializing GAPIS")
+
 	if verb.For.Seconds() == float64(0) {
 		verb.For = time.Duration(time.Minute)
 	}
@@ -94,11 +98,18 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 	client, err := getGapis(ctx, GapisFlags{}, GapirFlags{})
 	verb.gapisStartTime = time.Now()
 	if verb.DumpTrace != "" {
+		profile := bytes.Buffer{}
+		stopProfile := status.RegisterTracer(&profile)
 		trace, err := os.Create(verb.DumpTrace)
 		if err != nil {
 			panic(err)
 		}
-		defer trace.Close()
+		defer func() {
+			// Skip the leading [
+			stopProfile()
+			trace.Write(profile.Bytes()[1:])
+			trace.Close()
+		}()
 		stop, err := client.Profile(ctx, nil, trace, 1)
 		if err != nil {
 			panic(err)
@@ -126,6 +137,7 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 		return log.Err(ctx, err, "Failed to connect to the GAPIS server")
 	}
 	defer client.Close()
+	status.Finish(ctx)
 
 	if flags.NArg() > 0 {
 		traceURI := flags.Arg(0)
@@ -139,7 +151,9 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 	}
 
 	verb.traceSizeInBytes = s.Size()
+	status.Event(ctx, status.GlobalScope, "Trace Size %+v", verb.traceSizeInBytes)
 
+	ctx = status.Start(oldCtx, "Initializing Capture")
 	verb.gapisTraceLoadTime = time.Now()
 	c, err := client.LoadCapture(ctx, BenchmarkName)
 	if err != nil {
@@ -184,6 +198,8 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 	wg.Add(1)
 	gotContext.Add(1)
 	go func() {
+		ctx = status.Start(oldCtx, "Resolving Contexts")
+		defer status.Finish(ctx)
 		contextsInterface, err := client.Get(ctx, c.Contexts().Path(), resolveConfig)
 		if err != nil {
 			panic(err)
@@ -201,6 +217,8 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 
 	wg.Add(1)
 	go func() {
+		ctx = status.Start(oldCtx, "Getting Report")
+		defer status.Finish(ctx)
 		gotContext.Wait()
 		filter := &path.CommandFilter{}
 		filter.Context = ctxId
@@ -219,6 +237,8 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 
 	wg.Add(1)
 	go func() {
+		ctx = status.Start(oldCtx, "Getting Thumbnails")
+		defer status.Finish(ctx)
 		events, err := getEvents(ctx, client, &path.Events{
 			Capture:                 c,
 			AllCommands:             false,
@@ -272,6 +292,8 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 
 	wg.Add(1)
 	go func() {
+		ctx = status.Start(oldCtx, "Resolving Command Tree")
+
 		gotContext.Wait()
 		filter := &path.CommandFilter{}
 		filter.Context = ctxId
@@ -306,6 +328,7 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 		gotNodes := sync.WaitGroup{}
 		settings := &service.RenderSettings{MaxWidth: uint32(64), MaxHeight: uint32(64)}
 		hints := &service.UsageHints{Background: true}
+		tnCtx := status.Start(oldCtx, "Resolving Command Thumbnails")
 		for i := 0; i < numChildren; i++ {
 			gotThumbnails.Add(1)
 			gotNodes.Add(1)
@@ -317,7 +340,7 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 				}
 				child := boxedChild.(*service.CommandTreeNode)
 				gotNodes.Done()
-				iip, err := client.GetFramebufferAttachment(ctx,
+				iip, err := client.GetFramebufferAttachment(tnCtx,
 					&service.ReplaySettings{
 						Device: device,
 						DisableReplayOptimization: false,
@@ -325,38 +348,45 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 					},
 					child.Representation, api.FramebufferAttachment_Color0, settings, hints)
 
-				iio, err := client.Get(ctx, iip.Path(), resolveConfig)
+				iio, err := client.Get(tnCtx, iip.Path(), resolveConfig)
 				if err != nil {
 					return
 				}
 				ii := iio.(*img.Info)
-				dataO, err := client.Get(ctx, path.NewBlob(ii.Bytes.ID()).Path(), resolveConfig)
+				dataO, err := client.Get(tnCtx, path.NewBlob(ii.Bytes.ID()).Path(), resolveConfig)
 				if err != nil {
-					panic(log.Errf(ctx, err, "Get frame image data failed"))
+					panic(log.Errf(tnCtx, err, "Get frame image data failed"))
 				}
 				_, _, _ = int(ii.Width), int(ii.Height), dataO.([]byte)
 			}(i)
 		}
 
 		gotNodes.Wait()
+		status.Finish(ctx)
 		verb.gapisCommandTreeNodesResolved = time.Now()
 
 		gotThumbnails.Wait()
+		status.Finish(tnCtx)
 		verb.gapisCommandTreeThumbnailsResolved = time.Now()
-
 		wg.Done()
 	}()
-
+	// Done initializing capture
 	wg.Wait()
 	// At this point we are Interactive. All pre-loading is done:
 	// Next we have to actually handle an interaction
+	status.Finish(ctx)
 
+	status.Event(ctx, status.GlobalScope, "Load done, interaction starting %+v", verb.traceSizeInBytes)
+
+	ctx = status.Start(oldCtx, "Interacting with frame")
 	// One interaction done
 	verb.interactionStartTime = time.Now()
 	interactionWG := sync.WaitGroup{}
 	interactionWG.Add(1)
 	// Get state tree
 	go func() {
+		ctx = status.Start(oldCtx, "Resolving State Tree")
+		defer status.Finish(ctx)
 		defer interactionWG.Done()
 		//commandToClick
 		boxedTree, err := client.Get(ctx, commandToClick.StateAfter().Tree().Path(), resolveConfig)
@@ -400,6 +430,8 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 	// Get the framebuffer
 	interactionWG.Add(1)
 	go func() {
+		ctx = status.Start(oldCtx, "Getting Framebuffer")
+		defer status.Finish(ctx)
 		defer interactionWG.Done()
 		hints := &service.UsageHints{Primary: true}
 		settings := &service.RenderSettings{MaxWidth: uint32(0xFFFFFFFF), MaxHeight: uint32(0xFFFFFFFF)}
@@ -427,6 +459,8 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 	// Get the mesh
 	interactionWG.Add(1)
 	go func() {
+		ctx = status.Start(oldCtx, "Getting Mesh")
+		defer status.Finish(ctx)
 		defer interactionWG.Done()
 		meshOptions := path.NewMeshOptions(false)
 		_, _ = client.Get(ctx, commandToClick.Mesh(meshOptions).Path(), resolveConfig)
@@ -436,19 +470,53 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 	// GetMemory
 	interactionWG.Add(1)
 	go func() {
+		ctx = status.Start(oldCtx, "Getting Memory")
+		defer status.Finish(ctx)
 		defer interactionWG.Done()
+		observationsPath := &path.Memory{
+			Address:         0,
+			Size:            uint64(0xFFFFFFFFFFFFFFFF),
+			Pool:            0,
+			After:           commandToClick,
+			ExcludeData:     true,
+			ExcludeObserved: true,
+		}
+		allMemory, err := client.Get(ctx, observationsPath.Path(), resolveConfig)
+		if err != nil {
+			panic(err)
+		}
+		memory := allMemory.(*service.Memory)
+		gotMemory := sync.WaitGroup{}
+		for _, x := range memory.Reads {
+			gotMemory.Add(1)
+			go func(addr, size uint64) {
+				defer gotMemory.Done()
+				client.Get(ctx, commandToClick.MemoryAfter(0, addr, size).Path(), resolveConfig)
+			}(x.Base, x.Size)
+		}
+		for _, x := range memory.Writes {
+			gotMemory.Add(1)
+			go func(addr, size uint64) {
+				defer gotMemory.Done()
+				client.Get(ctx, commandToClick.MemoryAfter(0, addr, size).Path(), resolveConfig)
+			}(x.Base, x.Size)
+		}
+		gotMemory.Wait()
 	}()
 
 	// Get Resource Data (For each texture, and shader)
 	interactionWG.Add(1)
 	go func() {
+		ctx = status.Start(oldCtx, "Getting Resources")
+		defer status.Finish(ctx)
 		defer interactionWG.Done()
 		gotResources := sync.WaitGroup{}
 		for _, types := range resources.GetTypes() {
-			for _, v := range types.GetResources() {
-				if types.Type == api.ResourceType_TextureResource ||
+			for ii, v := range types.GetResources() {
+				if (types.Type == api.ResourceType_TextureResource ||
 					types.Type == api.ResourceType_ShaderResource ||
-					types.Type == api.ResourceType_ProgramResource {
+					types.Type == api.ResourceType_ProgramResource) &&
+					ii < 30 {
 					gotResources.Add(1)
 					go func(id *path.ID) {
 						defer gotResources.Done()
@@ -464,6 +532,8 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 
 	interactionWG.Wait()
 	verb.interactionDoneTime = time.Now()
+	status.Finish(ctx)
+	ctx = oldCtx
 	fmt.Printf("Gapis creation time %+v\n", (verb.gapisStartTime.Sub(verb.startTime)))
 	fmt.Printf("Gapis get string table time %+v\n", verb.gapisStringTableTime.Sub(verb.gapisStartTime))
 	fmt.Printf("Get Server Info Time %+v\n", (verb.serverInfoTime.Sub(verb.gapisStringTableTime)))
@@ -499,6 +569,9 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 // so that we can independently chnage how what we do to benchmark
 // everything.
 func (verb *benchmarkVerb) doTrace(ctx context.Context, client client.Client, traceURI string) error {
+	ctx = status.Start(ctx, "Record Trace for %+v", verb.For)
+	defer status.Finish(ctx)
+
 	// Find the actual trace URI from all of the devices
 	_, err := client.GetServerInfo(ctx)
 	if err != nil {
