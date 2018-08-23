@@ -15,19 +15,19 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 	"sync"
+	"text/tabwriter"
 	"time"
 
 	"github.com/google/gapid/core/app"
-	"github.com/google/gapid/core/app/crash"
 	"github.com/google/gapid/core/app/status"
 	"github.com/google/gapid/core/event/task"
 	img "github.com/google/gapid/core/image"
@@ -42,35 +42,16 @@ import (
 
 type benchmarkVerb struct {
 	BenchmarkFlags
-	startTime                          time.Time
-	gapisStartTime                     time.Time
-	gapisStringTableTime               time.Time
-	serverInfoTime                     time.Time
-	gotDevicesTime                     time.Time
-	nDevices                           uint64
-	foundTraceTargetTime               time.Time
-	beforeStartTraceTime               time.Time
-	traceInitializedTime               time.Time
-	traceDoneTime                      time.Time
-	traceSizeInBytes                   int64
-	gapisTraceLoadTime                 time.Time
-	gapisTraceLoadedTime               time.Time
-	gapisGotEventsTime                 time.Time
-	gapisGotResourcesTime              time.Time
-	gapisGotContextsTime               time.Time
-	gapisGotReplayDevicesTime          time.Time
-	gapisReportTime                    time.Time
-	gapisGotThumbnailsTime             time.Time
-	gapisCommandTreeNodesResolved      time.Time
-	gapisCommandTreeThumbnailsResolved time.Time
-	interactionStartTime               time.Time
-	interactionResolvedStateTree       time.Time
-	interactionFramebufferTime         time.Time
-	interactionMeshTime                time.Time
-	interactionResourcesTime           time.Time
-	interactionMemoryTime              time.Time
-	interactionDoneTime                time.Time
-	traceFrames                        int
+	startTime            time.Time
+	beforeStartTraceTime time.Time
+	traceInitializedTime time.Time
+	traceDoneTime        time.Time
+	traceSizeInBytes     int64
+	traceFrames          int
+	gapisInteractiveTime time.Time
+	gapisCachingDoneTime time.Time
+	interactionStartTime time.Time
+	interactionDoneTime  time.Time
 }
 
 var BenchmarkName = "benchmark.gfxtrace"
@@ -85,36 +66,46 @@ func init() {
 	})
 }
 
+// We wnat to write our some of our own tracing data
+type profileTask struct {
+	Name      string `json:"name,omitempty"`
+	Pid       uint64 `json:"pid"`
+	Tid       uint64 `json:"tid"`
+	EventType string `json:"ph"`
+	Ts        int64  `json:"ts"`
+	S         string `json:"s,omitempty"`
+}
+
 func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 	oldCtx := ctx
 	ctx = status.Start(ctx, "Initializing GAPIS")
 
-	if verb.For.Seconds() == float64(0) {
-		verb.For = time.Duration(time.Minute)
+	if verb.NumFrames == 0 {
+		verb.NumFrames = 100
 	}
 
 	verb.startTime = time.Now()
 
 	client, err := getGapis(ctx, GapisFlags{}, GapirFlags{})
-	verb.gapisStartTime = time.Now()
+
+	var writeTrace func(path string, gapisTrace, gapitTrace *bytes.Buffer) error
+
 	if verb.DumpTrace != "" {
-		profile := bytes.Buffer{}
-		stopProfile := status.RegisterTracer(&profile)
-		trace, err := os.Create(verb.DumpTrace)
+		gapitTrace := &bytes.Buffer{}
+		gapisTrace := &bytes.Buffer{}
+		stopGapitTrace := status.RegisterTracer(gapitTrace)
+		stopGapisTrace, err := client.Profile(ctx, nil, gapisTrace, 1)
 		if err != nil {
-			panic(err)
+			return err
 		}
+
 		defer func() {
-			// Skip the leading [
-			stopProfile()
-			trace.Write(profile.Bytes()[1:])
-			trace.Close()
+			stopGapitTrace()
+			stopGapisTrace()
+			if err := writeTrace(verb.DumpTrace, gapisTrace, gapitTrace); err != nil {
+				log.E(ctx, "Failed to write trace: %v", err)
+			}
 		}()
-		stop, err := client.Profile(ctx, nil, trace, 1)
-		if err != nil {
-			panic(err)
-		}
-		defer stop()
 	}
 
 	stringTables, err := client.GetAvailableStringTables(ctx)
@@ -131,7 +122,6 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 		}
 	}
 	_ = stringTable
-	verb.gapisStringTableTime = time.Now()
 
 	if err != nil {
 		return log.Err(ctx, err, "Failed to connect to the GAPIS server")
@@ -154,12 +144,10 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 	status.Event(ctx, status.GlobalScope, "Trace Size %+v", verb.traceSizeInBytes)
 
 	ctx = status.Start(oldCtx, "Initializing Capture")
-	verb.gapisTraceLoadTime = time.Now()
 	c, err := client.LoadCapture(ctx, BenchmarkName)
 	if err != nil {
 		return err
 	}
-	verb.gapisTraceLoadedTime = time.Now()
 
 	devices, err := client.GetDevicesForReplay(ctx, c)
 	if err != nil {
@@ -174,8 +162,6 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 	}
 	device := devices[0]
 
-	verb.gapisGotReplayDevicesTime = time.Now()
-
 	wg := sync.WaitGroup{}
 	gotContext := sync.WaitGroup{}
 
@@ -187,7 +173,6 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 			panic(err)
 		}
 		resources = boxedResources.(*service.Resources)
-		verb.gapisGotResourcesTime = time.Now()
 
 		wg.Done()
 	}()
@@ -205,12 +190,10 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 			panic(err)
 		}
 		contexts := contextsInterface.(*service.Contexts)
-		fmt.Printf("%+v\n", contexts.GetList()[0])
 		ctxId = contexts.GetList()[0].ID
 		contextInterface, err := client.Get(ctx, contexts.GetList()[0].Path(), resolveConfig)
 		context = contextInterface.(*service.Context)
 
-		verb.gapisGotContextsTime = time.Now()
 		gotContext.Done()
 		wg.Done()
 	}()
@@ -229,27 +212,29 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 		}
 
 		_, err = client.Get(ctx, c.Report(device, filter, false).Path(), resolveConfig)
-		verb.gapisReportTime = time.Now()
 		wg.Done()
 	}()
 
 	var commandToClick *path.Command
 
 	wg.Add(1)
+
+	var events []*service.Event
 	go func() {
 		ctx = status.Start(oldCtx, "Getting Thumbnails")
 		defer status.Finish(ctx)
-		events, err := getEvents(ctx, client, &path.Events{
+		var e error
+		events, e = getEvents(ctx, client, &path.Events{
 			Capture:                 c,
 			AllCommands:             false,
 			FirstInFrame:            false,
 			LastInFrame:             true,
 			FramebufferObservations: false,
+			IncludeTiming:           true,
 		})
-		if err != nil {
-			panic(err)
+		if e != nil {
+			panic(e)
 		}
-		verb.gapisGotEventsTime = time.Now()
 		verb.traceFrames = len(events)
 
 		gotThumbnails := sync.WaitGroup{}
@@ -286,7 +271,6 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 			}(i)
 		}
 		gotThumbnails.Wait()
-		verb.gapisGotThumbnailsTime = time.Now()
 		wg.Done()
 	}()
 
@@ -363,15 +347,16 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 
 		gotNodes.Wait()
 		status.Finish(ctx)
-		verb.gapisCommandTreeNodesResolved = time.Now()
+		verb.gapisInteractiveTime = time.Now()
 
 		gotThumbnails.Wait()
 		status.Finish(tnCtx)
-		verb.gapisCommandTreeThumbnailsResolved = time.Now()
 		wg.Done()
 	}()
 	// Done initializing capture
 	wg.Wait()
+	verb.gapisCachingDoneTime = time.Now()
+
 	// At this point we are Interactive. All pre-loading is done:
 	// Next we have to actually handle an interaction
 	status.Finish(ctx)
@@ -424,7 +409,6 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 			}(i)
 		}
 		gotNodes.Wait()
-		verb.interactionResolvedStateTree = time.Now()
 	}()
 
 	// Get the framebuffer
@@ -453,7 +437,6 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 			panic(log.Errf(ctx, err, "Get frame image data failed"))
 		}
 		_, _, _ = int(ii.Width), int(ii.Height), dataO.([]byte)
-		verb.interactionFramebufferTime = time.Now()
 	}()
 
 	// Get the mesh
@@ -464,7 +447,6 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 		defer interactionWG.Done()
 		meshOptions := path.NewMeshOptions(false)
 		_, _ = client.Get(ctx, commandToClick.Mesh(meshOptions).Path(), resolveConfig)
-		verb.interactionMeshTime = time.Now()
 	}()
 
 	// GetMemory
@@ -527,40 +509,169 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 			}
 		}
 		gotResources.Wait()
-		verb.interactionResourcesTime = time.Now()
 	}()
 
 	interactionWG.Wait()
 	verb.interactionDoneTime = time.Now()
 	status.Finish(ctx)
+
+	m, err := client.Get(ctx, c.Messages().Path(), nil)
+	if err != nil {
+		return err
+	}
+	messages := m.(*service.Messages)
+
+	boxedVal, err := client.Get(ctx, (&path.Stats{
+		Capture:  c,
+		DrawCall: false,
+	}).Path(), nil)
+	if err != nil {
+		return err
+	}
+	traceStartTimestamp := boxedVal.(*service.Stats).TraceStart
+
+	stateBuildTime := int64(0)
+	stateBuildStartTime := traceStartTimestamp
+	stateBuildEndTime := traceStartTimestamp
+	for _, m := range messages.List {
+		if m.Message == "State serialization started" {
+			stateBuildStartTime = m.Timestamp
+		}
+		if m.Message == "State serialization finished" {
+			stateBuildEndTime = m.Timestamp
+			stateBuildTime = int64(stateBuildEndTime - stateBuildStartTime)
+		}
+	}
+	if len(events) < 1 {
+		panic("No events")
+	}
+	lastFrameEvent := events[len(events)-1]
+	frameCaptureTime := lastFrameEvent.Timestamp - stateBuildEndTime
+	// Convert nanoseconds to milliseconds
+	frameTime := float64(frameCaptureTime / uint64(len(events)))
+	stateTime := float64(stateBuildTime)
+
 	ctx = oldCtx
-	fmt.Printf("Gapis creation time %+v\n", (verb.gapisStartTime.Sub(verb.startTime)))
-	fmt.Printf("Gapis get string table time %+v\n", verb.gapisStringTableTime.Sub(verb.gapisStartTime))
-	fmt.Printf("Get Server Info Time %+v\n", (verb.serverInfoTime.Sub(verb.gapisStringTableTime)))
-	fmt.Printf("Start until Devices enumerated %+v\n", (verb.serverInfoTime.Sub(verb.startTime)))
-	fmt.Printf("Finding the correct target %+v\n", (verb.foundTraceTargetTime.Sub(verb.gotDevicesTime)))
-	fmt.Printf("Setting up trace %+v\n", (verb.traceInitializedTime.Sub(verb.beforeStartTraceTime)))
-	fmt.Printf("Trace setup time: : %+v\n", verb.traceDoneTime.Sub(verb.traceInitializedTime)-verb.For)
-	fmt.Printf("Total trace time: %+v\n", (verb.traceDoneTime.Sub(verb.traceInitializedTime)))
-	fmt.Printf("Trace Size %+vMB\n", (verb.traceSizeInBytes / (1024 * 1024)))
-	fmt.Printf("Total frames captured %+v\n", verb.traceFrames)
-	fmt.Printf("Frame Time %+v\n", (verb.For.Seconds() / float64(verb.traceFrames)))
+	w := tabwriter.NewWriter(os.Stdout, 4, 4, 3, ' ', 0)
+	fmt.Fprintln(w, "Trace Time\tTrace Size\tTrace Frames\tState Serialization\tTrace Frame Time\tInteractive\tCaching Done\tInteraction")
+	fmt.Fprintln(w, "----------\t----------\t------------\t-------------------\t----------------\t-----------\t------------\t-----------")
+	fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
+		verb.traceDoneTime.Sub(verb.beforeStartTraceTime),
+		verb.traceSizeInBytes,
+		verb.traceFrames,
+		time.Duration(stateTime)*time.Nanosecond,
+		time.Duration(frameTime)*time.Nanosecond,
+		verb.gapisInteractiveTime.Sub(verb.traceDoneTime),
+		verb.gapisCachingDoneTime.Sub(verb.traceDoneTime),
+		verb.interactionDoneTime.Sub(verb.interactionStartTime),
+	)
+	w.Flush()
 
-	fmt.Printf("Server Trace Load Time %+v\n", verb.gapisTraceLoadedTime.Sub(verb.gapisTraceLoadTime))
-	fmt.Printf("Resolved Replay Device Time %+v\n", verb.gapisGotReplayDevicesTime.Sub(verb.gapisTraceLoadedTime))
-	fmt.Printf("Resolved Resources Time %+v\n", verb.gapisGotResourcesTime.Sub(verb.gapisGotReplayDevicesTime))
-	fmt.Printf("Got Contexts Time %+v\n", verb.gapisGotContextsTime.Sub(verb.gapisGotReplayDevicesTime))
-	fmt.Printf("Report completed time %+v\n", verb.gapisReportTime.Sub(verb.gapisGotReplayDevicesTime))
-	fmt.Printf("Thumbnails completed time %+v\n", verb.gapisGotThumbnailsTime.Sub(verb.gapisGotReplayDevicesTime))
-	fmt.Printf("Command Tree Nodes time %+v\n", verb.gapisCommandTreeNodesResolved.Sub(verb.gapisGotReplayDevicesTime))
-	fmt.Printf("Command Tree Thumbnails time %+v\n", verb.gapisCommandTreeThumbnailsResolved.Sub(verb.gapisGotReplayDevicesTime))
+	writeTrace = func(path string, gapisTrace, gapitTrace *bytes.Buffer) error {
+		f, err := os.Create(path)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
 
-	fmt.Printf("Interaction Command Index: %+v\n", commandToClick.Indices[0])
-	fmt.Printf("Interactions: State Tree: %+v\n", verb.interactionResolvedStateTree.Sub(verb.interactionStartTime))
-	fmt.Printf("Interactions: Framebuffer: %+v\n", verb.interactionFramebufferTime.Sub(verb.interactionStartTime))
-	fmt.Printf("Interactions: Mesh: %+v\n", verb.interactionMeshTime.Sub(verb.interactionStartTime))
-	fmt.Printf("Interactions: Resources: %+v\n", verb.interactionResourcesTime.Sub(verb.interactionStartTime))
-	fmt.Printf("Interactions Done: %+v\n", verb.interactionDoneTime.Sub(verb.interactionStartTime))
+		_, err = f.Write(gapisTrace.Bytes())
+		if err != nil {
+			return err
+		}
+		// Skip the leading [
+		_, err = f.Write(gapitTrace.Bytes()[1:])
+		if err != nil {
+			return err
+		}
+
+		// This is the entire profile except for what happened on the trace device.
+		// This is now stored in the trace file.
+		// We have all of the timing information for the trace file,
+		// the last thing we have to do is sync the existing traces with our trace.
+		// We need to find the point in the GAPIS trace where the trace was connected.
+		timeOffsetInMicroseconds := int64(0)
+		var prof interface{}
+		err = json.Unmarshal(gapisTrace.Bytes(), &prof)
+		if prof, ok := prof.([]interface{}); ok {
+			for _, d := range prof {
+				if d, ok := d.(map[string]interface{}); ok {
+					if n, ok := d["name"]; ok {
+						if s, ok := n.(string); ok {
+							if s == "Trace Connected" {
+								if n, ok := d["ts"]; ok {
+									if n, ok := n.(float64); ok {
+										timeOffsetInMicroseconds = int64(n)
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		} else {
+			panic("Could not read profile data")
+		}
+		traceStartTimestampInMicroseconds := (traceStartTimestamp / 1000)
+		timeOffsetInMicroseconds = int64(traceStartTimestampInMicroseconds) - timeOffsetInMicroseconds
+		// Manually write out some profiling data for the trace
+		tsk := profileTask{
+			Name:      "Tracing",
+			Tid:       0,
+			Pid:       1,
+			Ts:        int64(traceStartTimestampInMicroseconds) - timeOffsetInMicroseconds,
+			EventType: "B",
+		}
+		b, _ := json.Marshal(tsk)
+		f.Write([]byte("\n"))
+		f.Write(b)
+		f.Write([]byte(","))
+
+		if stateBuildStartTime != stateBuildEndTime {
+			tsk.Name = "State Serialization"
+			tsk.Ts = int64(stateBuildStartTime/1000) - timeOffsetInMicroseconds
+			b, _ = json.Marshal(tsk)
+			f.Write([]byte("\n"))
+			f.Write(b)
+			f.Write([]byte(","))
+
+			tsk.Name = ""
+			tsk.Ts = int64(stateBuildEndTime/1000) - timeOffsetInMicroseconds
+			tsk.EventType = "E"
+			b, _ = json.Marshal(tsk)
+			f.Write([]byte("\n"))
+			f.Write(b)
+			f.Write([]byte(","))
+		}
+		startTime := (stateBuildEndTime / 1000)
+		for i, e := range events {
+			tsk.Name = fmt.Sprintf("Frame %+v", i)
+			tsk.Ts = int64(startTime) - timeOffsetInMicroseconds
+			tsk.EventType = "B"
+			b, _ = json.Marshal(tsk)
+			f.Write([]byte("\n"))
+			f.Write(b)
+			f.Write([]byte(","))
+
+			tsk.Name = ""
+			tsk.Ts = int64(e.Timestamp/1000) - timeOffsetInMicroseconds
+			tsk.EventType = "E"
+			b, _ = json.Marshal(tsk)
+			f.Write([]byte("\n"))
+			f.Write(b)
+			f.Write([]byte(","))
+
+			startTime = (e.Timestamp / 1000)
+		}
+
+		tsk.Name = ""
+		tsk.Ts = int64(startTime) - timeOffsetInMicroseconds
+		tsk.EventType = "E"
+		b, _ = json.Marshal(tsk)
+		f.Write([]byte("\n"))
+		f.Write(b)
+		f.Write([]byte("]"))
+		return nil
+	}
 
 	return nil
 }
@@ -569,7 +680,7 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 // so that we can independently chnage how what we do to benchmark
 // everything.
 func (verb *benchmarkVerb) doTrace(ctx context.Context, client client.Client, traceURI string) error {
-	ctx = status.Start(ctx, "Record Trace for %+v", verb.For)
+	ctx = status.Start(ctx, "Record Trace for %+v frames", verb.NumFrames)
 	defer status.Finish(ctx)
 
 	// Find the actual trace URI from all of the devices
@@ -577,14 +688,11 @@ func (verb *benchmarkVerb) doTrace(ctx context.Context, client client.Client, tr
 	if err != nil {
 		return err
 	}
-	verb.serverInfoTime = time.Now()
 
 	devices, err := client.GetDevices(ctx)
 	if err != nil {
 		return err
 	}
-	verb.gotDevicesTime = time.Now()
-	verb.nDevices = uint64(len(devices))
 
 	devices, err = filterDevices(ctx, &verb.DeviceFlags, client)
 	if err != nil {
@@ -651,12 +759,9 @@ func (verb *benchmarkVerb) doTrace(ctx context.Context, client client.Client, tr
 		return log.Errf(ctx, nil, "%v", sb.String())
 	}
 
-	fmt.Printf("Tracing %+v", found[0].uri)
 	out := BenchmarkName
 	uri := found[0].uri
 	traceDevice := found[0].device
-
-	verb.foundTraceTargetTime = time.Now()
 
 	options := &service.TraceOptions{
 		Device: traceDevice,
@@ -664,16 +769,17 @@ func (verb *benchmarkVerb) doTrace(ctx context.Context, client client.Client, tr
 		AdditionalCommandLineArgs: verb.AdditionalArgs,
 		Cwd:                   verb.WorkingDir,
 		Environment:           verb.Env,
-		Duration:              float32(verb.For.Seconds()),
+		Duration:              0,
 		ObserveFrameFrequency: 0,
 		ObserveDrawFrequency:  0,
-		StartFrame:            0,
-		FramesToCapture:       0,
+		StartFrame:            uint32(verb.StartFrame),
+		FramesToCapture:       uint32(verb.NumFrames),
 		DisablePcs:            true,
 		RecordErrorState:      false,
 		DeferStart:            false,
 		NoBuffer:              false,
 		HideUnknownExtensions: true,
+		RecordTraceTimes:      true,
 		ClearCache:            false,
 		ServerLocalSavePath:   out,
 	}
@@ -708,8 +814,6 @@ func (verb *benchmarkVerb) doTrace(ctx context.Context, client client.Client, tr
 	}
 	verb.traceInitializedTime = time.Now()
 
-	handlerInstalled := false
-
 	return task.Retry(ctx, 0, time.Second*3, func(ctx context.Context) (retry bool, err error) {
 		status, err = handler.Event(service.TraceEvent_Status)
 		if err == io.EOF {
@@ -723,23 +827,6 @@ func (verb *benchmarkVerb) doTrace(ctx context.Context, client client.Client, tr
 			return true, nil
 		}
 
-		if status.BytesCaptured > 0 {
-			if !handlerInstalled {
-				crash.Go(func() {
-					reader := bufio.NewReader(os.Stdin)
-					if options.DeferStart {
-						println("Press enter to start capturing...")
-						_, _ = reader.ReadString('\n')
-						_, _ = handler.Event(service.TraceEvent_Begin)
-					}
-					println("Press enter to stop capturing...")
-					_, _ = reader.ReadString('\n')
-					handler.Event(service.TraceEvent_Stop)
-				})
-				handlerInstalled = true
-			}
-			log.I(ctx, "Capturing %+v", status.BytesCaptured)
-		}
 		if status.Status == service.TraceStatus_Done {
 			return true, nil
 		}
