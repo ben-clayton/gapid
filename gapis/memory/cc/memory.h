@@ -21,14 +21,18 @@
 extern "C" {
 #endif
 
-struct memory;
+typedef struct memory_t memory;
+typedef uint64_t pool_id;
 
 memory* memory_create(arena*);
 void memory_destroy(memory*);
 
-void* memory_read(memory*, slice* sli);
-void memory_write(memory*, slice* sli, const void* data);
+void* memory_read(memory*, pool_id, uint64_t addr, uint64_t size,
+                  GAPIL_BOOL* free_ptr);
+void memory_write(memory*, pool_id, uint64_t addr, uint64_t size,
+                  const void* data);
 void memory_copy(memory*, slice* dst, slice* src);
+pool_id memory_new_pool(memory*);
 
 #ifdef __cplusplus
 }  // extern "C"

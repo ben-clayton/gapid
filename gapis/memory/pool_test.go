@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package memory
+package memory_test
 
 import (
 	"bytes"
@@ -23,7 +23,9 @@ import (
 	"github.com/google/gapid/core/assert"
 	"github.com/google/gapid/core/data/id"
 	"github.com/google/gapid/core/log"
+	"github.com/google/gapid/core/memory/arena"
 	"github.com/google/gapid/gapis/database"
+	"github.com/google/gapid/gapis/memory"
 	"github.com/pkg/errors"
 )
 
@@ -42,14 +44,14 @@ func readFully(r io.Reader, maxRead int) ([]byte, error) {
 	}
 }
 
-func checkData(ctx context.Context, s Data, expected []byte) {
+func checkData(ctx context.Context, s memory.Data, expected []byte) {
 	assert.For(ctx, "size").That(s.Size()).Equals(uint64(len(expected)))
 
 	for _, offset := range []uint64{0, 1, s.Size() - 1, s.Size()} {
 		got := make([]byte, len(expected)-int(offset))
 		err := s.Get(ctx, offset, got)
-		assert.For(ctx, "err").ThatError(err).Succeeded()
-		assert.For(ctx, "got").ThatSlice(got).Equals(expected[offset:])
+		assert.For(ctx, "Err(%v)", offset).ThatError(err).Succeeded()
+		assert.For(ctx, "Get(%v)", offset).ThatSlice(got).Equals(expected[offset:])
 	}
 
 	for _, maxReadSize := range []int{1, 2, 3, 512} {
@@ -62,14 +64,14 @@ func checkData(ctx context.Context, s Data, expected []byte) {
 func TestBlobSlice(t *testing.T) {
 	ctx := log.Testing(t)
 	ctx = database.Put(ctx, database.NewInMemory(ctx))
-	data := Blob([]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
+	data := memory.Blob([]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
 	for _, test := range []struct {
-		rng      Range
+		rng      memory.Range
 		expected []byte
 	}{
-		{Range{Base: 0, Size: 10}, []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}},
-		{Range{Base: 3, Size: 3}, []byte{3, 4, 5}},
-		{Range{Base: 6, Size: 3}, []byte{6, 7, 8}},
+		{memory.Range{Base: 0, Size: 10}, []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}},
+		{memory.Range{Base: 3, Size: 3}, []byte{3, 4, 5}},
+		{memory.Range{Base: 6, Size: 3}, []byte{6, 7, 8}},
 	} {
 		checkData(ctx, data.Slice(test.rng), test.expected)
 	}
@@ -92,19 +94,24 @@ func TestBlobSlice(t *testing.T) {
 func TestPoolBlobWriteRead(t *testing.T) {
 	ctx := log.Testing(t)
 	ctx = database.Put(ctx, database.NewInMemory(ctx))
-	p := Pool{}
+	a := arena.New()
+	defer a.Dispose()
+	m := memory.New(a)
+	defer m.Dispose()
+	p := m.NewPool()
+
 	for _, test := range []struct {
-		data     Data
+		data     memory.Data
 		expected []byte
 	}{
-		{Blob([]byte{10, 11, 12, 13, 14}), []byte{10, 11, 12, 13, 14, 0}},
-		{Blob([]byte{20, 21, 22, 23, 24}), []byte{20, 21, 22, 23, 24, 0}},
-		{Blob([]byte{30, 31}), []byte{30, 31, 22, 23, 24, 0}},
-		{Blob([]byte{40, 41, 42, 43, 44, 45}), []byte{40, 41, 42, 43, 44, 45}},
+		{memory.Blob([]byte{10, 11, 12, 13, 14}), []byte{10, 11, 12, 13, 14, 0}},
+		{memory.Blob([]byte{20, 21, 22, 23, 24}), []byte{20, 21, 22, 23, 24, 0}},
+		{memory.Blob([]byte{30, 31}), []byte{30, 31, 22, 23, 24, 0}},
+		{memory.Blob([]byte{40, 41, 42, 43, 44, 45}), []byte{40, 41, 42, 43, 44, 45}},
 	} {
 		p.Write(0, test.data)
 
-		checkData(ctx, p.Slice(Range{Base: 0, Size: 6}), test.expected)
+		checkData(ctx, p.Slice(memory.Range{Base: 0, Size: 6}), test.expected)
 	}
 }
 
@@ -129,24 +136,29 @@ func TestPoolBlobWriteRead(t *testing.T) {
 func TestMemoryBlobWriteReadScattered(t *testing.T) {
 	ctx := log.Testing(t)
 	ctx = database.Put(ctx, database.NewInMemory(ctx))
-	p := Pool{}
-	p.Write(1, Blob([]byte{10, 11, 12}))
-	p.Write(7, Blob([]byte{20, 21, 22, 23}))
-	p.Write(2, Blob([]byte{30, 31}))
-	p.Write(2, Blob([]byte{40, 41, 42}))
-	p.Write(8, Blob([]byte{50}))
+	a := arena.New()
+	defer a.Dispose()
+	m := memory.New(a)
+	defer m.Dispose()
+	p := m.NewPool()
+
+	p.Write(1, memory.Blob([]byte{10, 11, 12}))
+	p.Write(7, memory.Blob([]byte{20, 21, 22, 23}))
+	p.Write(2, memory.Blob([]byte{30, 31}))
+	p.Write(2, memory.Blob([]byte{40, 41, 42}))
+	p.Write(8, memory.Blob([]byte{50}))
 
 	for _, test := range []struct {
-		rng      Range
+		rng      memory.Range
 		expected []byte
 	}{
-		{Range{Base: 0, Size: 12}, []byte{0, 10, 40, 41, 42, 00, 00, 20, 50, 22, 23, 00}},
-		{Range{Base: 1, Size: 10}, []byte{10, 40, 41, 42, 00, 00, 20, 50, 22, 23}},
-		{Range{Base: 2, Size: 3}, []byte{40, 41, 42}},
-		{Range{Base: 3, Size: 6}, []byte{41, 42, 0, 0, 20, 50}},
-		{Range{Base: 3, Size: 7}, []byte{41, 42, 0, 0, 20, 50, 22}},
-		{Range{Base: 5, Size: 2}, []byte{0, 0}},
-		{Range{Base: 8, Size: 1}, []byte{50}},
+		{memory.Range{Base: 0, Size: 12}, []byte{0, 10, 40, 41, 42, 00, 00, 20, 50, 22, 23, 00}},
+		{memory.Range{Base: 1, Size: 10}, []byte{10, 40, 41, 42, 00, 00, 20, 50, 22, 23}},
+		{memory.Range{Base: 2, Size: 3}, []byte{40, 41, 42}},
+		{memory.Range{Base: 3, Size: 6}, []byte{41, 42, 0, 0, 20, 50}},
+		{memory.Range{Base: 3, Size: 7}, []byte{41, 42, 0, 0, 20, 50, 22}},
+		{memory.Range{Base: 5, Size: 2}, []byte{0, 0}},
+		{memory.Range{Base: 8, Size: 1}, []byte{50}},
 	} {
 		checkData(ctx, p.Slice(test.rng), test.expected)
 	}
@@ -180,22 +192,27 @@ func TestMemoryResourceWriteReadScattered(t *testing.T) {
 	resD, _ := database.Store(ctx, []byte{40, 41, 42})
 	resE, _ := database.Store(ctx, []byte{50})
 
-	p := Pool{}
-	p.Write(1, Resource(resA, 3))
-	p.Write(7, Resource(resB, 4))
-	p.Write(2, Resource(resC, 2))
-	p.Write(2, Resource(resD, 3))
-	p.Write(8, Resource(resE, 1))
+	a := arena.New()
+	defer a.Dispose()
+	m := memory.New(a)
+	defer m.Dispose()
+	p := m.NewPool()
+
+	p.Write(1, memory.Resource(resA, 3))
+	p.Write(7, memory.Resource(resB, 4))
+	p.Write(2, memory.Resource(resC, 2))
+	p.Write(2, memory.Resource(resD, 3))
+	p.Write(8, memory.Resource(resE, 1))
 
 	for _, test := range []struct {
-		rng      Range
+		rng      memory.Range
 		expected []byte
 	}{
-		{Range{Base: 0, Size: 12}, []byte{0, 10, 40, 41, 42, 00, 00, 20, 50, 22, 23, 00}},
-		{Range{Base: 1, Size: 10}, []byte{10, 40, 41, 42, 00, 00, 20, 50, 22, 23}},
-		{Range{Base: 2, Size: 3}, []byte{40, 41, 42}},
-		{Range{Base: 5, Size: 2}, []byte{0, 0}},
-		{Range{Base: 8, Size: 1}, []byte{50}},
+		{memory.Range{Base: 0, Size: 12}, []byte{0, 10, 40, 41, 42, 00, 00, 20, 50, 22, 23, 00}},
+		{memory.Range{Base: 1, Size: 10}, []byte{10, 40, 41, 42, 00, 00, 20, 50, 22, 23}},
+		{memory.Range{Base: 2, Size: 3}, []byte{40, 41, 42}},
+		{memory.Range{Base: 5, Size: 2}, []byte{0, 0}},
+		{memory.Range{Base: 8, Size: 1}, []byte{50}},
 	} {
 		slice := p.Slice(test.rng)
 		checkData(ctx, slice, test.expected)
@@ -211,10 +228,16 @@ func TestMemoryResourceWriteReadScattered(t *testing.T) {
 func TestPoolSliceReaderErrorPropagation(t *testing.T) {
 	ctx := log.Testing(t)
 	ctx = database.Put(ctx, database.NewInMemory(ctx))
-	p := Pool{}
-	p.Write(2, Resource(id.ID{}, 5))
 
-	got, err := readFully(p.Slice(Range{Base: 0, Size: 10}).NewReader(ctx), 512)
+	a := arena.New()
+	defer a.Dispose()
+	m := memory.New(a)
+	defer m.Dispose()
+	p := m.NewPool()
+
+	p.Write(2, memory.Resource(id.ID{}, 5))
+
+	got, err := readFully(p.Slice(memory.Range{Base: 0, Size: 10}).NewReader(ctx), 512)
 	assert.For(ctx, "len").That(len(got)).Equals(2)
 	assert.For(ctx, "err").ThatError(err).Failed()
 }
@@ -252,18 +275,23 @@ func TestSliceNesting(t *testing.T) {
 	ctx := log.Testing(t)
 	ctx = database.Put(ctx, database.NewInMemory(ctx))
 
-	innerPool := Pool{}
-	innerPool.Write(0, Blob([]byte{4, 55, 66}))
+	a := arena.New()
+	defer a.Dispose()
+	m := memory.New(a)
+	defer m.Dispose()
 
-	midPool := Pool{}
-	midPool.Write(1, innerPool.Slice(Range{Size: 3}))
-	midPool.Write(2, Blob([]byte{5, 6, 7, 88}))
+	innerPool := m.NewPool()
+	innerPool.Write(0, memory.Blob([]byte{4, 55, 66}))
+
+	midPool := m.NewPool()
+	midPool.Write(1, innerPool.Slice(memory.Range{Size: 3}))
+	midPool.Write(2, memory.Blob([]byte{5, 6, 7, 88}))
 	res, _ := database.Store(ctx, []byte{8, 9, 10})
-	midPool.Write(5, Resource(res, 3))
+	midPool.Write(5, memory.Resource(res, 3))
 
-	outerPool := Pool{}
-	outerPool.Write(1, Blob([]byte{1, 2, 3, 44}))
-	outerPool.Write(4, midPool.Slice(Range{Base: 1, Size: 7}))
+	outerPool := m.NewPool()
+	outerPool.Write(1, memory.Blob([]byte{1, 2, 3, 44}))
+	outerPool.Write(4, midPool.Slice(memory.Range{Base: 1, Size: 7}))
 
-	checkData(ctx, outerPool.Slice(Range{Size: 11}), []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	checkData(ctx, outerPool.Slice(memory.Range{Size: 11}), []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
 }

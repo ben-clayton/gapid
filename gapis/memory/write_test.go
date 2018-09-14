@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package memory
+package memory_test
 
 import (
 	"bytes"
@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/gapid/core/data/endian"
 	"github.com/google/gapid/core/os/device"
+	"github.com/google/gapid/gapis/memory"
 )
 
 func TestWriteOn32bitArch(t *testing.T) {
@@ -28,7 +29,7 @@ func TestWriteOn32bitArch(t *testing.T) {
 		uint8(0x12), int8(0x12),
 		uint16(0x1234), int16(0x1234),
 		uint32(0x12345678), int32(0x12345678),
-		BytePtr(0x87654321),
+		memory.BytePtr(0x87654321),
 		[]uint8{0x10, 0x20, 0x30},
 		[]uint16{0x10, 0x20, 0x30},
 		[]uint32{0x10, 0x20, 0x30},
@@ -36,8 +37,8 @@ func TestWriteOn32bitArch(t *testing.T) {
 	}
 
 	buf := &bytes.Buffer{}
-	e := NewEncoder(endian.Writer(buf, arch.GetEndian()), arch)
-	Write(e, values)
+	e := memory.NewEncoder(endian.Writer(buf, arch.GetEndian()), arch)
+	memory.Write(e, values)
 
 	got := buf.Bytes()
 	expected := []byte{
@@ -62,14 +63,14 @@ func TestWriteOn32bitArch(t *testing.T) {
 
 type encodableStruct struct {
 	X uint8
-	Y Pointer
+	Y memory.Pointer
 	Z int16
 	W uint64
 }
 
-var _ Encodable = encodableStruct{}
+var _ memory.Encodable = encodableStruct{}
 
-func (s encodableStruct) Encode(e *Encoder) {
+func (s encodableStruct) Encode(e *memory.Encoder) {
 	e.U8(s.X)
 	e.Pointer(s.Y.Address())
 	e.I16(s.Z)
@@ -78,11 +79,11 @@ func (s encodableStruct) Encode(e *Encoder) {
 
 func TestWriteStructOn32bitArch(t *testing.T) {
 	arch := device.Big32
-	values := encodableStruct{0x12, BytePtr(0xdeadbeef), 0x3456, 0x8888888899999999}
+	values := encodableStruct{0x12, memory.BytePtr(0xdeadbeef), 0x3456, 0x8888888899999999}
 
 	buf := &bytes.Buffer{}
-	e := NewEncoder(endian.Writer(buf, arch.GetEndian()), arch)
-	Write(e, values)
+	e := memory.NewEncoder(endian.Writer(buf, arch.GetEndian()), arch)
+	memory.Write(e, values)
 
 	got := buf.Bytes()
 	expected := []byte{
@@ -106,16 +107,16 @@ func TestWriteOn64bitArch(t *testing.T) {
 		uint8(0x12), int8(0x12),
 		uint16(0x1234), int16(0x1234),
 		uint32(0x12345678), int32(0x12345678),
-		BytePtr(0x87654321),
+		memory.BytePtr(0x87654321),
 		[]uint8{0x10, 0x20, 0x30},
-		BytePtr(0x1234567890abcdef),
+		memory.BytePtr(0x1234567890abcdef),
 		"hello",
 		uint64(0xfedcba0987654321), // Mock size_t type
 	}
 
 	buf := &bytes.Buffer{}
-	e := NewEncoder(endian.Writer(buf, arch.GetEndian()), arch)
-	Write(e, values)
+	e := memory.NewEncoder(endian.Writer(buf, arch.GetEndian()), arch)
+	memory.Write(e, values)
 
 	got := buf.Bytes()
 	expected := []byte{
@@ -140,11 +141,11 @@ func TestWriteOn64bitArch(t *testing.T) {
 
 func TestWriteStructOn64bitArch(t *testing.T) {
 	arch := device.Big64
-	values := encodableStruct{0x12, BytePtr(0xbeefdeaddeadbeef), 0x3456, 0x8888888899999999}
+	values := encodableStruct{0x12, memory.BytePtr(0xbeefdeaddeadbeef), 0x3456, 0x8888888899999999}
 
 	buf := &bytes.Buffer{}
-	e := NewEncoder(endian.Writer(buf, arch.GetEndian()), arch)
-	Write(e, values)
+	e := memory.NewEncoder(endian.Writer(buf, arch.GetEndian()), arch)
+	memory.Write(e, values)
 
 	got := buf.Bytes()
 	expected := []byte{

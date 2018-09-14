@@ -14,6 +14,7 @@
 
 package memory
 
+/*
 import (
 	"fmt"
 	"io"
@@ -37,3 +38,4 @@ func (w *writer) Write(p []byte) (n int, err error) {
 	*w = (*w)[n:]
 	return
 }
+*/

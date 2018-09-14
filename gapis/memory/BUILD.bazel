@@ -27,9 +27,9 @@ go_library(
         "encoder.go",
         "id.go",
         "load.go",
+        "memory.go",
         "native.go",
         "pointer.go",
-        "pool.go",
         "pool_write.go",
         "range.go",
         "range_list.go",
@@ -41,6 +41,10 @@ go_library(
         "write.go",
         "writer.go",
     ],
+    cdeps = [
+        "//gapis/memory/cc",
+    ],
+    cgo = True,
     embed = [":memory_go_proto"],
     importpath = "github.com/google/gapid/gapis/memory",
     visibility = ["//visibility:public"],
@@ -55,7 +59,6 @@ go_library(
         "//core/memory/arena:go_default_library",
         "//core/os/device:go_default_library",
         "//gapis/database:go_default_library",
-        "@com_github_pkg_errors//:go_default_library",
     ],
 )
 
@@ -74,8 +77,10 @@ go_test(
         "//core/data/id:go_default_library",
         "//core/log:go_default_library",
         "//core/math/interval:go_default_library",
+        "//core/memory/arena:go_default_library",
         "//core/os/device:go_default_library",
         "//gapis/database:go_default_library",
+        "//gapis/memory:go_default_library",
         "@com_github_pkg_errors//:go_default_library",
     ],
 )

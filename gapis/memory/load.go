@@ -14,6 +14,7 @@
 
 package memory
 
+/*
 import (
 	"context"
 	"reflect"
@@ -51,3 +52,4 @@ func LoadPointer(ctx context.Context, p Pointer, pools Pools, l *device.MemoryLa
 	}
 	return elPtr.Elem().Interface(), nil
 }
+*/

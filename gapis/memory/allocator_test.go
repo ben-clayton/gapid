@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package memory
+package memory_test
 
 import (
 	"math"
@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/gapid/core/assert"
 	"github.com/google/gapid/core/math/interval"
+	"github.com/google/gapid/gapis/memory"
 )
 
 func TestInvertMemoryRanges(t *testing.T) {
@@ -84,7 +85,7 @@ func TestInvertMemoryRanges(t *testing.T) {
 			after:  interval.U64RangeList{},
 		},
 	} {
-		assert.For("InvertMemoryRanges").ThatSlice(InvertMemoryRanges(testCase.before)).Equals(testCase.after)
+		assert.For("InvertMemoryRanges").ThatSlice(memory.InvertMemoryRanges(testCase.before)).Equals(testCase.after)
 	}
 }
 
@@ -99,7 +100,7 @@ func TestBasicAllocator(t *testing.T) {
 		interval.U64Range{First: 19, Count: 2},
 	}
 
-	al := NewBasicAllocator(initialFreeList)
+	al := memory.NewBasicAllocator(initialFreeList)
 
 	type allocExpectation struct{ expect func(uint64, bool) }
 	alloc := func(count uint64, align uint64) allocExpectation {
