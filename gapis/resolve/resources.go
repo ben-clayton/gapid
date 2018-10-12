@@ -59,7 +59,6 @@ func (r *ResourcesResolvable) Resolve(ctx context.Context) (interface{}, error) 
 	}
 
 	env := c.Env().ReserveMemory(ranges).Execute().Build(ctx)
-	env.State.ReserveMemory(ranges)
 	defer env.Dispose()
 	ctx = executor.PutEnv(ctx, env)
 
