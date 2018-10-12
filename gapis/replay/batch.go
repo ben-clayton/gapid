@@ -32,6 +32,7 @@ import (
 	"github.com/google/gapid/gapis/replay/builder"
 	"github.com/google/gapid/gapis/replay/executor"
 	"github.com/google/gapid/gapis/replay/scheduler"
+	"github.com/google/gapid/gapis/resolve/initialcmds"
 	"github.com/google/gapid/gapis/service/path"
 )
 
@@ -119,8 +120,13 @@ func (m *manager) execute(
 		return log.Err(ctx, err, "Failed to load capture")
 	}
 
+	_, ranges, err := initialcmds.InitialCommands(ctx, capturePath)
+	if err != nil {
+		return log.Err(ctx, err, "Failed to resolve initial commands")
+	}
+
 	ctx = capture.Put(ctx, capturePath)
-	env := c.Env().InitState().Execute().Build(ctx)
+	env := c.Env().ReserveMemory(ranges).Execute().Build(ctx)
 	defer env.Dispose()
 	ctx = exec.PutEnv(ctx, env)
 	ctx = log.V{
@@ -146,8 +152,6 @@ func (m *manager) execute(
 	ctx = log.V{"replay target ABI": replayABI}.Bind(ctx)
 
 	b := builder.New(replayABI.MemoryLayout)
-
-	// _, ranges, err := initialcmds.InitialCommands(ctx, capturePath)
 
 	out := &adapter{env: env, builder: b}
 
