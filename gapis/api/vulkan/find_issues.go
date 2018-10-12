@@ -91,7 +91,7 @@ func (t *findIssues) reportTo(r replay.Result) { t.res = append(t.res, r) }
 func (t *findIssues) Transform(ctx context.Context, id api.CmdID, cmd api.Cmd, out transform.Writer) {
 	ctx = log.Enter(ctx, "findIssues")
 
-	mutateErr := cmd.Mutate(ctx, id, t.env.State, nil /* no builder */, nil /* no watcher */)
+	mutateErr := cmd.Mutate(executor.PutEnv(ctx, t.env), id, t.env.State, nil /* no builder */, nil /* no watcher */)
 	if mutateErr != nil {
 		// Ignore since downstream transform layers can only consume valid commands
 		return
