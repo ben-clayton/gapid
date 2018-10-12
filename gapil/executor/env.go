@@ -459,6 +459,7 @@ func (e *Env) cloneSlice(dst, src *C.gapil_slice) {
 		id := memory.PoolID(src.pool.id)
 		if pool := e.pools[id]; pool != nil {
 			dst.pool = &pool.base
+			dst.pool.ref_count++
 		} else {
 			dst.pool = &e.makePoolAt(id).base
 		}

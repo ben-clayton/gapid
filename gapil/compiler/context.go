@@ -91,7 +91,7 @@ func (c *C) buildContextFuncs() {
 						val = c.initialValue(s, g.Type)
 					}
 					val.SetName(g.Name())
-					c.reference(s, val, g.Type)
+					c.Reference(s, val, g.Type)
 					globals.Index(0, api.Name(), g.Name()).Store(val)
 				}
 			}
