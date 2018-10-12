@@ -186,7 +186,16 @@ func (b *EnvBuilder) Build(ctx context.Context) *executor.Env {
 		for k, v := range b.c.InitialState.APIs {
 			s := v.Clone(ctx)
 			s.SetupInitialState(ctx)
-			env.State.APIs[k.ID()] = s
+			if e, ok := env.State.APIs[k.ID()]; ok {
+				// Any default-initialized values will leak here
+				// until the arena is freed.
+				e.Set(s)
+			} else {
+				// If there was no executor set on the config
+				// then we won't have any States in the context.
+				// Set up the initial states here.
+				env.State.APIs[k.ID()] = s
+			}
 		}
 	}
 

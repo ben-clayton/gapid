@@ -85,6 +85,8 @@ type State interface {
 	// It can fill in any derived data which we choose not to serialize,
 	// or it can apply backward-compatibility fixes for older traces.
 	SetupInitialState(ctx context.Context)
+
+	Set(State)
 }
 
 // NewStateWithEmptyAllocator returns a new, default-initialized State object,
