@@ -1250,7 +1250,7 @@ import (»
   func (c {{$name}}) Format(f fmt.State, r rune) {
     fmt.Fprintln(f, "{{$name}}{")«
     {{range $f := $.Fields}}
-      fmt.Fprintf(f, "  {{$f}}: %v\n", c.{{$f.Name | GoPublicName}}())
+      fmt.Fprintf(f, "  {{$f.Name}}: %v\n", c.{{$f.Name | GoPublicName}}())
     {{end}}
     fmt.Fprintln(f, "}")
   }
@@ -1621,6 +1621,20 @@ import (»
       a: ϟa,
     }
   }
+
+  // Format implements fmt.Formatter to print the state.
+  func (s *State) Format(f fmt.State, r rune) {
+    fmt.Fprintln(f, "{{$.Name}}{")«
+    {{range $f := $.Globals}}
+      fmt.Fprintf(f, "  {{$f.Name}}: %v\n", s.{{$f.Name | GoPublicName}}())
+    {{end}}
+    fmt.Fprintln(f, "}")
+  }
+
+  func (s *State) Set(v ϟapi.State) {
+    *s.c = *v.(*State).c
+  }
+
 
   // Init initializes the state.
   func (s *State) Init() {
