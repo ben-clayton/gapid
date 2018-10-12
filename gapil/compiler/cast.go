@@ -42,7 +42,7 @@ func (c *C) doCast(s *S, dstTy, srcTy semantic.Type, v *codegen.Value) *codegen.
 		slice := slicePtr.Load()
 		c.plugins.foreach(func(p OnReadListener) { p.OnRead(s, slice, srcPtrTy.Slice) })
 		str := s.Call(c.callbacks.sliceToString, s.Ctx, slicePtr)
-		c.release(s, slice, slicePrototype)
+		c.Release(s, slice, slicePrototype)
 		c.deferRelease(s, str, semantic.StringType)
 		return str
 	case srcIsSlice && srcSliceTy.To == semantic.CharType && dstIsString:

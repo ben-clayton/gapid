@@ -514,7 +514,7 @@ func (c *C) initialValue(s *S, t semantic.Type) *codegen.Value {
 			} else {
 				val = c.initialValue(s, f.Type)
 			}
-			c.reference(s, val, f.Type)
+			c.Reference(s, val, f.Type)
 			class = class.Insert(i, val)
 		}
 		c.deferRelease(s, class, t)
