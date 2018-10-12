@@ -32,9 +32,10 @@
 namespace {
 
 struct tracker {
-  tracker(core::Arena* a) : arena(a), map(a) {}
+  tracker(core::Arena* a) : arena(a)/*, map(a)*/ {}
   core::Arena* arena;
-  gapil::Map<void*, void*, false> map;
+  //gapil::Map<void*, void*, false> map;
+  std::unordered_map<void*, void*> map;
 };
 
 gapil_cloner_callbacks callbacks = {0};
@@ -60,20 +61,34 @@ void gapil_destroy_clone_tracker(void* ct) {
   t->arena->destroy(t);
 }
 
+// gapil_clone_tracker_lookup returns a pointer to the previously cloned object,
+// or nullptr if this object has not been cloned before.
 void* gapil_clone_tracker_lookup(void* t, void* object) {
   DEBUG_PRINT("tracker count: %d", reinterpret_cast<tracker*>(t)->map.count());
-  auto out = reinterpret_cast<tracker*>(t)->map.findOrZero(object);
+  tracker* _t = reinterpret_cast<tracker*>(t);
+
+  auto it = _t->map.find(object);
+  if (it == _t->map.end()) {
+    return nullptr;
+  }
+  return it->second;
+  //auto out = reinterpret_cast<tracker*>(t)->map.findOrZero(object);
   DEBUG_PRINT("gapil_clone_tracker_lookup(tracker: %p, object: %p) -> %p", t,
               object, out);
-  return out;
+  //return out;
 }
 
+// gapil_clone_tracker_track associates the original object to its cloned
+// version.
 void gapil_clone_tracker_track(void* t, void* original, void* cloned) {
   DEBUG_PRINT(
       "gapil_clone_tracker_track(tracker: %p, original: %p, cloned: %p)", t,
       original, cloned);
-  reinterpret_cast<tracker*>(t)->map[original] = cloned;
+  tracker* _t = reinterpret_cast<tracker*>(t);
+  _t->map[original] = cloned;
+  //reinterpret_cast<tracker*>(t)->map[original] = cloned;
 }
+
 
 void gapil_clone_slice(gapil_context* ctx, gapil_slice* dst, gapil_slice* src) {
   DEBUG_PRINT("gapil_clone_slice(ctx: %p, dst: %p, src: " SLICE_FMT ")", ctx,
