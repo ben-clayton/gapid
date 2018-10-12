@@ -32,6 +32,7 @@ func init() {
 	executor.RegisterGoExtern("vulkan.fetchPhysicalDeviceMemoryProperties", externFetchPhysicalDeviceMemoryProperties)
 	executor.RegisterGoExtern("vulkan.fetchPhysicalDeviceProperties", externFetchPhysicalDeviceProperties)
 	executor.RegisterGoExtern("vulkan.fetchPhysicalDeviceQueueFamilyProperties", externFetchPhysicalDeviceQueueFamilyProperties)
+	executor.RegisterGoExtern("vulkan.fetchPhysicalDeviceFormatProperties", externFetchPhysicalDeviceFormatProperties)
 	executor.RegisterGoExtern("vulkan.hasDynamicProperty", externHasDynamicProperty)
 	executor.RegisterGoExtern("vulkan.leaveSubcontext", externLeaveSubcontext)
 	executor.RegisterGoExtern("vulkan.mapMemory", externMapMemory)
@@ -64,6 +65,11 @@ func init() {
 	executor.RegisterGoExtern("vulkan.vkErrNotNullPointer", externVkErrNotNullPointer)
 	executor.RegisterGoExtern("vulkan.vkErrNullPointer", externVkErrNullPointer)
 	executor.RegisterGoExtern("vulkan.vkErrUnrecognizedExtension", externVkErrUnrecognizedExtension)
+	executor.RegisterGoExtern("vulkan.recordFenceSignal", externRecordFenceSignal)
+	executor.RegisterGoExtern("vulkan.recordFenceWait", externRecordFenceWait)
+	executor.RegisterGoExtern("vulkan.recordFenceReset", externRecordFenceReset)
+	executor.RegisterGoExtern("vulkan.recordAcquireNextImage", externRecordAcquireNextImage)
+	executor.RegisterGoExtern("vulkan.recordPresentSwapchainImage", externRecordPresentSwapchainImage)
 }
 
 func externsFromEnv(env *executor.Env) *externs {
@@ -151,6 +157,18 @@ func externFetchPhysicalDeviceQueueFamilyProperties(env *executor.Env, args, out
 	o := (*C.fetchPhysicalDeviceQueueFamilyProperties_res)(out)
 
 	*o = e.fetchPhysicalDeviceQueueFamilyProperties(
+		VkInstance(a.instance),
+		VkPhysicalDeviceˢ{&a.devs},
+	).c
+}
+
+// fetchPhysicalDeviceFormatProperties
+func externFetchPhysicalDeviceFormatProperties(env *executor.Env, args, out unsafe.Pointer) {
+	e := externsFromEnv(env)
+	a := (*C.fetchPhysicalDeviceFormatProperties_args)(args)
+	o := (*C.fetchPhysicalDeviceFormatProperties_res)(out)
+
+	*o = e.fetchPhysicalDeviceFormatProperties(
 		VkInstance(a.instance),
 		VkPhysicalDeviceˢ{&a.devs},
 	).c
@@ -472,5 +490,50 @@ func externVkErrUnrecognizedExtension(env *executor.Env, args, out unsafe.Pointe
 
 	e.vkErrUnrecognizedExtension(
 		C.GoStringN((*C.char)(unsafe.Pointer(&a.name.data[0])), (C.int)(a.name.length)),
+	)
+}
+
+func externRecordFenceSignal(env *executor.Env, args, out unsafe.Pointer) {
+	e := externsFromEnv(env)
+	a := (*C.recordFenceSignal_args)(args)
+
+	e.recordFenceSignal(
+		VkFence(a.fence),
+	)
+}
+
+func externRecordFenceWait(env *executor.Env, args, out unsafe.Pointer) {
+	e := externsFromEnv(env)
+	a := (*C.recordFenceWait_args)(args)
+
+	e.recordFenceWait(
+		VkFence(a.fence),
+	)
+}
+
+func externRecordFenceReset(env *executor.Env, args, out unsafe.Pointer) {
+	e := externsFromEnv(env)
+	a := (*C.recordFenceReset_args)(args)
+
+	e.recordFenceReset(
+		VkFence(a.fence),
+	)
+}
+
+func externRecordAcquireNextImage(env *executor.Env, args, out unsafe.Pointer) {
+	e := externsFromEnv(env)
+	a := (*C.recordAcquireNextImage_args)(args)
+
+	e.recordAcquireNextImage(
+		VkSwapchainKHR(a.swapchain), uint32(a.imageIndex),
+	)
+}
+
+func externRecordPresentSwapchainImage(env *executor.Env, args, out unsafe.Pointer) {
+	e := externsFromEnv(env)
+	a := (*C.recordPresentSwapchainImage_args)(args)
+
+	e.recordPresentSwapchainImage(
+		VkSwapchainKHR(a.swapchain), uint32(a.imageIndex),
 	)
 }
