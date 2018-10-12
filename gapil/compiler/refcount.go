@@ -319,9 +319,11 @@ func caller() string {
 	return strings.Join(locs, " ")
 }
 
-func (c *C) reference(s *S, val *codegen.Value, ty semantic.Type) {
+// Reference adds a reference to the given value. If the given type
+// is not a reference type, then this is a no-op.
+func (c *C) Reference(s *S, val *codegen.Value, ty semantic.Type) {
 	if got, expect := val.Type(), c.T.Target(ty); got != expect {
-		fail("reference() called with a value of an unexpected type. Got %+v, expect %+v", got, expect)
+		fail("Reference() called with a value of an unexpected type. Got %+v, expect %+v", got, expect)
 	}
 	if !c.isRefCounted(semantic.Underlying(ty)) {
 		return
@@ -339,9 +341,12 @@ func (c *C) reference(s *S, val *codegen.Value, ty semantic.Type) {
 	}
 }
 
-func (c *C) release(s *S, val *codegen.Value, ty semantic.Type) {
+// Release removes a reference to the given value. If the given type
+// is not a reference type, then this is a no-op. If the number of
+// references hits 0, then the value is freed.
+func (c *C) Release(s *S, val *codegen.Value, ty semantic.Type) {
 	if got, expect := val.Type(), c.T.Target(ty); got != expect {
-		fail("release() called with a value of an unexpected type. Got %+v, expect %+v", got, expect)
+		fail("Release() called with a value of an unexpected type. Got %+v, expect %+v", got, expect)
 	}
 	if !c.isRefCounted(semantic.Underlying(ty)) {
 		return

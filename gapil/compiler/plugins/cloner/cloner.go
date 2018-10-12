@@ -112,6 +112,7 @@ func (c *cloner) implementClones() {
 						c.cloneTo(s, ty.To, clone.Index(0, compiler.RefValue), this.Index(0, compiler.RefValue).Load(), tracker)
 						s.Return(clone)
 					}, func(s *compiler.S) {
+						c.Reference(s, existing, ty)
 						s.Return(existing)
 					})
 				})
@@ -143,6 +144,7 @@ func (c *cloner) implementClones() {
 						})
 						s.Return(clone)
 					}, func(s *compiler.S) {
+						c.Reference(s, existing, ty)
 						s.Return(existing)
 					})
 				})
