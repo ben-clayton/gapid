@@ -393,8 +393,8 @@ func (e *Env) pool(pool *C.pool) *memory.Pool {
 	if pool == nil {
 		return e.State.Memory.ApplicationPool()
 	}
-	if id := envID(pool.env); id != e.id {
-		e = envFromID(id) // Pool belongs to a different env.
+	if e.id != envID(pool.env) {
+		panic("Attempting to use pool from a different env")
 	}
 	id := memory.PoolID(pool.base.id)
 	return e.State.Memory.MustGet(id)
@@ -464,7 +464,6 @@ func (e *Env) cloneSlice(dst, src *C.gapil_slice) {
 			dst.pool = &e.makePoolAt(id).base
 		}
 	}
-	e.copySlice(dst, src)
 }
 
 func (e *Env) freePool(pool *C.pool) {
