@@ -28,11 +28,13 @@ import (
 import "C"
 
 func init() {
-	executor.RegisterPrebuilt(executor.Config{}, (unsafe.Pointer)(&C.prebuilt_host))
 	executor.RegisterPrebuilt(executor.Config{
-		CaptureABI: device.AndroidARM, Execute: true,
+		Execute: true, Optimize: true,
+	}, (unsafe.Pointer)(&C.prebuilt_host))
+	executor.RegisterPrebuilt(executor.Config{
+		CaptureABI: device.AndroidARM, Execute: true, Optimize: true,
 	}, (unsafe.Pointer)(&C.prebuilt_armv7a))
 	executor.RegisterPrebuilt(executor.Config{
-		CaptureABI: device.AndroidARMv7a, Execute: true,
+		CaptureABI: device.AndroidARMv7a, Execute: true, Optimize: true,
 	}, (unsafe.Pointer)(&C.prebuilt_armv7a))
 }

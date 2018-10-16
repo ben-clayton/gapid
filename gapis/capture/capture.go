@@ -175,6 +175,9 @@ func (b *EnvBuilder) Build(ctx context.Context) *executor.Env {
 	env.State.Allocator = b.allocator
 
 	if b.initState && b.c.InitialState != nil {
+		ctx = status.Start(ctx, "Setup Initial State")
+		defer status.Finish(ctx)
+
 		ctx = executor.PutEnv(ctx, env)
 		// Rebuild all the writes into the memory pools.
 		for _, m := range b.c.InitialState.Memory {
@@ -204,9 +207,11 @@ func (b *EnvBuilder) Build(ctx context.Context) *executor.Env {
 
 // Env returns a new execution environment builder.
 func (c *Capture) Env() *EnvBuilder {
-	cfg := executor.Config{}
-	cfg.CaptureABI = c.Header.ABI
-	cfg.APIs = c.APIs
+	cfg := executor.Config{
+		Optimize:   true,
+		CaptureABI: c.Header.ABI,
+		APIs:       c.APIs,
+	}
 	allocator := memory.NewBasicAllocator(value.ValidMemoryRanges)
 	allocator.ReserveRanges(c.Observed)
 	return &EnvBuilder{
