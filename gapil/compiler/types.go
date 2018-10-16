@@ -64,6 +64,7 @@ type Types struct {
 	targetToCapture map[semantic.Type]*codegen.Function
 	mangled         map[codegen.Type]mangling.Type
 	rttis           map[semantic.Type]codegen.Global
+	widen           bool // Should target-variable-length types be widened to the largest supported size?
 }
 
 type memLayoutKey string
@@ -104,6 +105,7 @@ func (c *C) declareTypes() {
 	c.T.targetToCapture = map[semantic.Type]*codegen.Function{}
 	c.T.mangled = map[codegen.Type]mangling.Type{}
 	c.T.rttis = map[semantic.Type]codegen.Global{}
+	c.T.widen = c.Settings.WidenTypes
 
 	for _, api := range c.APIs {
 		// Forward-declare all the class types.
@@ -301,16 +303,30 @@ func (t *Types) Target(ty semantic.Type) codegen.Type {
 	case *semantic.Builtin:
 		switch ty {
 		case semantic.IntType:
-			return t.Int64
-		case semantic.UintType, semantic.SizeType:
-			return t.Uint64
+			if t.widen {
+				return t.Int64
+			}
+			return t.Int
+		case semantic.UintType:
+			if t.widen {
+				return t.Uint64
+			}
+			return t.Uint
+		case semantic.SizeType:
+			if t.widen {
+				return t.Uint64
+			}
+			return t.Size
 		}
 	case *semantic.StaticArray:
 		return t.Array(t.Target(ty.ValueType), int(ty.Size))
 	case *semantic.Slice:
 		return t.Sli
 	case *semantic.Pointer:
-		return t.Uint64
+		if t.widen {
+			return t.Uint64
+		}
+		return t.Uintptr
 	case *semantic.Class, *semantic.Reference, *semantic.Map:
 		if out, ok := t.target[ty]; ok {
 			return out

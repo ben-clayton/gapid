@@ -76,11 +76,12 @@ type compileVerb struct {
 		Context bool `help:"Emit context constructor / destructor"`
 		Replay  bool `help:"Emit replay generation methods"`
 	}
-	Namespace string        `help:"Dot-delimited root namespace(s)"`
-	Symbols   symbols       `help:"Symbol generation method"`
-	Optimize  bool          `help:"Optimize generated code"`
-	Dump      bool          `help:"Dump LLVM IR to stderr"`
-	Search    file.PathList `help:"The set of paths to search for includes"`
+	WidenTypes bool          `help:"Widen target-variable-length types to largest supported size"`
+	Namespace  string        `help:"Dot-delimited root namespace(s)"`
+	Symbols    symbols       `help:"Symbol generation method"`
+	Optimize   bool          `help:"Optimize generated code"`
+	Dump       bool          `help:"Dump LLVM IR to stderr"`
+	Search     file.PathList `help:"The set of paths to search for includes"`
 }
 
 func parseABI(s string) (*device.ABI, error) {
@@ -136,6 +137,7 @@ func (v *compileVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 		EmitDebug:   true, // TODO: Hook up to build settings
 		EmitExec:    v.Emit.Exec,
 		EmitContext: v.Emit.Context,
+		WidenTypes:  v.WidenTypes,
 	}
 
 	if v.Emit.Encode {

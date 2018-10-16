@@ -69,6 +69,7 @@ apic_compile(
     apis = [":api"],
     emit = ["clone"],
     symbols = "c",
+    widen_types = True,
 )
 
 # Needed because apic_compile, can't (yet) return a cc provider.

@@ -139,6 +139,7 @@ func Compile(ctx context.Context, cfg Config) *Executor {
 		CaptureABI:  cfg.CaptureABI,
 		EmitContext: true,
 		EmitExec:    cfg.Execute,
+		WidenTypes:  true,
 	}
 
 	if cfg.ReplayABI != nil {
