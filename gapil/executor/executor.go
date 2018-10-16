@@ -27,6 +27,7 @@ import (
 
 	"github.com/google/gapid/core/app/status"
 	"github.com/google/gapid/core/os/device"
+	"github.com/google/gapid/core/os/device/host"
 	"github.com/google/gapid/gapil/compiler"
 	"github.com/google/gapid/gapil/compiler/plugins/replay"
 	"github.com/google/gapid/gapil/semantic"
@@ -63,8 +64,14 @@ type Config struct {
 }
 
 func (c Config) key() string {
+	captureABI := c.CaptureABI
+	if captureABI == nil {
+		hostABI := host.Instance(context.Background()).Configuration.ABIs[0]
+		captureABI = hostABI
+	}
+
 	key := fmt.Sprintf("capture: %+v replay: %+v exec: %v opt: %v",
-		c.CaptureABI,
+		captureABI,
 		c.ReplayABI,
 		c.Execute,
 		c.Optimize)
@@ -72,25 +79,42 @@ func (c Config) key() string {
 	return key
 }
 
+func lookup(cfg Config, notFound func(Config) *Executor) *Executor {
+	obj, existing := cache.LoadOrStore(cfg.key(), &apiExec{ready: make(chan struct{})})
+	ae := obj.(*apiExec)
+	if existing {
+		<-ae.ready
+		return ae.exec
+	}
+	ae.exec = notFound(cfg)
+	close(ae.ready)
+	return ae.exec
+}
+
 // NewEnv returns a new environment for an executor with the given config.
 func NewEnv(ctx context.Context, cfg Config) *Env {
 	ctx = status.Start(ctx, "NewEnv")
 	defer status.Finish(ctx)
 
-	obj, existing := cache.LoadOrStore(cfg.key(), &apiExec{ready: make(chan struct{})})
-	ae := obj.(*apiExec)
-	if !existing {
-		ae.exec = Compile(ctx, cfg)
-		close(ae.ready)
-	} else {
-		<-ae.ready
+	var create func(cfg Config) *Executor
+
+	create = func(cfg Config) *Executor {
+		if !cfg.Execute {
+			// No execute is a pure subset of execute.
+			// Use this if we can.
+			cfg.Execute = true
+			return lookup(cfg, create)
+		}
+		return Compile(ctx, cfg)
 	}
-	return ae.exec.NewEnv(ctx)
+
+	e := lookup(cfg, create)
+	return e.NewEnv(ctx)
 }
 
 // Compile returns a new and initialized Executor for the given config.
 func Compile(ctx context.Context, cfg Config) *Executor {
-	ctx = status.Start(ctx, "executor.Compile")
+	ctx = status.Start(ctx, "executor.Compile %v", cfg.key())
 	defer status.Finish(ctx)
 
 	apis := cfg.APIs

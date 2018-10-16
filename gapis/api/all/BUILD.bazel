@@ -22,7 +22,6 @@ apic_compile(
         "//gapis/api/vulkan:api",
         "//gapis/api/gvr:api",
     ],
-    capture = "armeabi-v7a",
     emit = [
         "context",
         "exec",

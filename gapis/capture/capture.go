@@ -207,9 +207,11 @@ func (b *EnvBuilder) Build(ctx context.Context) *executor.Env {
 
 // Env returns a new execution environment builder.
 func (c *Capture) Env() *EnvBuilder {
-	cfg := executor.Config{}
-	cfg.CaptureABI = c.Header.ABI
-	cfg.APIs = c.APIs
+	cfg := executor.Config{
+		Optimize:   true,
+		CaptureABI: c.Header.ABI,
+		APIs:       c.APIs,
+	}
 	allocator := memory.NewBasicAllocator(value.ValidMemoryRanges)
 	allocator.ReserveRanges(c.Observed)
 	return &EnvBuilder{

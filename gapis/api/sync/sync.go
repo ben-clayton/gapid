@@ -89,6 +89,9 @@ func (s *writer) MutateAndWrite(ctx context.Context, id api.CmdID, cmd api.Cmd) 
 // mutations to have the state for all commands before and including the given
 // index.
 func MutationCmdsFor(ctx context.Context, c *path.Capture, data *Data, cmds []api.Cmd, id api.CmdID, subindex api.SubCmdIdx, initialCall bool) ([]api.Cmd, error) {
+	ctx = status.Start(ctx, "MutationCmdsFor %v", id)
+	defer status.Finish(ctx)
+
 	// This is where we want to handle sub-states
 	// This involves transforming the tree for the given Indices, and
 	//   then mutating that.
