@@ -1636,7 +1636,7 @@ import (»
   type State struct {
     c *C.State
     a arena.Arena
-    refs []interface{}
+    refs []interface{} `nocompare:"true" hidden:"true" nobox:"true"`
     customState `hidden:"true" nobox:"true"`
   }
 
