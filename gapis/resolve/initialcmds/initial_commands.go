@@ -66,7 +66,7 @@ func (r *InitialCmdsResolvable) Resolve(ctx context.Context) (interface{}, error
 		// Build an execution environment so we can rebuild the state from a
 		// clean slate.
 		newEnv := c.Env().Execute().Build(ctx)
-		// defer newEnv.Dispose() // TODO: When should we dispose of this env?
+		defer newEnv.AutoDispose()
 		ctx := executor.PutEnv(ctx, newEnv)
 
 		for _, api := range c.APIs {

@@ -59,7 +59,7 @@ func drawCallStats(ctx context.Context, capt *path.Capture, stats *service.Stats
 	}
 
 	env := c.Env().InitState().Execute().Build(ctx)
-	defer env.Dispose() // TODO: How do we deal with state lifetime here?
+	env.AutoDispose()
 	ctx = executor.PutEnv(ctx, env)
 
 	flags := make([]api.CmdFlags, len(cmds))

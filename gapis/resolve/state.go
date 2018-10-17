@@ -56,7 +56,7 @@ func (r *GlobalStateResolvable) Resolve(ctx context.Context) (interface{}, error
 	}
 
 	env := c.Env().InitState().Execute().Build(ctx)
-	// defer env.Dispose() // TODO: How do we deal with state lifetime here?
+	env.AutoDispose()
 	ctx = executor.PutEnv(ctx, env)
 
 	sd, err := SyncData(ctx, r.Path.After.Capture)

@@ -88,7 +88,7 @@ func newDependencyGraphBuilder(ctx context.Context, config DependencyGraphConfig
 	c *capture.Capture, initialCmds []api.Cmd) *dependencyGraphBuilder {
 	graph := newDependencyGraph(ctx, config, c, initialCmds)
 	builder := &dependencyGraphBuilder{
-		graph: graph,
+		graph:                   graph,
 		currentDependencyExists: make([]bool, graph.NumNodes()),
 		currentCmdID:            api.CmdNoID,
 		currentNodeID:           NodeNoID,
@@ -293,6 +293,7 @@ func BuildDependencyGraph(ctx context.Context, config DependencyGraphConfig,
 	} else {
 		env = c.Env().InitState().Execute().Build(ctx)
 	}
+	defer env.Dispose()
 	state := env.State
 	err := builder.graph.ForeachCmd(ctx, func(ctx context.Context, id api.CmdID, cmd api.Cmd) error {
 		return cmd.Mutate(ctx, id, state, nil, builder)

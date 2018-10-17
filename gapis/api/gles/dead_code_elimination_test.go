@@ -241,6 +241,7 @@ func TestDeadCommandRemoval(t *testing.T) {
 		}
 
 		env := c.Env().InitState().Build(ctx)
+		defer env.Dispose()
 		ctx = executor.PutEnv(ctx, env)
 
 		// First verify the commands mutate without errors

@@ -69,12 +69,20 @@ type GlobalState struct {
 
 	// AddTag is called when we want to tag report item.
 	AddTag func(msgID uint32, msg *stringtable.Msg)
+
+	// refs is a list of empty interfaces used to prevent GC of the held
+	// objects.
+	refs []interface{}
 }
 
 // State represents the graphics state for a single API.
 type State interface {
 	// All states belong to an API
 	APIObject
+
+	// HoldReference holds a reference to the object to for the lifetime of this
+	// State. This is used to prevent GC of objects while the State is alive.
+	HoldReference(to interface{})
 
 	// Clone returns a deep copy of the state object.
 	Clone(context.Context) State
@@ -205,6 +213,13 @@ func (s *GlobalState) AllocDataOrPanic(ctx context.Context, v ...interface{}) Al
 		panic(err)
 	}
 	return res
+}
+
+// HoldReference holds a reference to the object to for the lifetime of this
+// GlobalState. This is used to prevent GC of objects while the GlobalState is
+// alive.
+func (s *GlobalState) HoldReference(to interface{}) {
+	s.refs = append(s.refs, to)
 }
 
 // AllocResult represents the result of allocating a range using

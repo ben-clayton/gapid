@@ -56,6 +56,7 @@ func newFindIssues(ctx context.Context, c *capture.Capture, device *device.Insta
 		device:        device,
 		targetVersion: targetVersion,
 	}
+	transform.env.AutoDispose()
 	transform.env.State.OnError = func(err interface{}) {
 		if glenum, ok := err.(GLenum); ok {
 			transform.lastGlError = glenum

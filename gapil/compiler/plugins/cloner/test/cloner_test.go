@@ -274,7 +274,7 @@ func TestCloneArrays(t *testing.T) {
 	tmp := arena.New()
 
 	orig := NewArraysʳ(a1,
-		NewU8ː4ᵃ(tmp, 10, 20, 30, 40),                                                                             // A
+		NewU8ː4ᵃ(tmp, 10, 20, 30, 40), // A
 		NewBasicTypesː4ᵃ(tmp, MakeBasicTypes(tmp), MakeBasicTypes(tmp), MakeBasicTypes(tmp), MakeBasicTypes(tmp)), // B
 	)
 	primeBasicTypes(orig.B().Get(2))
@@ -368,6 +368,7 @@ func newEnv(ctx context.Context) (context.Context, arena.Arena) {
 	}
 
 	env := c.Env().InitState().Build(ctx)
+	env.AutoDispose()
 	ctx = executor.PutEnv(ctx, env)
 
 	return ctx, c.Arena

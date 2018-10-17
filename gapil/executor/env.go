@@ -17,6 +17,8 @@ package executor
 import (
 	"context"
 	"fmt"
+	"runtime"
+	"runtime/debug"
 	"sync"
 	"unsafe"
 
@@ -51,25 +53,55 @@ type Env struct {
 	buffers     []unsafe.Pointer
 	lastCmdID   api.CmdID
 
-	id    envID
-	cCtx  *C.gapil_context // The gapil C context.
-	goCtx context.Context  // The go context.
-	cmds  []api.Cmd        // The currently executing commands.
+	id   envID
+	cCtx *C.gapil_context // The gapil C context.
+
+	boundState struct {
+		goCtx   context.Context // The go context.
+		cmds    []api.Cmd       // The currently executing commands.
+		isBound bool
+	}
+
+	// dispose / finalizer fields
+	disposeOnce        sync.Once
+	autoDispose        bool // Should the env automatically call Dispose on GC?
+	creationStacktrace string
 }
 
 // Dispose releases the memory used by the environment.
 // Call after the env is no longer needed to avoid leaking memory.
 func (e *Env) Dispose() {
-	C.destroy_context(e.Executor.module, e.cCtx)
-	e.bufferArena.Dispose()
-	e.State.Arena.Dispose()
+	e.disposeOnce.Do(func() {
+		C.destroy_context(e.Executor.module, e.cCtx)
+		e.bufferArena.Dispose()
+		e.State.Arena.Dispose()
+	})
+}
+
+// AutoDispose automatically releases the memory used by this env when the env
+// is garbage collected by the go runtime. As the GC can happen long after the
+// last reference is dropped, use explicit calls to Dispose() whenever possible.
+func (e *Env) AutoDispose() {
+	e.autoDispose = true
+}
+
+func envFinalizer(e *Env) {
+	if e.autoDispose {
+		e.Dispose()
+	} else {
+		e.disposeOnce.Do(func() {
+			panic("Env.Dispose() not called before GC, leaking memory.\n" +
+				"Env created here:\n" +
+				e.creationStacktrace)
+		})
+	}
 }
 
 type envID uint32
 
 var (
-	envMutex  sync.RWMutex
 	nextEnvID envID
+	envMutex  sync.RWMutex
 	envs      = map[envID]*Env{}
 )
 
@@ -84,7 +116,7 @@ func envFromID(id envID) *Env {
 	out, ok := envs[id]
 	envMutex.RUnlock()
 	if !ok {
-		panic(fmt.Errorf("Unknown envID %v", id))
+		panic(fmt.Errorf("Unknown envID %v. Did you forget to call Env.Bind()?", id))
 	}
 	return out
 }
@@ -107,10 +139,12 @@ func (e *Executor) NewEnv(ctx context.Context) *Env {
 		nextEnvID++
 
 		env = &Env{
-			Executor: e,
-			id:       envID(id),
-			pools:    map[memory.PoolID]*C.pool{},
+			Executor:           e,
+			id:                 envID(id),
+			pools:              map[memory.PoolID]*C.pool{},
+			creationStacktrace: string(debug.Stack()),
 		}
+		runtime.SetFinalizer(env, envFinalizer)
 		envs[id] = env
 	}()
 
@@ -120,14 +154,19 @@ func (e *Executor) NewEnv(ctx context.Context) *Env {
 		APIs:         map[api.ID]api.State{},
 		Memory:       memory.NewPools(),
 	}
+
+	// Hold a back-reference from the state to the env. This is done so that
+	// functions that return a state object from an env keep the env alive.
+	env.State.HoldReference(env)
+
 	env.bufferArena = arena.New()
 
 	// Create the context and initialize the globals.
 	status.Do(ctx, "Create Context", func(ctx context.Context) {
-		env.goCtx = ctx
-		env.cCtx = C.create_context(e.module, (*C.arena)(env.State.Arena.Pointer))
-		env.cCtx.id = (C.uint32_t)(id)
-		env.goCtx = nil
+		env.Bind(ctx, func() {
+			env.cCtx = C.create_context(e.module, (*C.arena)(env.State.Arena.Pointer))
+			env.cCtx.id = (C.uint32_t)(id)
+		})
 	})
 
 	// Prime the state objects.
@@ -136,12 +175,45 @@ func (e *Executor) NewEnv(ctx context.Context) *Env {
 		for _, api := range api.All() {
 			if m := C.get_api_module(e.module, C.uint32_t(api.Index())); m != nil {
 				addr := uintptr(m.globals_offset) + globalsBase
-				env.State.APIs[api.ID()] = api.State(env.State.Arena, unsafe.Pointer(addr))
+				state := api.State(env.State.Arena, unsafe.Pointer(addr))
+				state.HoldReference(env)
+				env.State.APIs[api.ID()] = state
 			}
 		}
 	}
 
 	return env
+}
+
+// Bind binds the environment to call out to native code.
+// Failure to call Bind() before making a GAPIL runtime call will likely result
+// in a panic.
+func (e *Env) Bind(ctx context.Context, f func()) {
+	if !e.boundState.isBound {
+		envMutex.Lock()
+		envs[e.id] = e
+		envMutex.Unlock()
+	}
+
+	prevState := e.boundState
+	e.boundState.goCtx = ctx
+	e.boundState.isBound = true
+
+	f()
+
+	e.boundState = prevState
+
+	if !e.boundState.isBound {
+		envMutex.Lock()
+		delete(envs, e.id)
+		envMutex.Unlock()
+	}
+}
+
+func (e *Env) assertBound() {
+	if !e.boundState.isBound {
+		panic("Env not bound")
+	}
 }
 
 // Execute executes the all the commands in l.
@@ -182,17 +254,15 @@ func (e *Env) ExecuteN(ctx context.Context, firstID api.CmdID, cmds []api.Cmd) [
 
 	res := make([]C.uint64_t, len(cmds))
 
-	e.cmds = cmds
-	e.goCtx = ctx
-
-	e.call(
-		&data[0],
-		C.uint64_t(len(cmds)),
-		&res[0],
-	)
-
-	e.goCtx = nil
-	e.cmds = nil
+	e.Bind(ctx, func() {
+		e.boundState.cmds = cmds
+		e.call(
+			&data[0],
+			C.uint64_t(len(cmds)),
+			&res[0],
+		)
+		e.boundState.cmds = nil
+	})
 
 	out := make([]error, len(cmds))
 	for i, r := range res {
@@ -213,16 +283,19 @@ func (e *Env) CContext() unsafe.Pointer {
 
 // Context returns the go context of the environment.
 func (e *Env) Context() context.Context {
-	return e.goCtx
+	e.assertBound()
+	return e.boundState.goCtx
 }
 
 // Cmd returns the currently executing command.
 func (e *Env) Cmd() api.Cmd {
-	return e.cmds[e.cCtx.cmd_idx]
+	e.assertBound()
+	return e.boundState.cmds[e.cCtx.cmd_idx]
 }
 
 // CmdID returns the currently executing command identifer.
 func (e *Env) CmdID() api.CmdID {
+	e.assertBound()
 	return api.CmdID(e.cCtx.cmd_id)
 }
 
@@ -337,7 +410,7 @@ func (e *Env) readPoolData(pool *memory.Pool, ptr, size uint64) unsafe.Pointer {
 		e.buffers = e.buffers[:0]
 	}
 
-	ctx := e.goCtx
+	ctx := e.boundState.goCtx
 
 	rng := memory.Range{Base: ptr, Size: size}
 	sli := pool.Slice(rng)
@@ -409,7 +482,7 @@ func (e *Env) copySlice(dst, src *C.gapil_slice) {
 
 func (e *Env) cstringToSlice(ptr C.uint64_t, out *C.gapil_slice) {
 	pool := e.State.Memory.ApplicationPool()
-	size, err := pool.Strlen(e.goCtx, uint64(ptr))
+	size, err := pool.Strlen(e.boundState.goCtx, uint64(ptr))
 	if err != nil {
 		panic(err)
 	}

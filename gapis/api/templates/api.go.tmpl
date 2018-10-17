@@ -256,9 +256,13 @@ import (»
   // Clone makes a deep copy of this static array.
   func (a {{$name}}) Clone(ϟctx context.Context) {{$name}} {
     ϟenv := ϟexec.GetEnv(ϟctx)
-    ϟt := C.gapil_create_clone_tracker(((*C.arena)(ϟenv.State.Arena.Pointer)))
-    defer C.gapil_destroy_clone_tracker(ϟt)
-    return a.clone(ϟenv, ϟt)
+    var out {{$name}}
+    ϟenv.Bind(ϟctx, func() {
+      ϟt := C.gapil_create_clone_tracker(((*C.arena)(ϟenv.State.Arena.Pointer)))
+      defer C.gapil_destroy_clone_tracker(ϟt)
+      out = a.clone(ϟenv, ϟt)
+    })
+    return out
   }
 
   func (a {{$name}}) clone(ϟenv *ϟexec.Env, ϟt unsafe.Pointer) {{$name}} {
@@ -411,9 +415,13 @@ import (»
   // Clone makes a deep copy of this map.
   func (c {{$name}}) Clone(ϟctx context.Context) {{$name}} {
     ϟenv := ϟexec.GetEnv(ϟctx)
-    ϟt := C.gapil_create_clone_tracker(((*C.arena)(ϟenv.State.Arena.Pointer)))
-    defer C.gapil_destroy_clone_tracker(ϟt)
-    return c.clone(ϟenv, ϟt)
+    var out {{$name}}
+    ϟenv.Bind(ϟctx, func() {
+      ϟt := C.gapil_create_clone_tracker(((*C.arena)(ϟenv.State.Arena.Pointer)))
+      defer C.gapil_destroy_clone_tracker(ϟt)
+      out = c.clone(ϟenv, ϟt)
+    })
+    return out
   }
 
   func (c {{$name}}) Cloneʷ(ϟctx context.Context, ϟw ϟapi.StateWatcher) {{$name}} {
@@ -489,9 +497,13 @@ import (»
   // Clone makes a deep copy of this reference.
   func (c {{$name}}) Clone(ϟctx context.Context) {{$name}} {
     ϟenv := ϟexec.GetEnv(ϟctx)
-    ϟt := C.gapil_create_clone_tracker(((*C.arena)(ϟenv.State.Arena.Pointer)))
-    defer C.gapil_destroy_clone_tracker(ϟt)
-    return c.clone(ϟenv, ϟt)
+    var out {{$name}}
+    ϟenv.Bind(ϟctx, func() {
+      ϟt := C.gapil_create_clone_tracker(((*C.arena)(ϟenv.State.Arena.Pointer)))
+      defer C.gapil_destroy_clone_tracker(ϟt)
+      out = c.clone(ϟenv, ϟt)
+    })
+    return out
   }
 
   func (c {{$name}}) clone(ϟenv *ϟexec.Env, ϟt unsafe.Pointer) {{$name}} {
@@ -595,7 +607,10 @@ import (»
     // memory pool containing a copy of str.
     func Make{{$slice_ty}}FromString(ϟctx context.Context, str string) {{$slice_ty}} {
       ϟenv := ϟexec.GetEnv(ϟctx)
-      p := C.gapil_make_pool((*C.gapil_context)(ϟenv.CContext()), C.uint64_t(len(str)))
+      var p *C.gapil_pool
+      ϟenv.Bind(ϟctx, func() {
+        p = C.gapil_make_pool((*C.gapil_context)(ϟenv.CContext()), C.uint64_t(len(str)))
+      })
       pool := ϟenv.State.Memory.MustGet(ϟmem.PoolID(p.id))
       pool.Write(0, ϟmem.Blob([]byte(str)))
       return {{$slice_ty}}{
@@ -641,9 +656,13 @@ import (»
     ϟenv := ϟexec.GetEnv(ϟctx)
     ϟl := ϟenv.State.MemoryLayout; _ = ϟl
     size := C.uint64_t(count * {{Template "Go.SizeOf" $s.To}})
+    var p *C.gapil_pool
+    ϟenv.Bind(ϟctx, func() {
+      p = C.gapil_make_pool((*C.gapil_context)(ϟenv.CContext()), C.uint64_t(size))
+    })
     return {{$slice_ty}}{
       c: &C.gapil_slice{
-        pool:  C.gapil_make_pool((*C.gapil_context)(ϟenv.CContext()), C.uint64_t(size)),
+        pool:  p,
         size:  size,
         count: C.uint64_t(count),
       },
@@ -654,7 +673,10 @@ import (»
   func (s {{$slice_ty}}) Clone(ϟctx context.Context, ϟc ϟapi.Cmd, ϟb *builder.Builder) {{$slice_ty}} {
     ϟenv := ϟexec.GetEnv(ϟctx)
     s.OnRead(ϟctx, ϟc, ϟenv.State, ϟb)
-    p := C.gapil_make_pool((*C.gapil_context)(ϟenv.CContext()), C.uint64_t(s.Size()))
+    var p *C.gapil_pool
+    ϟenv.Bind(ϟctx, func() {
+      p = C.gapil_make_pool((*C.gapil_context)(ϟenv.CContext()), C.uint64_t(s.Size()))
+    })
     dst := ϟenv.State.Memory.MustGet(ϟmem.PoolID(p.id))
     dst.Write(0, ϟenv.State.Memory.MustGet(s.Pool()).Slice(s.Range()))
     return {{$slice_ty}}{
@@ -1386,9 +1408,13 @@ import (»
   // Clone makes a deep copy of this class.
   func (c {{$name}}) Clone(ϟctx context.Context) {{$name}} {
     ϟenv := ϟexec.GetEnv(ϟctx)
-    ϟt := C.gapil_create_clone_tracker(((*C.arena)(ϟenv.State.Arena.Pointer)))
-    defer C.gapil_destroy_clone_tracker(ϟt)
-    return c.clone(ϟenv, ϟt)
+    var out {{$name}}
+    ϟenv.Bind(ϟctx, func() {
+      ϟt := C.gapil_create_clone_tracker(((*C.arena)(ϟenv.State.Arena.Pointer)))
+      defer C.gapil_destroy_clone_tracker(ϟt)
+      out = c.clone(ϟenv, ϟt)
+    })
+    return out
   }
 
   func (c {{$name}}) Cloneʷ(ϟctx context.Context, ϟw ϟapi.StateWatcher) {{$name}} {
@@ -1524,16 +1550,20 @@ import (»
   // clone returns a shallow clone of the command. Extras are shared.
   func (ϟc {{$name}}) clone(ϟctx context.Context) *{{$name}} {
     ϟenv := ϟexec.GetEnv(ϟctx)
-    ϟt := C.gapil_create_clone_tracker(((*C.arena)(ϟenv.State.Arena.Pointer)))
-    defer C.gapil_destroy_clone_tracker(ϟt)
-    ϟcc := (*C.gapil_context)(ϟenv.CContext())
-    return &{{$name}}{
-      c:      C.{{$.Command.Name}}__clone(ϟc.c, ϟcc, ϟt),
-      thread: ϟc.thread,
-      caller: ϟc.caller,
-      extras: ϟc.extras,
-      arena:  ϟenv.State.Arena,
-    }
+    var out *{{$name}}
+    ϟenv.Bind(ϟctx, func() {
+      ϟt := C.gapil_create_clone_tracker(((*C.arena)(ϟenv.State.Arena.Pointer)))
+      defer C.gapil_destroy_clone_tracker(ϟt)
+      ϟcc := (*C.gapil_context)(ϟenv.CContext())
+      out = &{{$name}}{
+        c:      C.{{$.Command.Name}}__clone(ϟc.c, ϟcc, ϟt),
+        thread: ϟc.thread,
+        caller: ϟc.caller,
+        extras: ϟc.extras,
+        arena:  ϟenv.State.Arena,
+      }
+    })
+    return out
   }
 
   // Clone returns a shallow clone of this command. Extras are shared.
@@ -1606,6 +1636,7 @@ import (»
   type State struct {
     c *C.State
     a arena.Arena
+    refs []interface{}
     customState `hidden:"true" nobox:"true"`
   }
 
@@ -1674,16 +1705,25 @@ import (»
   func (g *State) Clone(ϟctx context.Context) ϟapi.State {
     ϟenv := ϟexec.GetEnv(ϟctx)
     ϟa := ϟenv.State.Arena
-    ϟt := C.gapil_create_clone_tracker((*C.arena)(ϟa.Pointer))
-    defer C.gapil_destroy_clone_tracker(ϟt)
-
     out := NewState(ϟa)
-    out.customState = g.customState
-    {{range $g := $.Globals}}
-      {{$name := $g.Name | GoPublicName}}
-      out.Set{{$name}}({{Template "Clone" "Type" $g.Type "Src" (print "g." $name "()")}})
-    {{end}}
+    ϟenv.Bind(ϟctx, func() {
+      ϟt := C.gapil_create_clone_tracker((*C.arena)(ϟa.Pointer))
+      defer C.gapil_destroy_clone_tracker(ϟt)
+
+      out.customState = g.customState
+      {{range $g := $.Globals}}
+        {{$name := $g.Name | GoPublicName}}
+        out.Set{{$name}}({{Template "Clone" "Type" $g.Type "Src" (print "g." $name "()")}})
+      {{end}}
+    })
+
     return out
+  }
+
+	// HoldReference holds a reference to the object to for the lifetime of this
+	// State. This is used to prevent GC of objects while the State is alive.
+  func (g *State) HoldReference(to interface{}) {
+    g.refs = append(g.refs, to)
   }
 {{end}}
 

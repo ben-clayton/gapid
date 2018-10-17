@@ -392,7 +392,7 @@ func fromProto(ctx context.Context, r *Record) (out *Capture, err error) {
 	ctx = arena.Put(ctx, a)
 
 	env := executor.NewEnv(ctx, executor.Config{Optimize: true})
-	// defer env.Dispose() // TODO
+	defer env.AutoDispose()
 	ctx = executor.PutEnv(ctx, env)
 
 	d := newDecoder(a)
