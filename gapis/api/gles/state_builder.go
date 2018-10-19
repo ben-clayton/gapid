@@ -493,14 +493,19 @@ func (sb *stateBuilder) contextObjectPostEGLImage(ctx context.Context, handle EG
 func (sb *stateBuilder) bindContexts(ctx context.Context, s *State) {
 	write, cb := sb.write, sb.cb
 
-	for handle, c := range s.EGLContexts().All() {
+	contexts := s.EGLContexts().All()
+
+	for handle, c := range contexts {
 		if thread := c.Other().BoundOnThread(); thread != 0 {
 			cb := CommandBuilder{Thread: thread, Arena: sb.cb.Arena}
 			write(ctx, api.WithExtras(cb.EglMakeCurrent(memory.Nullptr, memory.Nullptr, memory.Nullptr, handle, EGLBoolean(1)),
 				sb.contextExtras(ctx, c)...))
 		}
 	}
-	write(ctx, cb.EglMakeCurrent(memory.Nullptr, memory.Nullptr, memory.Nullptr, memory.Nullptr, EGLBoolean(1)))
+
+	if len(contexts) > 0 {
+		write(ctx, cb.EglMakeCurrent(memory.Nullptr, memory.Nullptr, memory.Nullptr, memory.Nullptr, EGLBoolean(1)))
+	}
 }
 
 func (sb *stateBuilder) bufferObject(ctx context.Context, b Bufferʳ) {
