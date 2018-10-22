@@ -20,9 +20,16 @@ import (
 	"reflect"
 	"unsafe"
 
+	"github.com/google/gapid/core/data/id"
 	"github.com/google/gapid/core/data/slice"
+	"github.com/google/gapid/core/os/device"
 	"github.com/google/gapid/gapil/compiler/plugins/replay"
+	gapir "github.com/google/gapid/gapir/client"
 	replaysrv "github.com/google/gapid/gapir/replay_service"
+	"github.com/google/gapid/gapis/memory"
+	"github.com/google/gapid/gapis/replay/builder"
+	"github.com/google/gapid/gapis/replay/protocol"
+	"github.com/google/gapid/gapis/replay/value"
 )
 
 // #include "gapil/runtime/cc/replay/replay.h"
@@ -30,6 +37,94 @@ import (
 // typedef gapil_replay_data* (TGetReplayData) (gapil_context*);
 // gapil_replay_data* get_replay_data(TGetReplayData* func, gapil_context* ctx) { return func(ctx); }
 import "C"
+
+// ReplayBuilder returns a replay builder.
+func (e *Env) ReplayBuilder() builder.Builder {
+	return &replayBuilder{e}
+}
+
+type replayBuilder struct {
+	e *Env
+}
+
+func (b *replayBuilder) MemoryLayout() *device.MemoryLayout {
+	panic("MemoryLayout not implemented")
+}
+func (b *replayBuilder) AllocateMemory(size uint64) value.Pointer {
+	panic("AllocateMemory not implemented")
+}
+func (b *replayBuilder) AllocateTemporaryMemory(size uint64) value.Pointer {
+	panic("AllocateTemporaryMemory not implemented")
+}
+func (b *replayBuilder) BeginCommand(cmdID, threadID uint64) {
+	panic("BeginCommand not implemented")
+}
+func (b *replayBuilder) CommitCommand() {
+	panic("CommitCommand not implemented")
+}
+func (b *replayBuilder) RevertCommand(err error) {
+	panic("RevertCommand not implemented")
+}
+func (b *replayBuilder) Buffer(count int) value.Pointer {
+	panic("Buffer not implemented")
+}
+func (b *replayBuilder) String(s string) value.Pointer {
+	panic("String not implemented")
+}
+func (b *replayBuilder) Call(f builder.FunctionInfo) {
+	panic("Call not implemented")
+}
+func (b *replayBuilder) Copy(size uint64) {
+	panic("Copy not implemented")
+}
+func (b *replayBuilder) Clone(index int) {
+	panic("Clone not implemented")
+}
+func (b *replayBuilder) Load(ty protocol.Type, addr value.Pointer) {
+	panic("Load not implemented")
+}
+func (b *replayBuilder) Store(addr value.Pointer) {
+	panic("Store not implemented")
+}
+func (b *replayBuilder) StorePointer(idx value.PointerIndex, ptr value.Pointer) {
+	panic("StorePointer not implemented")
+}
+func (b *replayBuilder) Strcpy(maxCount uint64) {
+	panic("Strcpy not implemented")
+}
+func (b *replayBuilder) Post(addr value.Pointer, size uint64, p builder.Postback) {
+	panic("Post not implemented")
+}
+func (b *replayBuilder) Push(val value.Value) {
+	panic("Push not implemented")
+}
+func (b *replayBuilder) Pop(count uint32) {
+	panic("Pop not implemented")
+}
+func (b *replayBuilder) ReserveMemory(rng memory.Range) {
+	panic("ReserveMemory not implemented")
+}
+func (b *replayBuilder) MapMemory(rng memory.Range) {
+	panic("MapMemory not implemented")
+}
+func (b *replayBuilder) UnmapMemory(rng memory.Range) {
+	panic("UnmapMemory not implemented")
+}
+func (b *replayBuilder) Write(rng memory.Range, resourceID id.ID) {
+	panic("Write not implemented")
+}
+func (b *replayBuilder) Remappings() map[interface{}]value.Pointer {
+	panic("Remappings not implemented")
+}
+func (b *replayBuilder) RegisterNotificationReader(reader builder.NotificationReader) {
+	panic("RegisterNotificationReader not implemented")
+}
+func (b *replayBuilder) Export(ctx context.Context) (gapir.Payload, error) {
+	panic("Export not implemented")
+}
+func (b *replayBuilder) Build(ctx context.Context) (gapir.Payload, builder.PostDataHandler, builder.NotificationHandler, error) {
+	panic("Build not implemented")
+}
 
 // BuildReplay builds the replay payload for execution.
 func (e *Env) BuildReplay(ctx context.Context) (replaysrv.Payload, error) {

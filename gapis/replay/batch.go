@@ -112,6 +112,8 @@ func (m *manager) execute(
 	ctx = status.Start(ctx, "Batch (%d x config: %T%+v)", len(requests), cfg, cfg)
 	defer status.Finish(ctx)
 
+	const useNewBuilder = false
+
 	executeCounter.Increment()
 
 	capturePath := path.NewCapture(captureID)
@@ -124,17 +126,6 @@ func (m *manager) execute(
 	if err != nil {
 		return log.Err(ctx, err, "Failed to resolve initial commands")
 	}
-
-	ctx = capture.Put(ctx, capturePath)
-	env := c.Env().ReserveMemory(ranges).Execute().Build(ctx)
-	defer env.Dispose()
-	ctx = exec.PutEnv(ctx, env)
-	ctx = log.V{
-		"capture": captureID,
-		"device":  d.Instance().GetName(),
-	}.Bind(ctx)
-
-	intent := Intent{path.NewDevice(deviceID), capturePath}
 
 	cml := c.Header.ABI.MemoryLayout
 	ctx = log.V{"capture memory layout": cml}.Bind(ctx)
@@ -151,7 +142,28 @@ func (m *manager) execute(
 	}
 	ctx = log.V{"replay target ABI": replayABI}.Bind(ctx)
 
-	b := builder.New(replayABI.MemoryLayout)
+	ctx = capture.Put(ctx, capturePath)
+	envBuilder := c.Env().ReserveMemory(ranges).Execute()
+	if useNewBuilder {
+		envBuilder.Replay(replayABI)
+	}
+	env := envBuilder.Build(ctx)
+	defer env.Dispose()
+	ctx = exec.PutEnv(ctx, env)
+
+	ctx = log.V{
+		"capture": captureID,
+		"device":  d.Instance().GetName(),
+	}.Bind(ctx)
+
+	intent := Intent{path.NewDevice(deviceID), capturePath}
+
+	var b builder.Builder
+	if useNewBuilder {
+		b = env.ReplayBuilder()
+	} else {
+		b = builder.New(replayABI.MemoryLayout)
+	}
 
 	out := &adapter{env: env, builder: b}
 
