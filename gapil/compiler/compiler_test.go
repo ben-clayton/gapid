@@ -17,6 +17,7 @@ package compiler_test
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/google/gapid/core/assert"
@@ -2018,7 +2019,9 @@ cmd void Read(StructInStruct* input) {
 			if optimize {
 				name += " opt"
 			}
+			test, optimize := test, optimize
 			t.Run(test.name, func(t *testing.T) {
+				t.Parallel()
 				test.run(log.SubTest(ctx, t), optimize)
 			})
 		}
@@ -2052,6 +2055,24 @@ type test struct {
 	cmds     []cmd
 	expected expected
 	settings compiler.Settings
+}
+
+var externCalls = map[*executor.Env][]interface{}{}
+var externMutex = sync.RWMutex{}
+
+func init() {
+	testutils.ExternA = func(env *executor.Env, i uint64, f float32, b bool) uint64 {
+		externMutex.Lock()
+		defer externMutex.Unlock()
+		externCalls[env] = append(externCalls[env], externA{i, f, b})
+		return i + uint64(f)
+	}
+	testutils.ExternB = func(env *executor.Env, s string) bool {
+		externMutex.Lock()
+		defer externMutex.Unlock()
+		externCalls[env] = append(externCalls[env], externB{s})
+		return s == "meow"
+	}
 }
 
 func (t test) run(ctx context.Context, optimize bool) (succeeded bool) {
@@ -2098,8 +2119,6 @@ func (t test) run(ctx context.Context, optimize bool) (succeeded bool) {
 		}
 	}()
 
-	externCalls := []interface{}{}
-
 	for i, cmd := range t.cmds {
 		fmt.Printf("    > %s\n", cmd.N)
 
@@ -2115,14 +2134,6 @@ func (t test) run(ctx context.Context, optimize bool) (succeeded bool) {
 			continue
 		}
 
-		testutils.ExternA = func(env *executor.Env, i uint64, f float32, b bool) uint64 {
-			externCalls = append(externCalls, externA{i, f, b})
-			return i + uint64(f)
-		}
-		testutils.ExternB = func(env *executor.Env, s string) bool {
-			externCalls = append(externCalls, externB{s})
-			return s == "meow"
-		}
 		err = env.Execute(ctx, api.CmdID(0x1000+i), &cmd)
 		if !assert.For(ctx, "Execute(%v, %v)", i, cmd.N).ThatError(err).DeepEquals(t.expected.err) {
 			return false
@@ -2136,7 +2147,10 @@ func (t test) run(ctx context.Context, optimize bool) (succeeded bool) {
 	}
 
 	if t.expected.externCalls != nil {
-		if !assert.For(ctx, "ExternCalls").ThatSlice(externCalls).Equals(t.expected.externCalls) {
+		externMutex.RLock()
+		calls := externCalls[env]
+		externMutex.RUnlock()
+		if !assert.For(ctx, "ExternCalls").ThatSlice(calls).Equals(t.expected.externCalls) {
 			return false
 		}
 	}
