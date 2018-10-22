@@ -33,7 +33,7 @@ type externs struct {
 	cmd   api.Cmd
 	cmdID api.CmdID
 	s     *api.GlobalState
-	b     *rb.Builder
+	b     rb.Builder
 	w     api.StateWatcher
 }
 
@@ -67,7 +67,7 @@ func (e externs) mapMemory(value Voidᵖᵖ, slice memory.Slice) {
 }
 
 // CallReflectedCommand unpacks the given subcommand and arguments, and calls the method
-func CallReflectedCommand(ctx context.Context, cmd api.Cmd, id api.CmdID, s *api.GlobalState, b *rb.Builder, w api.StateWatcher, sub, data interface{}) {
+func CallReflectedCommand(ctx context.Context, cmd api.Cmd, id api.CmdID, s *api.GlobalState, b rb.Builder, w api.StateWatcher, sub, data interface{}) {
 	reflect.ValueOf(sub).Call([]reflect.Value{
 		reflect.ValueOf(ctx),
 		reflect.ValueOf(cmd),
@@ -76,7 +76,7 @@ func CallReflectedCommand(ctx context.Context, cmd api.Cmd, id api.CmdID, s *api
 		reflect.ValueOf(s),
 		reflect.ValueOf(GetState(s)),
 		reflect.ValueOf(cmd.Thread()),
-		reflect.ValueOf(b),
+		reflect.ValueOf(&b).Elem(),
 		reflect.ValueOf(&w).Elem(),
 		reflect.ValueOf(data),
 	})

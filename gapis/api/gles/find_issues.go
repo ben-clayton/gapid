@@ -131,7 +131,7 @@ func (t *findIssues) Transform(ctx context.Context, id api.CmdID, cmd api.Cmd, o
 	}
 
 	// Check the result of glGetError after every command.
-	out.MutateAndWrite(ctx, dID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b *builder.Builder) error {
+	out.MutateAndWrite(ctx, dID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b builder.Builder) error {
 		ptr := b.AllocateTemporaryMemory(4)
 		b.Call(funcInfoGlGetError)
 		b.Store(ptr)
@@ -192,7 +192,7 @@ func (t *findIssues) Transform(ctx context.Context, id api.CmdID, cmd api.Cmd, o
 
 		infoLog := make([]byte, buflen)
 		out.MutateAndWrite(ctx, dID, cb.GlGetShaderInfoLog(cmd.Shader(), buflen, memory.Nullptr, tmp.Ptr()))
-		out.MutateAndWrite(ctx, dID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b *builder.Builder) error {
+		out.MutateAndWrite(ctx, dID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b builder.Builder) error {
 			b.ReserveMemory(tmp.Range())
 			b.Post(value.ObservedPointer(tmp.Address()), buflen, func(r binary.Reader, err error) {
 				if err != nil {
@@ -209,7 +209,7 @@ func (t *findIssues) Transform(ctx context.Context, id api.CmdID, cmd api.Cmd, o
 
 		source := make([]byte, buflen)
 		out.MutateAndWrite(ctx, dID, cb.GlGetShaderSource(cmd.Shader(), buflen, memory.Nullptr, tmp.Ptr()))
-		out.MutateAndWrite(ctx, dID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b *builder.Builder) error {
+		out.MutateAndWrite(ctx, dID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b builder.Builder) error {
 			b.ReserveMemory(tmp.Range())
 			b.Post(value.ObservedPointer(tmp.Address()), buflen, func(r binary.Reader, err error) {
 				if err != nil {
@@ -225,7 +225,7 @@ func (t *findIssues) Transform(ctx context.Context, id api.CmdID, cmd api.Cmd, o
 		}))
 
 		out.MutateAndWrite(ctx, dID, cb.GlGetShaderiv(cmd.Shader(), GLenum_GL_COMPILE_STATUS, tmp.Ptr()))
-		out.MutateAndWrite(ctx, dID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b *builder.Builder) error {
+		out.MutateAndWrite(ctx, dID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b builder.Builder) error {
 			b.ReserveMemory(tmp.Range())
 			b.Post(value.ObservedPointer(tmp.Address()), 4, func(r binary.Reader, err error) {
 				if err != nil {
@@ -253,7 +253,7 @@ func (t *findIssues) Transform(ctx context.Context, id api.CmdID, cmd api.Cmd, o
 		tmp := t.env.State.AllocOrPanic(ctx, 4+buflen)
 		out.MutateAndWrite(ctx, dID, cb.GlGetProgramiv(cmd.Program(), GLenum_GL_LINK_STATUS, tmp.Ptr()))
 		out.MutateAndWrite(ctx, dID, cb.GlGetProgramInfoLog(cmd.Program(), buflen, memory.Nullptr, tmp.Offset(4)))
-		out.MutateAndWrite(ctx, dID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b *builder.Builder) error {
+		out.MutateAndWrite(ctx, dID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b builder.Builder) error {
 			b.ReserveMemory(tmp.Range())
 			b.Post(value.ObservedPointer(tmp.Address()), 4+buflen, func(r binary.Reader, err error) {
 				if err != nil {
@@ -298,7 +298,7 @@ func (t *findIssues) Transform(ctx context.Context, id api.CmdID, cmd api.Cmd, o
 
 func (t *findIssues) Flush(ctx context.Context, out transform.Writer) {
 	cb := CommandBuilder{Thread: 0, Arena: t.env.State.Arena}
-	out.MutateAndWrite(ctx, api.CmdNoID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b *builder.Builder) error {
+	out.MutateAndWrite(ctx, api.CmdNoID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b builder.Builder) error {
 		// Since the PostBack function is called before the replay target has actually arrived at the post command,
 		// we need to actually write some data here. r.Uint32() is what actually waits for the replay target to have
 		// posted the data in question. If we did not do this, we would shut-down the replay as soon as the second-to-last

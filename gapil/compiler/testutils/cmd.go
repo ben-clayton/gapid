@@ -84,7 +84,7 @@ func (c *Cmd) Extras() *api.CmdExtras {
 }
 
 // Mutate stubs the api.Cmd interface.
-func (c *Cmd) Mutate(context.Context, api.CmdID, *api.GlobalState, *builder.Builder, api.StateWatcher) error {
+func (c *Cmd) Mutate(context.Context, api.CmdID, *api.GlobalState, builder.Builder, api.StateWatcher) error {
 	return nil
 }
 

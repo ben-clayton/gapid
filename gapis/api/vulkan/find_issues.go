@@ -276,7 +276,7 @@ func (t *findIssues) Flush(ctx context.Context, out transform.Writer) {
 		// It is safe to delete keys in loop in Go
 		delete(t.reportCallbacks, inst)
 	}
-	out.MutateAndWrite(ctx, api.CmdNoID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b *builder.Builder) error {
+	out.MutateAndWrite(ctx, api.CmdNoID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b builder.Builder) error {
 		b.RegisterNotificationReader(func(n gapir.Notification) {
 			vkApi := API{}
 			if uint8(n.GetApiIndex()) != vkApi.Index() {

@@ -63,6 +63,6 @@ func (State) Root(ctx context.Context, p *path.State, r *path.ResolveConfig) (pa
 func (State) SetupInitialState(ctx context.Context) {}
 
 // Mutate is a no-op function.
-func (*Foo) Mutate(context.Context, api.CmdID, *api.GlobalState, *builder.Builder, api.StateWatcher) error {
+func (*Foo) Mutate(context.Context, api.CmdID, *api.GlobalState, builder.Builder, api.StateWatcher) error {
 	return nil
 }

@@ -38,7 +38,7 @@ func (TestCmd) CmdName() string                                                 
 func (TestCmd) CmdIndex() int                                                      { return -1 }
 func (TestCmd) CmdFlags(context.Context, api.CmdID, *api.GlobalState) api.CmdFlags { return 0 }
 func (TestCmd) Extras() *api.CmdExtras                                             { return &api.CmdExtras{} }
-func (TestCmd) Mutate(context.Context, api.CmdID, *api.GlobalState, *builder.Builder, api.StateWatcher) error {
+func (TestCmd) Mutate(context.Context, api.CmdID, *api.GlobalState, builder.Builder, api.StateWatcher) error {
 	return nil
 }
 func (TestCmd) Clone(context.Context) api.Cmd { return TestCmd{} }

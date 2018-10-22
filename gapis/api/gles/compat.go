@@ -1222,7 +1222,7 @@ func compat(ctx context.Context, device *device.Instance, onError onCompatError)
 				cmd.Mutate(ctx, id, s, nil /* builder */, nil /* watcher */)
 				// Translate it to the non-multiview version, but do not modify state,
 				// otherwise we would lose the knowledge about view count.
-				out.MutateAndWrite(ctx, dID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b *builder.Builder) error {
+				out.MutateAndWrite(ctx, dID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b builder.Builder) error {
 					cb.GlFramebufferTextureLayer(cmd.Target(), cmd.Attachment(), cmd.Texture(), cmd.Level(), cmd.BaseViewIndex()).Call(ctx, s, b)
 					return nil
 				}))
@@ -1235,7 +1235,7 @@ func compat(ctx context.Context, device *device.Instance, onError onCompatError)
 				cmd.Mutate(ctx, id, s, nil /* builder */, nil /* watcher */)
 				// Translate it to the non-multiview version, but do not modify state,
 				// otherwise we would lose the knowledge about view count.
-				out.MutateAndWrite(ctx, dID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b *builder.Builder) error {
+				out.MutateAndWrite(ctx, dID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b builder.Builder) error {
 					cb.GlFramebufferTextureLayer(cmd.Target(), cmd.Attachment(), cmd.Texture(), cmd.Level(), cmd.BaseViewIndex()).Call(ctx, s, b)
 					return nil
 				}))
@@ -1312,7 +1312,7 @@ func compatMultiviewDraw(ctx context.Context, id api.CmdID, cmd api.Cmd, out tra
 		for viewID := GLuint(0); viewID < GLuint(numViews); viewID++ {
 			// Set the magic uniform which shaders use to fetch view-dependent attributes.
 			// It is missing from the observed extras, so normal mutation would fail.
-			out.MutateAndWrite(ctx, dID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b *builder.Builder) error {
+			out.MutateAndWrite(ctx, dID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b builder.Builder) error {
 				if !c.Bound().Program().IsNil() {
 					viewIDLocation := UniformLocation(0x7FFF0000)
 					tmp := s.AllocDataOrPanic(ctx, "gapid_gl_ViewID_OVR")
@@ -1328,7 +1328,7 @@ func compatMultiviewDraw(ctx context.Context, id api.CmdID, cmd api.Cmd, out tra
 			// For each attachment, bind the layer corresponding to this ViewID.
 			// Do not modify the state so that we do not revert to single-view for next draw call.
 			c.Bound().DrawFramebuffer().ForEachAttachment(func(name GLenum, a FramebufferAttachment) {
-				out.MutateAndWrite(ctx, dID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b *builder.Builder) error {
+				out.MutateAndWrite(ctx, dID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b builder.Builder) error {
 					if !a.Texture().IsNil() {
 						cb.GlFramebufferTextureLayer(GLenum_GL_DRAW_FRAMEBUFFER, name, a.Texture().ID(), a.TextureLevel(), a.TextureLayer()+GLint(viewID)).Call(ctx, s, b)
 					}

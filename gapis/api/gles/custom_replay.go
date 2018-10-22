@@ -134,7 +134,7 @@ func (i EGLImageKHR) remap(cmd api.Cmd, s *api.GlobalState) (key interface{}, re
 	return
 }
 
-func (i GLsync) value(b *builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
+func (i GLsync) value(b builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
 	return value.AbsolutePointer(i)
 }
 
@@ -212,7 +212,7 @@ func remapImageID(cmd api.Cmd, s *api.GlobalState, name GLuint, target GLenum) (
 	return
 }
 
-func (i IndicesPointer) value(b *builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
+func (i IndicesPointer) value(b builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
 	c := GetContext(s, cmd.Thread())
 	if !c.Bound().VertexArray().ElementArrayBuffer().IsNil() {
 		return value.AbsolutePointer(i)
@@ -220,7 +220,7 @@ func (i IndicesPointer) value(b *builder.Builder, cmd api.Cmd, s *api.GlobalStat
 	return value.ObservedPointer(i)
 }
 
-func (i VertexPointer) value(b *builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
+func (i VertexPointer) value(b builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
 	c := GetContext(s, cmd.Thread())
 	if !c.Bound().ArrayBuffer().IsNil() {
 		return value.AbsolutePointer(i)
@@ -228,25 +228,25 @@ func (i VertexPointer) value(b *builder.Builder, cmd api.Cmd, s *api.GlobalState
 	return value.ObservedPointer(i)
 }
 
-func (i TexturePointer) value(b *builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
+func (i TexturePointer) value(b builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
 	if i == 0 || !GetContext(s, cmd.Thread()).Bound().PixelUnpackBuffer().IsNil() {
 		return value.AbsolutePointer(i)
 	}
 	return value.ObservedPointer(i)
 }
 
-func (i BufferDataPointer) value(b *builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
+func (i BufferDataPointer) value(b builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
 	if i == 0 {
 		return value.AbsolutePointer(i)
 	}
 	return value.ObservedPointer(i)
 }
 
-func (i EGLImageKHR) value(b *builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
+func (i EGLImageKHR) value(b builder.Builder, cmd api.Cmd, s *api.GlobalState) value.Value {
 	return value.AbsolutePointer(i)
 }
 
-func (ω *EglCreateContext) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
+func (ω *EglCreateContext) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b builder.Builder, w api.StateWatcher) error {
 	err := ω.mutate(ctx, id, s, nil, w)
 	if b == nil || err != nil {
 		return err
@@ -256,7 +256,7 @@ func (ω *EglCreateContext) Mutate(ctx context.Context, id api.CmdID, s *api.Glo
 	return cb.ReplayCreateRenderer(ctxID).Mutate(ctx, id, s, b, nil)
 }
 
-func (ω *EglMakeCurrent) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
+func (ω *EglMakeCurrent) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b builder.Builder, w api.StateWatcher) error {
 	prevContext := GetState(s).Contexts().Get(ω.Thread())
 	existed := GetState(s).EGLContexts().Contains(ω.Context())
 	err := ω.mutate(ctx, id, s, nil, w)
@@ -297,7 +297,7 @@ func (ω *EglMakeCurrent) Mutate(ctx context.Context, id api.CmdID, s *api.Globa
 	return nil
 }
 
-func (ω *EglCreateImageKHR) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
+func (ω *EglCreateImageKHR) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b builder.Builder, w api.StateWatcher) error {
 	err := ω.mutate(ctx, id, s, nil, w)
 	if b == nil || err != nil {
 		return err
@@ -312,7 +312,7 @@ func (ω *EglCreateImageKHR) Mutate(ctx context.Context, id api.CmdID, s *api.Gl
 	return cb.ReplayCreateExternalImage(ctxID, TextureId(ω.Buffer().Address()), ω.Result()).Mutate(ctx, id, s, b, nil)
 }
 
-func (ω *WglCreateContext) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
+func (ω *WglCreateContext) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b builder.Builder, w api.StateWatcher) error {
 	err := ω.mutate(ctx, id, s, nil, w)
 	if b == nil || err != nil {
 		return err
@@ -322,7 +322,7 @@ func (ω *WglCreateContext) Mutate(ctx context.Context, id api.CmdID, s *api.Glo
 	return cb.ReplayCreateRenderer(ctxID).Mutate(ctx, id, s, b, nil)
 }
 
-func (ω *WglCreateContextAttribsARB) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
+func (ω *WglCreateContextAttribsARB) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b builder.Builder, w api.StateWatcher) error {
 	err := ω.mutate(ctx, id, s, nil, w)
 	if b == nil || err != nil {
 		return err
@@ -332,7 +332,7 @@ func (ω *WglCreateContextAttribsARB) Mutate(ctx context.Context, id api.CmdID, 
 	return cb.ReplayCreateRenderer(ctxID).Mutate(ctx, id, s, b, nil)
 }
 
-func (ω *WglMakeCurrent) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
+func (ω *WglMakeCurrent) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b builder.Builder, w api.StateWatcher) error {
 	err := ω.mutate(ctx, id, s, nil, w)
 	if b == nil || err != nil {
 		return err
@@ -345,7 +345,7 @@ func (ω *WglMakeCurrent) Mutate(ctx context.Context, id api.CmdID, s *api.Globa
 	return cb.ReplayBindRenderer(ctxID, false).Mutate(ctx, id, s, b, nil)
 }
 
-func (ω *CGLCreateContext) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
+func (ω *CGLCreateContext) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b builder.Builder, w api.StateWatcher) error {
 	err := ω.mutate(ctx, id, s, nil, w)
 	if b == nil || err != nil {
 		return err
@@ -355,7 +355,7 @@ func (ω *CGLCreateContext) Mutate(ctx context.Context, id api.CmdID, s *api.Glo
 	return cb.ReplayCreateRenderer(ctxID).Mutate(ctx, id, s, b, nil)
 }
 
-func (ω *CGLSetCurrentContext) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
+func (ω *CGLSetCurrentContext) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b builder.Builder, w api.StateWatcher) error {
 	err := ω.mutate(ctx, id, s, nil, w)
 	if b == nil || err != nil {
 		return err
@@ -368,7 +368,7 @@ func (ω *CGLSetCurrentContext) Mutate(ctx context.Context, id api.CmdID, s *api
 	return cb.ReplayBindRenderer(ctxID, false).Mutate(ctx, id, s, b, nil)
 }
 
-func (ω *GlXCreateContext) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
+func (ω *GlXCreateContext) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b builder.Builder, w api.StateWatcher) error {
 	err := ω.mutate(ctx, id, s, nil, w)
 	if b == nil || err != nil {
 		return err
@@ -378,7 +378,7 @@ func (ω *GlXCreateContext) Mutate(ctx context.Context, id api.CmdID, s *api.Glo
 	return cb.ReplayCreateRenderer(ctxID).Mutate(ctx, id, s, b, nil)
 }
 
-func (ω *GlXCreateNewContext) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
+func (ω *GlXCreateNewContext) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b builder.Builder, w api.StateWatcher) error {
 	err := ω.mutate(ctx, id, s, nil, w)
 	if b == nil || err != nil {
 		return err
@@ -388,7 +388,7 @@ func (ω *GlXCreateNewContext) Mutate(ctx context.Context, id api.CmdID, s *api.
 	return cb.ReplayCreateRenderer(ctxID).Mutate(ctx, id, s, b, nil)
 }
 
-func (ω *GlXMakeContextCurrent) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
+func (ω *GlXMakeContextCurrent) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b builder.Builder, w api.StateWatcher) error {
 	err := ω.mutate(ctx, id, s, nil, w)
 	if b == nil || err != nil {
 		return err
@@ -402,7 +402,7 @@ func (ω *GlXMakeContextCurrent) Mutate(ctx context.Context, id api.CmdID, s *ap
 }
 
 // Force all attributes to use the capture-observed locations during replay.
-func bindAttribLocations(ctx context.Context, cmd api.Cmd, id api.CmdID, s *api.GlobalState, b *builder.Builder, pid ProgramId) error {
+func bindAttribLocations(ctx context.Context, cmd api.Cmd, id api.CmdID, s *api.GlobalState, b builder.Builder, pid ProgramId) error {
 	pi := FindLinkProgramExtra(s.Arena, cmd.Extras())
 	if !pi.IsNil() && b != nil && !pi.ActiveResources().IsNil() {
 		cb := CommandBuilder{Thread: cmd.Thread(), Arena: s.Arena}
@@ -427,7 +427,7 @@ func bindAttribLocations(ctx context.Context, cmd api.Cmd, id api.CmdID, s *api.
 }
 
 // Remap uniform block indices
-func bindUniformBlocks(ctx context.Context, cmd api.Cmd, id api.CmdID, s *api.GlobalState, b *builder.Builder, pid ProgramId) error {
+func bindUniformBlocks(ctx context.Context, cmd api.Cmd, id api.CmdID, s *api.GlobalState, b builder.Builder, pid ProgramId) error {
 	pi := FindLinkProgramExtra(s.Arena, cmd.Extras())
 	if !pi.IsNil() && b != nil && !pi.ActiveResources().IsNil() {
 		cb := CommandBuilder{Thread: cmd.Thread(), Arena: s.Arena}
@@ -445,7 +445,7 @@ func bindUniformBlocks(ctx context.Context, cmd api.Cmd, id api.CmdID, s *api.Gl
 	return nil
 }
 
-func (cmd *GlProgramBinaryOES) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
+func (cmd *GlProgramBinaryOES) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b builder.Builder, w api.StateWatcher) error {
 	if err := bindAttribLocations(ctx, cmd, id, s, b, cmd.Program()); err != nil {
 		return err
 	}
@@ -455,7 +455,7 @@ func (cmd *GlProgramBinaryOES) Mutate(ctx context.Context, id api.CmdID, s *api.
 	return bindUniformBlocks(ctx, cmd, id, s, b, cmd.Program())
 }
 
-func (cmd *GlLinkProgram) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
+func (cmd *GlLinkProgram) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b builder.Builder, w api.StateWatcher) error {
 	if err := bindAttribLocations(ctx, cmd, id, s, b, cmd.Program()); err != nil {
 		return err
 	}
@@ -465,7 +465,7 @@ func (cmd *GlLinkProgram) Mutate(ctx context.Context, id api.CmdID, s *api.Globa
 	return bindUniformBlocks(ctx, cmd, id, s, b, cmd.Program())
 }
 
-func (cmd *GlProgramBinary) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
+func (cmd *GlProgramBinary) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b builder.Builder, w api.StateWatcher) error {
 	if err := bindAttribLocations(ctx, cmd, id, s, b, cmd.Program()); err != nil {
 		return err
 	}

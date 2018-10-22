@@ -245,7 +245,7 @@ import (»
   }
 
   {{if IsNumericType $ty.ValueType}}
-    func (a {{$name}}) value(ϟb *builder.Builder, ϟc ϟapi.Cmd, ϟs *ϟapi.GlobalState) value.Pointer {
+    func (a {{$name}}) value(ϟb builder.Builder, ϟc ϟapi.Cmd, ϟs *ϟapi.GlobalState) value.Pointer {
       for i := 0; i < {{$ty.Size}}; i++ {
         ϟb.Push({{Template "Go.Replay.Value" "Type" $ty.ValueType "Name" "a.Get(i)"}})
       }
@@ -670,7 +670,7 @@ import (»
   }
 
   // Clone returns a copy of the {{$slice_ty}} in a new memory pool.
-  func (s {{$slice_ty}}) Clone(ϟctx context.Context, ϟc ϟapi.Cmd, ϟb *builder.Builder) {{$slice_ty}} {
+  func (s {{$slice_ty}}) Clone(ϟctx context.Context, ϟc ϟapi.Cmd, ϟb builder.Builder) {{$slice_ty}} {
     ϟenv := ϟexec.GetEnv(ϟctx)
     s.OnRead(ϟctx, ϟc, ϟenv.State, ϟb)
     var p *C.gapil_pool
@@ -782,7 +782,7 @@ import (»
     }
 
     // Read reads and returns all the {{$el_ty}} elements in this {{$slice_ty}}.
-    func (s {{$slice_ty}}) Read(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder) ([]{{$el_ty}}, error) {
+    func (s {{$slice_ty}}) Read(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder) ([]{{$el_ty}}, error) {
       ϟa := ϟg.Arena; _ = ϟa
       s.OnRead(ϟctx, ϟc, ϟg, ϟb)
       out := make([]{{$el_ty}}, s.Count())
@@ -800,24 +800,24 @@ import (»
       return out, nil
     }
 
-    func (s {{$slice_ty}}) Readʷ(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder, ϟw ϟapi.StateWatcher) ([]{{$el_ty}}, error) {
+    func (s {{$slice_ty}}) Readʷ(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder, ϟw ϟapi.StateWatcher) ([]{{$el_ty}}, error) {
       return s.Read(ϟctx, ϟc, ϟg, ϟb) // DCE STUB
     }
 
     // MustRead calls and returns Read, panicing if there was an error.
-    func (s {{$slice_ty}}) MustRead(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder) []{{$el_ty}} {
+    func (s {{$slice_ty}}) MustRead(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder) []{{$el_ty}} {
       vals, err := s.Read(ϟctx, ϟc, ϟg, ϟb)
       panicOnError(err)
       return vals
     }
 
-    func (s {{$slice_ty}}) MustReadʷ(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder, ϟw ϟapi.StateWatcher) []{{$el_ty}} {
+    func (s {{$slice_ty}}) MustReadʷ(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder, ϟw ϟapi.StateWatcher) []{{$el_ty}} {
       return s.MustRead(ϟctx, ϟc, ϟg, ϟb) // DCE STUB
     }
 
     // Write copies elements from src to this slice. The number of elements copied is returned
     // which is the minimum of s.count and len(src).
-    func (s {{$slice_ty}}) Write(ϟctx context.Context, src []{{$el_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder) (uint64, error) {
+    func (s {{$slice_ty}}) Write(ϟctx context.Context, src []{{$el_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder) (uint64, error) {
       ϟa := ϟg.Arena; _ = ϟa
       count := u64.Min(s.Count(), uint64(len(src)))
       e := s.Slice(0, count).Encoder(ϟg)
@@ -829,25 +829,25 @@ import (»
       return count, nil
     }
 
-    func (s {{$slice_ty}}) Writeʷ(ϟctx context.Context, src []{{$el_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder, ϟw ϟapi.StateWatcher) (uint64, error) {
+    func (s {{$slice_ty}}) Writeʷ(ϟctx context.Context, src []{{$el_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder, ϟw ϟapi.StateWatcher) (uint64, error) {
       return s.Write(ϟctx, src, ϟc, ϟg, ϟb) // DCE STUB
     }
 
     // MustWrite calls and returns Write, panicing if there was an error.
-    func (s {{$slice_ty}}) MustWrite(ϟctx context.Context, src []{{$el_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder) uint64 {
+    func (s {{$slice_ty}}) MustWrite(ϟctx context.Context, src []{{$el_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder) uint64 {
       count, err := s.Write(ϟctx, src, ϟc, ϟg, ϟb)
       panicOnError(err)
       return count
     }
 
-    func (s {{$slice_ty}}) MustWriteʷ(ϟctx context.Context, src []{{$el_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder, ϟw ϟapi.StateWatcher) uint64 {
+    func (s {{$slice_ty}}) MustWriteʷ(ϟctx context.Context, src []{{$el_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder, ϟw ϟapi.StateWatcher) uint64 {
       return s.MustWrite(ϟctx, src, ϟc, ϟg, ϟb) // DCE STUB
     }
 
     // Copy copies elements from src to this slice.
     // The number of elements copied is the minimum of dst.Count and src.Count.
     // The slices of this and dst to the copied elements is returned.
-    func (dst {{$slice_ty}}) Copy(ϟctx context.Context, src {{$slice_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder, ϟw ϟapi.StateWatcher) (d, s {{$slice_ty}}) {
+    func (dst {{$slice_ty}}) Copy(ϟctx context.Context, src {{$slice_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder, ϟw ϟapi.StateWatcher) (d, s {{$slice_ty}}) {
       count := u64.Min(dst.Count(), src.Count())
       dst, src = dst.Slice(0, count), src.Slice(0, count)
     {{if $el_is_ptr}}
@@ -862,12 +862,12 @@ import (»
       return dst, src
     }
 
-    func (dst {{$slice_ty}}) Copyʷ(ϟctx context.Context, src {{$slice_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder, ϟw ϟapi.StateWatcher) (d, s {{$slice_ty}}) {
+    func (dst {{$slice_ty}}) Copyʷ(ϟctx context.Context, src {{$slice_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder, ϟw ϟapi.StateWatcher) (d, s {{$slice_ty}}) {
       return dst.Copy(ϟctx, src, ϟc, ϟg, ϟb, ϟw) // DCE STUB
     }
 
     // Contains returns true if the slice contains the specified value.
-    func (s {{$slice_ty}}) Contains(ϟctx context.Context, val {{$el_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder) bool {
+    func (s {{$slice_ty}}) Contains(ϟctx context.Context, val {{$el_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder) bool {
       for _, e := range s.MustRead(ϟctx, ϟc, ϟg, ϟb) {
         if {{Template "Go.Equal" "Type" $s.To "LHS" "e" "RHS" "val"}} {
           return true
@@ -876,14 +876,14 @@ import (»
       return false
     }
 
-    func (s {{$slice_ty}}) Containsʷ(ϟctx context.Context, val {{$el_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder, ϟw ϟapi.StateWatcher) bool {
+    func (s {{$slice_ty}}) Containsʷ(ϟctx context.Context, val {{$el_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder, ϟw ϟapi.StateWatcher) bool {
       return s.Contains(ϟctx, val, ϟc, ϟg, ϟb) // DCE STUB
     }
 
   {{end}}
 
   // OnRead calls the backing pool's OnRead callback. s is returned so calls can be chained.
-  func (s {{$slice_ty}}) OnRead(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder) {{$slice_ty}} {
+  func (s {{$slice_ty}}) OnRead(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder) {{$slice_ty}} {
     ϟl, ϟa := ϟg.MemoryLayout, ϟg.Arena; _, _ = ϟl, ϟa
     if pool, err := ϟg.Memory.Get(s.Pool()); err == nil {
       if f := pool.OnRead; f != nil {
@@ -931,12 +931,12 @@ import (»
     return s
   }
 
-  func (s {{$slice_ty}}) OnReadʷ(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder, ϟw ϟapi.StateWatcher) {{$slice_ty}} {
+  func (s {{$slice_ty}}) OnReadʷ(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder, ϟw ϟapi.StateWatcher) {{$slice_ty}} {
       return s.OnRead(ϟctx, ϟc, ϟg, ϟb) // DCE STUB
   }
 
   // OnWrite calls the backing pool's OnWrite callback. s is returned so calls can be chained.
-  func (s {{$slice_ty}}) OnWrite(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder) {{$slice_ty}} {
+  func (s {{$slice_ty}}) OnWrite(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder) {{$slice_ty}} {
     ϟl, ϟa := ϟg.MemoryLayout, ϟg.Arena; _, _ = ϟl, ϟa
     if pool, err := ϟg.Memory.Get(s.Pool()); err == nil {
       if f := pool.OnWrite; f != nil {
@@ -952,10 +952,10 @@ import (»
         for i, c := uint64(0), s.Count(); i < c; i++ {
           v := {{Template "Go.Decode" $s.To}}
           if key, remap := v.remap(ϟc, ϟg); remap {
-            dst, found := ϟb.Remappings[key]
+            dst, found := ϟb.Remappings()[key]
             if !found {
               dst = ϟb.AllocateMemory(size)
-              ϟb.Remappings[key] = dst
+              ϟb.Remappings()[key] = dst
             }
             ϟb.Load({{Template "Go.Replay.Type" $s.To}}, ptr)
             ϟb.Store(dst)
@@ -968,11 +968,11 @@ import (»
     return s
   }
 
-  func (s {{$slice_ty}}) OnWriteʷ(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder, ϟw ϟapi.StateWatcher) {{$slice_ty}} {
+  func (s {{$slice_ty}}) OnWriteʷ(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder, ϟw ϟapi.StateWatcher) {{$slice_ty}} {
       return s.OnWrite(ϟctx, ϟc, ϟg, ϟb) // DCE STUB
   }
 
-  func (s {{$slice_ty}}) ReserveMemory(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder) {{$slice_ty}} {
+  func (s {{$slice_ty}}) ReserveMemory(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder) {{$slice_ty}} {
     if ϟb != nil && s.Pool() == ϟmem.ApplicationPool {
       rng := s.Range()
       ϟb.ReserveMemory(ϟmem.Range{Base: s.Root(), Size: uint64(rng.End() - s.Root())})
@@ -1104,7 +1104,7 @@ import (»
 
   {{if not $el_is_void}}
     // Read reads and returns the {{$el_ty}} element at the pointer.
-    func (p {{$ptr_ty}}) Read(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder) ({{$el_ty}}, error) {
+    func (p {{$ptr_ty}}) Read(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder) ({{$el_ty}}, error) {
       ϟa := ϟg.Arena; _ = ϟa
       vals, err := p.Slice(0, 1, ϟg.MemoryLayout).Read(ϟctx, ϟc, ϟg, ϟb)
       if err != nil {
@@ -1113,37 +1113,37 @@ import (»
       return vals[0], nil
     }
 
-    func (p {{$ptr_ty}}) Readʷ(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder, ϟw ϟapi.StateWatcher) ({{$el_ty}}, error) {
+    func (p {{$ptr_ty}}) Readʷ(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder, ϟw ϟapi.StateWatcher) ({{$el_ty}}, error) {
       return p.Read(ϟctx, ϟc, ϟg, ϟb) // DCE STUB
     }
 
     // MustRead calls and returns Read, panicing if there was an error.
-    func (p {{$ptr_ty}}) MustRead(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder) {{$el_ty}} {
+    func (p {{$ptr_ty}}) MustRead(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder) {{$el_ty}} {
       val, err := p.Read(ϟctx, ϟc, ϟg, ϟb)
       panicOnError(err)
       return val
     }
 
-    func (p {{$ptr_ty}}) MustReadʷ(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder, ϟw ϟapi.StateWatcher) {{$el_ty}} {
+    func (p {{$ptr_ty}}) MustReadʷ(ϟctx context.Context, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder, ϟw ϟapi.StateWatcher) {{$el_ty}} {
       return p.MustRead(ϟctx, ϟc, ϟg, ϟb) // DCE STUB
     }
 
     // Write writes value to the {{$el_ty}} element at the pointer.
-    func (p {{$ptr_ty}}) Write(ϟctx context.Context, value {{$el_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder) error {
+    func (p {{$ptr_ty}}) Write(ϟctx context.Context, value {{$el_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder) error {
       _, err := p.Slice(0, 1, ϟg.MemoryLayout).Write(ϟctx, []{{$el_ty}}{value}, ϟc, ϟg, ϟb)
       return err
     }
 
-    func (p {{$ptr_ty}}) Writeʷ(ϟctx context.Context, value {{$el_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder, ϟw ϟapi.StateWatcher) error {
+    func (p {{$ptr_ty}}) Writeʷ(ϟctx context.Context, value {{$el_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder, ϟw ϟapi.StateWatcher) error {
       return p.Write(ϟctx, value, ϟc, ϟg, ϟb) // DCE STUB
     }
 
     // MustWrite calls Write, panicing if there was an error.
-    func (p {{$ptr_ty}}) MustWrite(ϟctx context.Context, value {{$el_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder) {
+    func (p {{$ptr_ty}}) MustWrite(ϟctx context.Context, value {{$el_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder) {
       panicOnError(p.Write(ϟctx, value, ϟc, ϟg, ϟb))
     }
 
-    func (p {{$ptr_ty}}) MustWriteʷ(ϟctx context.Context, value {{$el_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb *builder.Builder, ϟw ϟapi.StateWatcher) {
+    func (p {{$ptr_ty}}) MustWriteʷ(ϟctx context.Context, value {{$el_ty}}, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState, ϟb builder.Builder, ϟw ϟapi.StateWatcher) {
       p.MustWrite(ϟctx, value, ϟc, ϟg, ϟb) // DCE STUB
     }
   {{end}}
@@ -1200,7 +1200,7 @@ import (»
   }
 
   {{if not (GetAnnotation $ "replay_custom_value")}}
-    func (p {{$ptr_ty}}) value(ϟb *builder.Builder, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState) value.Pointer {
+    func (p {{$ptr_ty}}) value(ϟb builder.Builder, ϟc ϟapi.Cmd, ϟg *ϟapi.GlobalState) value.Pointer {
       if p != 0 {
         {{if $el_is_ptr}}
           return value.PointerIndex(uint64(p) / uint64(ϟg.MemoryLayout.GetPointer().GetSize()))
@@ -1589,7 +1589,7 @@ import (»
     Arena  arena.Arena
   }
   ¶
-  func (cb CommandBuilder) Custom(f func(context.Context, *ϟapi.GlobalState, *builder.Builder) error) *replay.Custom {
+  func (cb CommandBuilder) Custom(f func(context.Context, *ϟapi.GlobalState, builder.Builder) error) *replay.Custom {
     return &replay.Custom{T: cb.Thread, F: f}
   }
   ¶

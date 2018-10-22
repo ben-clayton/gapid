@@ -218,7 +218,7 @@ func (m *manager) execute(
 // writes on each command.
 type adapter struct {
 	env     *exec.Env
-	builder *builder.Builder
+	builder builder.Builder
 }
 
 func (w *adapter) State() *api.GlobalState {

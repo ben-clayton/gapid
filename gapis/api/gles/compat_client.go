@@ -198,7 +198,7 @@ func moveClientVBsToVAs(
 	// Apply the memory observations that were made by the draw call now.
 	// We need to do this as the glBufferData calls below will require the data.
 	dID := id.Derived()
-	out.MutateAndWrite(ctx, dID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b *builder.Builder) error {
+	out.MutateAndWrite(ctx, dID, cb.Custom(func(ctx context.Context, s *api.GlobalState, b builder.Builder) error {
 		cmd.Extras().Observations().ApplyReads(s.Memory.ApplicationPool())
 		return nil
 	}))

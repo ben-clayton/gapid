@@ -37,7 +37,7 @@ type externs struct {
 	cmd   api.Cmd
 	cmdID api.CmdID
 	s     *api.GlobalState
-	b     *rb.Builder
+	b     rb.Builder
 	w     api.StateWatcher
 }
 

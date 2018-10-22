@@ -29,11 +29,11 @@ var _ = api.Cmd(Custom{})
 // upon Replay().
 type Custom struct {
 	T uint64 // The thread ID
-	F func(ctx context.Context, s *api.GlobalState, b *builder.Builder) error
+	F func(ctx context.Context, s *api.GlobalState, b builder.Builder) error
 }
 
 func (c Custom) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState,
-	b *builder.Builder, w api.StateWatcher) error {
+	b builder.Builder, w api.StateWatcher) error {
 	if b == nil {
 		return nil
 	}
