@@ -307,7 +307,7 @@ func (m *Module) Ctor(priority int32, cb func(*Builder)) {
 	}, false)
 
 	entries := []llvm.Value{
-		llvm.ConstStruct([]llvm.Value{
+		m.ctx.ConstStruct([]llvm.Value{
 			m.Scalar(priority).llvm,
 			ctor.llvm,
 		}, false),
@@ -461,7 +461,7 @@ func (m *Module) ScalarOfType(v interface{}, ty Type) Const {
 			var ok bool
 			val, ok = m.strings[s]
 			if !ok {
-				arr := llvm.ConstString(s, true)
+				arr := m.ctx.ConstString(s, true)
 				buf := llvm.AddGlobal(m.llvm, arr.Type(), "str")
 				buf.SetInitializer(arr)
 				buf.SetLinkage(llvm.PrivateLinkage)
