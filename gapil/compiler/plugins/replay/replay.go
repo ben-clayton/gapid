@@ -363,6 +363,8 @@ func (r *replayer) value(s *compiler.S, val *codegen.Value, ty semantic.Type) *c
 			r.Fail("Static array parameters of remapped types currently not supported")
 		}
 		return r.addConstant(s, val, ty)
+	case *semantic.Enum:
+		return r.value(s, val, ty.NumberType)
 	}
 	r.Fail("Unhandled type %v", ty.Name())
 	return nil
