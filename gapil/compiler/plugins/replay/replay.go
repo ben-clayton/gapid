@@ -151,7 +151,7 @@ func (r *replayer) Functions() map[string]*codegen.Function {
 func (r *replayer) OnBeginCommand(s *compiler.S, cmd *semantic.Function) {
 	callFunc := r.buildCall(cmd)
 	s.Ctx.Index(0, data, call).Store(s.FuncAddr(callFunc))
-	r.emitLabel(s)
+	r.emitBeginCommand(s)
 }
 
 func (r *replayer) OnFence(s *compiler.S) {
@@ -297,9 +297,9 @@ func (r *replayer) emitCall(s *compiler.S) {
 	s.CallIndirect(callFunc, s.Ctx)
 }
 
-func (r *replayer) emitLabel(s *compiler.S) {
-	cmdID := s.Ctx.Index(0, compiler.ContextCmdID).Load().Cast(r.T.Uint32)
-	r.asmLabel(s, cmdID)
+func (r *replayer) emitBeginCommand(s *compiler.S) {
+	cmdID := s.Ctx.Index(0, compiler.ContextCmdID).Load()
+	r.asmBeginCommand(s, cmdID)
 }
 
 func (r *replayer) reserve(s *compiler.S, slice *codegen.Value, ty *semantic.Slice) {

@@ -274,6 +274,17 @@ void Builder::generate_opcodes() {
     }
 
     switch (gapil_replay_asm_inst(ty)) {
+      case GAPIL_REPLAY_ASM_INST_BEGIN_COMMAND: {
+        gapil_replay_asm_begincommand inst;
+        if (reader.read(&inst)) {
+          DEBUG_PRINT_INST(
+              "GAPIL_REPLAY_ASM_INST_BEGIN_COMMAND(cmd_id: %" PRIu64 ")",
+              inst.cmd_id);
+          auto label = std::min<uint32_t>(0x3ffffff, inst.cmd_id);
+          CX(Opcode::LABEL, label);
+        }
+        break;
+      }
       case GAPIL_REPLAY_ASM_INST_CALL: {
         gapil_replay_asm_call inst;
         if (reader.read(&inst)) {
@@ -381,15 +392,6 @@ void Builder::generate_opcodes() {
           DEBUG_PRINT_INST("GAPIL_REPLAY_ASM_INST_ADD(count: %" PRIu32 ")",
                            inst.count);
           CX(Opcode::RESOURCE, inst.count);
-        }
-        break;
-      }
-      case GAPIL_REPLAY_ASM_INST_LABEL: {
-        gapil_replay_asm_label inst;
-        if (reader.read(&inst)) {
-          DEBUG_PRINT_INST("GAPIL_REPLAY_ASM_INST_LABEL(count: %" PRIu32 ")",
-                           inst.value);
-          CX(Opcode::LABEL, inst.value);
         }
         break;
       }

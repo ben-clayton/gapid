@@ -37,6 +37,7 @@ typedef enum gapil_replay_asm_type_t {
 } gapil_replay_asm_type;
 
 typedef enum gapil_replay_asm_inst_t {
+  GAPIL_REPLAY_ASM_INST_BEGIN_COMMAND,
   GAPIL_REPLAY_ASM_INST_CALL,
   GAPIL_REPLAY_ASM_INST_PUSH,
   GAPIL_REPLAY_ASM_INST_POP,
@@ -48,7 +49,6 @@ typedef enum gapil_replay_asm_inst_t {
   GAPIL_REPLAY_ASM_INST_RESOURCE,
   GAPIL_REPLAY_ASM_INST_POST,
   GAPIL_REPLAY_ASM_INST_ADD,
-  GAPIL_REPLAY_ASM_INST_LABEL,
   GAPIL_REPLAY_ASM_INST_SWITCHTHREAD,
 } gapil_replay_asm_inst;
 
@@ -133,10 +133,11 @@ typedef struct gapil_replay_asm_add_t {
   uint32_t count;
 } gapil_replay_asm_add;
 
-// label is an instruction that holds a marker value, used for debugging.
-typedef struct gapil_replay_asm_label_t {
-  uint32_t value;
-} gapil_replay_asm_label;
+// begincommand is an instruction that starts indicates the start of a new
+// command.
+typedef struct gapil_replay_asm_begincommand_t {
+  uint64_t cmd_id;
+} gapil_replay_asm_begincommand;
 
 // switchthread is an instruction that changes execution to a different thread.
 typedef struct gapil_replay_asm_switchthread_t {
