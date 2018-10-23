@@ -51,14 +51,33 @@ class Buffer {
   // reader returns a reader for this Buffer.
   inline Reader reader();
 
+  // data returns a pointer to the start of the buffer's data.
+  inline void* data() const;
+
+  // size returns the current size of the buffer.
+  inline size_t size() const;
+
   // set_size changes the size of the buffer, increasing the capacity if
   // necessary.
   inline void set_size(size_t size);
+
+  // capacity returns the current capacity of the buffer.
+  inline size_t capacity() const;
+
+  // reserve expands the capacity to hold at least size bytes.
+  inline void reserve(size_t size);
+
+  // appends the specified data end of the buffer, reallocating if the buffer
+  // capacity has been exceeded.
+  inline void append(const void* data, size_t size);
 
   // appends the bytes of T to the end of the buffer, reallocating if the buffer
   // capacity has been exceeded.
   template <typename T>
   inline void append(const T& data);
+
+  // appends size bytes of zero to the end of the buffer.
+  inline void append_zeros(size_t size);
 
   // Writes the bytes of data to the offset in the buffer.
   // Returns true if there was enough space from offset to write a full T,
@@ -103,17 +122,37 @@ bool Buffer::Reader::read(T* out) {
   return true;
 }
 
+void* Buffer::data() const { return buf_.data; }
+
+size_t Buffer::size() const { return buf_.size; }
+
 void Buffer::set_size(size_t size) {
-  if (size > buf_.capacity) {
+  reserve(size);
+  buf_.size = size;
+}
+
+size_t Buffer::capacity() const { return buf_.capacity; }
+
+void Buffer::reserve(size_t size) {
+  if (size > capacity()) {
     gapil_realloc(buf_.arena, buf_.data, size, buf_.alignment);
     buf_.capacity = size;
   }
-  buf_.size = size;
+}
+
+void Buffer::append(const void* data, size_t size) {
+  gapil_append_buffer(&buf_, data, size);
 }
 
 template <typename T>
 void Buffer::append(const T& data) {
   gapil_append_buffer(&buf_, &data, sizeof(data));
+}
+
+void Buffer::append_zeros(size_t n) {
+  reserve(buf_.size + n);
+  memset(buf_.data + buf_.size, 0, n);
+  buf_.size += n;
 }
 
 template <typename T>

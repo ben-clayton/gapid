@@ -160,7 +160,10 @@ func (m *manager) execute(
 
 	var b builder.Builder
 	if useNewBuilder {
-		b = env.ReplayBuilder()
+		b, err = env.ReplayBuilder(ctx)
+		if err != nil {
+			return err
+		}
 	} else {
 		b = builder.New(replayABI.MemoryLayout)
 	}

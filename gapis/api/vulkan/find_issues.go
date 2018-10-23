@@ -305,8 +305,10 @@ func (t *findIssues) Flush(ctx context.Context, out transform.Writer) {
 		// posted the data in question. If we did not do this, we would shut-down the replay as soon as the second-to-last
 		// Post had occurred, which may not be anywhere near the end of the stream.
 		code := uint32(0xe11de11d)
+		eosPtr := b.AllocateTemporaryMemory(4)
 		b.Push(value.U32(code))
-		b.Post(b.Buffer(1), 4, func(r binary.Reader, err error) {
+		b.Store(eosPtr)
+		b.Post(eosPtr, 4, func(r binary.Reader, err error) {
 			for _, res := range t.res {
 				res.Do(func() (interface{}, error) {
 					if err != nil {

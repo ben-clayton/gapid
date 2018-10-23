@@ -65,12 +65,19 @@ func (test test) check(ctx context.Context, cl, rl *device.MemoryLayout) {
 		env.Execute(ctx, api.CmdID(i), c)
 	}
 
-	payload, err := env.BuildReplay(ctx)
-	if assert.For(ctx, "Build").ThatError(err).Succeeded() {
-		got, err := opcode.Disassemble(bytes.NewReader(payload.Opcodes), device.LittleEndian)
-		if assert.For(ctx, "Disassemble").ThatError(err).Succeeded() {
-			assert.For(ctx, "opcodes").ThatSlice(got).Equals(test.expected.opcodes)
-		}
+	b, err := env.ReplayBuilder(ctx)
+	if !assert.For(ctx, "Replay Builder").ThatError(err).Succeeded() {
+		return
+	}
+
+	payload, _, _, err := b.Build(ctx)
+	if !assert.For(ctx, "Build").ThatError(err).Succeeded() {
+		return
+	}
+
+	got, err := opcode.Disassemble(bytes.NewReader(payload.Opcodes), device.LittleEndian)
+	if assert.For(ctx, "Disassemble").ThatError(err).Succeeded() {
+		assert.For(ctx, "opcodes").ThatSlice(got).Equals(test.expected.opcodes)
 	}
 
 	checkResource(ctx, payload.Resources, test.expected.resources)

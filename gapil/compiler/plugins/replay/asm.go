@@ -106,7 +106,7 @@ const (
 )
 
 func (r *replayer) asmWrite(s *compiler.S, v *codegen.Value) {
-	bufPtr := s.Ctx.Index(0, data, stream)
+	bufPtr := s.Ctx.Index(0, data, instructions)
 	r.AppendBufferData(s, bufPtr, s.LocalInit("write", v))
 }
 

@@ -17,6 +17,8 @@
 
 #include "gapil/runtime/cc/runtime.h"
 
+// Enumerator of VM types.
+// Must be kept in sync with the Type enum in replay_protocol.proto.
 typedef enum gapil_replay_asm_type_t {
   GAPIL_REPLAY_ASM_TYPE_BOOL,
   GAPIL_REPLAY_ASM_TYPE_INT8,
@@ -32,8 +34,11 @@ typedef enum gapil_replay_asm_type_t {
   GAPIL_REPLAY_ASM_TYPE_ABSOLUTE_POINTER,
   GAPIL_REPLAY_ASM_TYPE_CONSTANT_POINTER,
   GAPIL_REPLAY_ASM_TYPE_VOLATILE_POINTER,
-  GAPIL_REPLAY_ASM_TYPE_OBSERVED_POINTER_NAMESPACE_0,  // namespaces increment
-                                                       // from here
+  // Start of non-VM types.
+  GAPIL_REPLAY_ASM_TYPE_VOID,
+  GAPIL_REPLAY_ASM_TYPE_ABSOLUTE_STACK_POINTER,
+  GAPIL_REPLAY_ASM_TYPE_OBSERVED_POINTER_NAMESPACE_0,
+  // namespaces increment from here
 } gapil_replay_asm_type;
 
 typedef enum gapil_replay_asm_inst_t {
@@ -50,6 +55,8 @@ typedef enum gapil_replay_asm_inst_t {
   GAPIL_REPLAY_ASM_INST_POST,
   GAPIL_REPLAY_ASM_INST_ADD,
   GAPIL_REPLAY_ASM_INST_SWITCHTHREAD,
+  GAPIL_REPLAY_ASM_INST_MAPMEMORY,
+  GAPIL_REPLAY_ASM_INST_UNMAPMEMORY,
 } gapil_replay_asm_inst;
 
 typedef struct gapil_replay_asm_value_t {
@@ -143,5 +150,23 @@ typedef struct gapil_replay_asm_begincommand_t {
 typedef struct gapil_replay_asm_switchthread_t {
   uint32_t index;
 } gapil_replay_asm_switchthread;
+
+// mapmemory is an instruction that maps the observed pointer address range
+// [src_base, src_base+size) to be remapped to [dst_base, dst_base+size), where
+// dst_base is a pointer that is can be loaded from dst_pp.
+// The observed pointer range must not intersect any other mapped memory ranges.
+// replay-dynamic target address.
+typedef struct gapil_replay_asm_mapmemory_t {
+  uint64_t dst_pp;    // pointer used to load the volatile target pointer.
+  uint64_t src_base;  // remap source range base address.
+  uint64_t size;      // remap source range size in bytes.
+} gapil_replay_asm_mapmemory;
+
+// unmapmemory is an instruction that unregisters the observed memory range
+// mapped with a previous mapmemory instruction.
+typedef struct gapil_replay_asm_unmapmemory_t {
+  uint64_t src_base;  // remap source range base address.
+  uint64_t size;      // remap source range size in bytes.
+} gapil_replay_asm_unmapmemory;
 
 #endif  // __GAPIL_RUNTIME_REPLAY_ASM_H__
